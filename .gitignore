@@ -1,0 +1,38 @@
+# Operating-system files
+.DS_Store
+Thumbs.db
+
+# Editor and IDE state
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Local environment and rsproxy runtime state
+.env
+.env.*
+!.env.example
+/.rsproxy/
+
+# Rust / Cargo outputs
+/target/
+*.rs.bk
+*.profraw
+*.profdata
+
+# Node.js package-manager state
+node_modules/
+.npm/
+.bun/
+npm-debug.log*
+bun-error.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+*.tgz
+
+# Repository-generated reports and packages
+/artifacts/
+/coverage/
+/dist/

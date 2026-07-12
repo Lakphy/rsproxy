@@ -1,0 +1,48 @@
+name: Rules fuzz
+
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rules-fuzz
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+  RSPROXY_FUZZ_RUNS: "0"
+  RSPROXY_FUZZ_SECONDS: "300"
+  RSPROXY_FUZZ_MAX_LEN: "65536"
+
+jobs:
+  parse-resolve:
+    name: Parse and resolve
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Install nightly Rust
+        uses: dtolnay/rust-toolchain@nightly
+      - name: Restore Rust cache
+        uses: Swatinem/rust-cache@v2
+      - name: Install cargo-fuzz
+        run: cargo install cargo-fuzz --version 0.13.2 --locked
+      - name: Replay versioned seeds
+        run: cargo test -p rsproxy-rules --test fuzz_seeds --locked
+      - name: Fuzz parser and resolver
+        run: ./scripts/verify.sh fuzz
+      - name: Preserve crash artifacts
+        if: failure()
+        uses: actions/upload-artifact@v6
+        with:
+          name: parse-resolve-crashes-${{ github.run_id }}
+          path: fuzz/artifacts/parse_resolve
+          if-no-files-found: ignore
+          retention-days: 14

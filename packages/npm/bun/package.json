@@ -1,0 +1,23 @@
+{
+  "name": "@rsproxy/bun",
+  "version": "0.1.0",
+  "description": "Bun launcher for the rsproxy debugging proxy",
+  "license": "MIT",
+  "bin": {
+    "rsproxy": "bin/rsproxy.js"
+  },
+  "files": [
+    "bin",
+    "README.md",
+    "LICENSE"
+  ],
+  "dependencies": {
+    "@rsproxy/runtime": "0.1.0"
+  },
+  "engines": {
+    "bun": ">=1.1"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

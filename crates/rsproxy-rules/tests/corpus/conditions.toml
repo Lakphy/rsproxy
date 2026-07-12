@@ -1,0 +1,250 @@
+[[case]]
+id = "condition-method-falls-through"
+spec = true
+rules = "example.test status(201) when method(POST)\nexample.test status(202)"
+expect_actions = ["status"]
+expect_rules = ["default:2"]
+[case.request]
+method = "GET"
+url = "http://example.test/"
+
+[[case]]
+id = "condition-host-glob"
+spec = true
+rules = "example.test status(203) when host(**.example.test)"
+expect_actions = ["status"]
+expect_rules = ["default:1"]
+[case.request]
+url = "http://example.test/"
+
+[[case]]
+id = "condition-url-regex"
+spec = true
+rules = "example.test status(204) when url(/mode=debug/)"
+expect_actions = ["status"]
+expect_rules = ["default:1"]
+[case.request]
+url = "http://example.test/api?mode=debug"
+
+[[case]]
+id = "condition-header-contains"
+spec = true
+rules = "example.test status(205) when header(content-type ~ json)"
+expect_actions = ["status"]
+expect_rules = ["default:1"]
+[case.request]
+url = "http://example.test/"
+headers = [["Content-Type", "application/json; charset=utf-8"]]
+
+[[case]]
+id = "condition-negated-header-presence"
+spec = true
+rules = "example.test status(206) when !header(authorization)"
+expect_actions = ["status"]
+expect_rules = ["default:1"]
+[case.request]
+url = "http://example.test/"
+
+[[case]]
+id = "condition-body-substring"
+spec = true
+rules = "example.test status(207) when body(~ beta-token)"
+expect_actions = ["status"]
+expect_rules = ["default:1"]
+[case.request]
+method = "POST"
+url = "http://example.test/"
+body = "mode=beta-token"
+
+[[case]]
+id = "condition-body-regex"
+spec = true
+rules = "example.test status(208) when body(/token=\\d+/)"
+expect_actions = ["status"]
+expect_rules = ["default:1"]
+[case.request]
+method = "POST"
+url = "http://example.test/"
+body = "token=42"
+
+[[case]]
+id = "condition-client-ip-glob"
+spec = true
+rules = "example.test status(209) when clientIp(203.0.113.*)"
+expect_actions = ["status"]
+expect_rules = ["default:1"]
+[case.request]
+url = "http://example.test/"
+client_ip = "203.0.113.9:54321"
+
+[[case]]
+id = "condition-server-ip"
+spec = true
+rules = "example.test status(210) when serverIp(198.51.100.4)"
+expect_actions = ["status"]
+expect_rules = ["default:1"]
+[case.request]
+url = "http://example.test/"
+server_ip = "198.51.100.4"
+
+[[case]]
+id = "condition-response-status"
+spec = true
+rules = "example.test res.status(211) when status(204)\nexample.test res.status(212)"
+expect_actions = ["res.status"]
+expect_rules = ["default:1"]
+[case.request]
+url = "http://example.test/"
+[case.response]
+status = 204
+
+[[case]]
+id = "condition-response-header"
+spec = true
+rules = "example.test res.status(213) when res.header(x-mode ~ beta)\nexample.test res.status(214)"
+expect_actions = ["res.status"]
+expect_rules = ["default:1"]
+[case.request]
+url = "http://example.test/"
+[case.response]
+status = 200
+headers = [["X-Mode", "beta-release"]]
+
+[[case]]
+id = "condition-any"
+spec = true
+rules = "example.test status(215) when any(method(POST), header(x-mode ~ beta))"
+expect_actions = ["status"]
+expect_rules = ["default:1"]
+[case.request]
+url = "http://example.test/"
+headers = [["X-Mode", "beta"]]
+
+[[case]]
+id = "condition-chance-zero-falls-through"
+rules = "example.test status(216) when chance(0)\nexample.test status(217)"
+expect_actions = ["status"]
+expect_rules = ["default:2"]
+[case.request]
+url = "http://example.test/"
+
+[[case]]
+id = "condition-multiple-when-are-and"
+rules = "example.test status(218) when method(POST) when header(x-mode ~ beta)\nexample.test status(219)"
+expect_actions = ["status"]
+expect_rules = ["default:2"]
+[case.request]
+method = "POST"
+url = "http://example.test/"
+headers = [["X-Mode", "prod"]]
+
+[[case]]
+id = "condition-method-list-is-case-insensitive"
+rules = "example.test status(220) when method(get, POST)"
+expect_actions = ["status"]
+expect_rules = ["default:1"]
+[case.request]
+method = "GET"
+url = "http://example.test/"
+
+[[case]]
+id = "condition-header-presence"
+spec = true
+rules = "example.test status(221) when header(x-present)"
+expect_actions = ["status"]
+expect_rules = ["default:1"]
+[case.request]
+url = "http://example.test/"
+headers = [["X-Present", ""]]
+
+[[case]]
+id = "condition-url-glob"
+rules = "example.test status(222) when url(*mode=debug*)"
+expect_actions = ["status"]
+expect_rules = ["default:1"]
+[case.request]
+url = "http://example.test/api?mode=debug&x=1"
+
+[[case]]
+id = "condition-ip-alias-matches-one-of-many"
+rules = "example.test status(223) when ip(192.0.2.*, 203.0.113.*)"
+expect_actions = ["status"]
+expect_rules = ["default:1"]
+[case.request]
+url = "http://example.test/"
+client_ip = "203.0.113.9"
+
+[[case]]
+id = "condition-response-header-presence"
+spec = true
+rules = "example.test res.status(224) when res.header(x-present)"
+expect_actions = ["res.status"]
+expect_rules = ["default:1"]
+[case.request]
+url = "http://example.test/"
+[case.response]
+status = 200
+headers = [["X-Present", "yes"]]
+
+[[case]]
+id = "condition-response-status-list"
+rules = "example.test res.status(225) when status(201, 204)"
+expect_actions = ["res.status"]
+expect_rules = ["default:1"]
+[case.request]
+url = "http://example.test/"
+[case.response]
+status = 204
+
+[[case]]
+id = "condition-chance-one-always-matches"
+spec = true
+rules = "example.test status(226) when chance(1)"
+expect_actions = ["status"]
+expect_rules = ["default:1"]
+[case.request]
+url = "http://example.test/"
+
+[[case]]
+id = "condition-nested-any-and-negation"
+rules = "example.test status(227) when !any(method(POST), header(x-blocked))"
+expect_actions = ["status"]
+expect_rules = ["default:1"]
+[case.request]
+method = "GET"
+url = "http://example.test/"
+
+[[case]]
+id = "condition-env-missing-falls-through"
+spec = true
+rules = "example.test status(228) when env(RSPROXY_CORPUS_VARIABLE_THAT_MUST_NOT_EXIST)\nexample.test status(229)"
+expect_actions = ["status"]
+expect_rules = ["default:2"]
+[case.request]
+url = "http://example.test/"
+
+[[case]]
+id = "condition-negated-response-status-defers-before-response"
+rules = "example.test req.header(x-too-early: no) when !status(500)"
+expect_actions = []
+expect_rules = []
+[case.request]
+url = "http://example.test/"
+
+[[case]]
+id = "condition-negated-response-status-matches-after-response"
+rules = "example.test res.header(x-after: yes) when !status(500)"
+expect_actions = ["res.header"]
+expect_rules = ["default:1"]
+[case.request]
+url = "http://example.test/"
+[case.response]
+status = 200
+
+[[case]]
+id = "condition-negated-response-header-defers-before-response"
+rules = "example.test req.header(x-too-early: no) when !res.header(x-blocked)"
+expect_actions = []
+expect_rules = []
+[case.request]
+url = "http://example.test/"

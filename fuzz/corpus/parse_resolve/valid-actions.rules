@@ -1,0 +1,3 @@
+example.test req.header(x-fuzz: ${id}) url.query(mode=${method}) tag(seed:${path})
+example.test res.header(x-status: ${statusCode}) res.body.replace(/raw/i, rendered)
+example.test delete(pathname.0, urlParams.secret, reqHeaders.x-old, resCookies.sid, trailer.x-old)

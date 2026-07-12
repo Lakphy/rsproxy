@@ -1,0 +1,464 @@
+[[mapping]]
+id = "host"
+whistle = ["host", "hosts", "xhost"]
+sources = ["docs/docs/rules/host.md", "lib/rules/protocols.js"]
+rsproxy = "example.test host(127.0.0.1:8080)"
+expect_actions = ["host"]
+
+[[mapping]]
+id = "upstream"
+whistle = ["proxy", "http-proxy", "https-proxy", "socks"]
+sources = ["docs/docs/rules/proxy.md", "docs/docs/rules/https-proxy.md", "docs/docs/rules/socks.md", "lib/rules/protocols.js"]
+rsproxy = "example.test upstream(proxy://127.0.0.1:8080)"
+expect_actions = ["upstream"]
+
+[[mapping]]
+id = "direct"
+whistle = ["forward"]
+sources = ["test/units/forward.test.js"]
+rsproxy = "example.test direct"
+expect_actions = ["direct"]
+
+[[mapping]]
+id = "mock"
+whistle = ["file", "rawfile"]
+sources = ["docs/docs/rules/file.md", "docs/docs/rules/rawfile.md"]
+rsproxy = 'example.test mock("fixture")'
+expect_actions = ["mock"]
+
+[[mapping]]
+id = "status"
+whistle = ["statusCode", "status"]
+sources = ["docs/docs/rules/statusCode.md", "lib/rules/protocols.js"]
+rsproxy = "example.test status(410)"
+expect_actions = ["status"]
+
+[[mapping]]
+id = "redirect"
+whistle = ["redirect"]
+sources = ["docs/docs/rules/redirect.md"]
+rsproxy = "example.test redirect(https://new.example.test, 302)"
+expect_actions = ["redirect"]
+
+[[mapping]]
+id = "req-header"
+whistle = ["reqHeaders", "headerReplace"]
+sources = ["docs/docs/rules/reqHeaders.md", "docs/docs/rules/headerReplace.md"]
+rsproxy = "example.test req.header(x-value: migrated)"
+expect_actions = ["req.header"]
+
+[[mapping]]
+id = "res-header"
+whistle = ["resHeaders", "headerReplace", "responseFor"]
+sources = ["docs/docs/rules/resHeaders.md", "docs/docs/rules/headerReplace.md", "docs/docs/rules/responseFor.md"]
+rsproxy = "example.test res.header(x-value: migrated)"
+expect_actions = ["res.header"]
+
+[[mapping]]
+id = "res-status"
+whistle = ["replaceStatus"]
+sources = ["docs/docs/rules/replaceStatus.md"]
+rsproxy = "example.test res.status(299)"
+expect_actions = ["res.status"]
+
+[[mapping]]
+id = "req-method"
+whistle = ["method"]
+sources = ["docs/docs/rules/method.md"]
+rsproxy = "example.test req.method(POST)"
+expect_actions = ["req.method"]
+
+[[mapping]]
+id = "req-cookie"
+whistle = ["reqCookies"]
+sources = ["docs/docs/rules/reqCookies.md"]
+rsproxy = "example.test req.cookie(sid=migrated)"
+expect_actions = ["req.cookie"]
+
+[[mapping]]
+id = "res-cookie"
+whistle = ["resCookies"]
+sources = ["docs/docs/rules/resCookies.md"]
+rsproxy = "example.test res.cookie(sid=migrated; Path=/)"
+expect_actions = ["res.cookie"]
+
+[[mapping]]
+id = "req-ua"
+whistle = ["ua"]
+sources = ["docs/docs/rules/ua.md"]
+rsproxy = "example.test req.ua(migrated-agent)"
+expect_actions = ["req.ua"]
+
+[[mapping]]
+id = "req-referer"
+whistle = ["referer"]
+sources = ["docs/docs/rules/referer.md"]
+rsproxy = "example.test req.referer(https://ref.example.test/)"
+expect_actions = ["req.referer"]
+
+[[mapping]]
+id = "req-auth"
+whistle = ["auth"]
+sources = ["docs/docs/rules/auth.md"]
+rsproxy = "example.test req.auth(user:pass)"
+expect_actions = ["req.auth"]
+
+[[mapping]]
+id = "req-forwarded"
+whistle = ["forwardedFor"]
+sources = ["docs/docs/rules/forwardedFor.md"]
+rsproxy = "example.test req.forwarded(${clientIp})"
+expect_actions = ["req.forwarded"]
+
+[[mapping]]
+id = "req-type"
+whistle = ["reqType"]
+sources = ["docs/docs/rules/reqType.md"]
+rsproxy = "example.test req.type(application/json)"
+expect_actions = ["req.type"]
+
+[[mapping]]
+id = "req-charset"
+whistle = ["reqCharset"]
+sources = ["docs/docs/rules/reqCharset.md"]
+rsproxy = "example.test req.charset(utf-8)"
+expect_actions = ["req.charset"]
+
+[[mapping]]
+id = "res-cors"
+whistle = ["resCors"]
+sources = ["docs/docs/rules/resCors.md"]
+rsproxy = "example.test res.cors(*)"
+expect_actions = ["res.cors"]
+
+[[mapping]]
+id = "res-type"
+whistle = ["resType"]
+sources = ["docs/docs/rules/resType.md"]
+rsproxy = "example.test res.type(application/json)"
+expect_actions = ["res.type"]
+
+[[mapping]]
+id = "res-charset"
+whistle = ["resCharset"]
+sources = ["docs/docs/rules/resCharset.md"]
+rsproxy = "example.test res.charset(utf-8)"
+expect_actions = ["res.charset"]
+
+[[mapping]]
+id = "res-merge"
+whistle = ["resMerge"]
+sources = ["docs/docs/rules/resMerge.md"]
+rsproxy = 'example.test res.merge({"migrated":true})'
+expect_actions = ["res.merge"]
+
+[[mapping]]
+id = "res-trailer"
+whistle = ["trailers"]
+sources = ["docs/docs/rules/trailers.md"]
+rsproxy = "example.test res.trailer(x-migrated: yes)"
+expect_actions = ["res.trailer"]
+
+[[mapping]]
+id = "attachment"
+whistle = ["attachment", "download"]
+sources = ["docs/docs/rules/attachment.md", "lib/rules/protocols.js"]
+rsproxy = "example.test attachment(report.txt)"
+expect_actions = ["attachment"]
+
+[[mapping]]
+id = "cache"
+whistle = ["cache"]
+sources = ["docs/docs/rules/cache.md"]
+rsproxy = "example.test cache(public, max-age=60)"
+expect_actions = ["cache"]
+
+[[mapping]]
+id = "tls"
+whistle = ["cipher", "tlsOptions"]
+sources = ["docs/docs/rules/cipher.md", "lib/rules/protocols.js"]
+rsproxy = "example.test tls(min=1.2, ciphers=TLS_AES_128_GCM_SHA256)"
+expect_actions = ["tls"]
+
+[[mapping]]
+id = "url-rewrite"
+whistle = ["urlReplace", "pathReplace"]
+sources = ["docs/docs/rules/pathReplace.md", "lib/rules/protocols.js"]
+rsproxy = "example.test url.rewrite(/items, /v2/items)"
+expect_actions = ["url.rewrite"]
+
+[[mapping]]
+id = "url-query"
+whistle = ["urlParams", "params", "reqMerge"]
+sources = ["docs/docs/rules/urlParams.md", "lib/rules/protocols.js"]
+rsproxy = "example.test url.query(migrated=yes)"
+expect_actions = ["url.query"]
+
+[[mapping]]
+id = "req-body-set"
+whistle = ["reqBody"]
+sources = ["docs/docs/rules/reqBody.md"]
+rsproxy = 'example.test req.body.set("migrated")'
+expect_actions = ["req.body.set"]
+
+[[mapping]]
+id = "req-body-prepend"
+whistle = ["reqPrepend"]
+sources = ["docs/docs/rules/reqPrepend.md"]
+rsproxy = 'example.test req.body.prepend("before-")'
+expect_actions = ["req.body.prepend"]
+
+[[mapping]]
+id = "req-body-append"
+whistle = ["reqAppend"]
+sources = ["docs/docs/rules/reqAppend.md"]
+rsproxy = 'example.test req.body.append("-after")'
+expect_actions = ["req.body.append"]
+
+[[mapping]]
+id = "req-body-replace"
+whistle = ["reqReplace"]
+sources = ["docs/docs/rules/reqReplace.md"]
+rsproxy = "example.test req.body.replace(/item-(\\d+)/, migrated-$1)"
+expect_actions = ["req.body.replace"]
+
+[[mapping]]
+id = "delete"
+whistle = ["delete"]
+sources = ["docs/docs/rules/delete.md", "lib/rules/protocols.js"]
+rsproxy = "example.test delete(pathname.0, urlParams.secret, reqHeaders.x-old, resHeaders.x-old, reqCookies.sid, resCookies.sid, reqBody, resBody, reqType, resCharset, trailer.x-old)"
+expect_actions = ["delete"]
+
+[[mapping]]
+id = "res-body-set"
+whistle = ["resBody"]
+sources = ["docs/docs/rules/resBody.md"]
+rsproxy = 'example.test res.body.set("migrated")'
+expect_actions = ["res.body.set"]
+
+[[mapping]]
+id = "res-body-prepend"
+whistle = ["resPrepend"]
+sources = ["docs/docs/rules/resPrepend.md"]
+rsproxy = 'example.test res.body.prepend("before-")'
+expect_actions = ["res.body.prepend"]
+
+[[mapping]]
+id = "res-body-append"
+whistle = ["resAppend"]
+sources = ["docs/docs/rules/resAppend.md"]
+rsproxy = 'example.test res.body.append("-after")'
+expect_actions = ["res.body.append"]
+
+[[mapping]]
+id = "res-body-replace"
+whistle = ["resReplace"]
+sources = ["docs/docs/rules/resReplace.md"]
+rsproxy = "example.test res.body.replace(/item-(\\d+)/, migrated-$1)"
+expect_actions = ["res.body.replace"]
+
+[[mapping]]
+id = "inject"
+whistle = ["htmlAppend", "htmlBody", "htmlPrepend", "jsAppend", "jsBody", "jsPrepend", "cssAppend", "cssBody", "cssPrepend", "html", "js", "css"]
+sources = ["docs/docs/rules/htmlAppend.md", "docs/docs/rules/htmlBody.md", "docs/docs/rules/htmlPrepend.md", "docs/docs/rules/jsAppend.md", "docs/docs/rules/jsBody.md", "docs/docs/rules/jsPrepend.md", "docs/docs/rules/cssAppend.md", "docs/docs/rules/cssBody.md", "docs/docs/rules/cssPrepend.md", "lib/rules/protocols.js"]
+rsproxy = 'example.test inject(html, "<!-- migrated -->", append)'
+expect_actions = ["inject"]
+
+[[mapping]]
+id = "delay-request"
+whistle = ["reqDelay"]
+sources = ["docs/docs/rules/reqDelay.md"]
+rsproxy = "example.test delay(req, 5ms)"
+expect_actions = ["delay.req"]
+
+[[mapping]]
+id = "delay-response"
+whistle = ["resDelay"]
+sources = ["docs/docs/rules/resDelay.md"]
+rsproxy = "example.test delay(res, 5ms)"
+expect_actions = ["delay.res"]
+
+[[mapping]]
+id = "throttle-request"
+whistle = ["reqSpeed"]
+sources = ["docs/docs/rules/reqSpeed.md"]
+rsproxy = "example.test throttle(req, 1KB/s)"
+expect_actions = ["throttle.req"]
+
+[[mapping]]
+id = "throttle-response"
+whistle = ["resSpeed"]
+sources = ["docs/docs/rules/resSpeed.md"]
+rsproxy = "example.test throttle(res, 1KB/s)"
+expect_actions = ["throttle.res"]
+
+[[mapping]]
+id = "bypass"
+whistle = ["disable", "capture"]
+sources = ["docs/docs/rules/disable.md"]
+rsproxy = "example.test bypass"
+expect_actions = ["bypass"]
+
+[[mapping]]
+id = "hide"
+whistle = ["enable", "hide"]
+sources = ["docs/docs/rules/enable.md"]
+rsproxy = "example.test hide"
+expect_actions = ["hide"]
+
+[[mapping]]
+id = "tag"
+whistle = ["G", "P"]
+sources = ["lib/rules/protocols.js"]
+rsproxy = "example.test tag(migrated)"
+expect_actions = ["tag"]
+
+[[mapping]]
+id = "skip"
+whistle = ["skip", "ignore"]
+sources = ["docs/docs/rules/skip.md", "docs/docs/rules/ignore.md"]
+rsproxy = "example.test skip(res.header)"
+expect_actions = ["skip"]
+
+[[syntax_mapping]]
+id = "rule-line"
+whistle = ["rule"]
+sources = ["docs/docs/rules/rule.md", "lib/rules/protocols.js"]
+rsproxy = "example.test status(208)"
+expect_actions = ["status"]
+
+[[syntax_mapping]]
+id = "include-filter"
+whistle = ["filter", "includeFilter"]
+sources = ["docs/docs/rules/filters.md", "lib/rules/protocols.js"]
+rsproxy = "example.test status(208) when method(GET)"
+expect_actions = ["status"]
+
+[[syntax_mapping]]
+id = "exclude-filter"
+whistle = ["excludeFilter"]
+sources = ["docs/docs/rules/filters.md", "lib/rules/protocols.js"]
+rsproxy = "example.test status(208) when !method(POST)"
+expect_actions = ["status"]
+
+[[unsupported]]
+capability = "pipe"
+status = "deferred-v2"
+source = "docs/docs/rules/pipe.md"
+reason = "Requires an extension/process protocol and is outside the v1 static action model."
+
+[[unsupported]]
+capability = "https2http-proxy"
+status = "deferred-v2"
+source = "lib/rules/protocols.js"
+reason = "Scheme-converting proxy hops are outside the v1 upstream route contract."
+
+[[unsupported]]
+capability = "http2https-proxy"
+status = "deferred-v2"
+source = "lib/rules/protocols.js"
+reason = "Scheme-converting proxy hops are outside the v1 upstream route contract."
+
+[[unsupported]]
+capability = "internal-proxy"
+status = "deferred-v2"
+source = "lib/rules/protocols.js"
+reason = "Whistle-internal plaintext proxy chaining has no portable v1 equivalent."
+
+[[unsupported]]
+capability = "xhttp-proxy"
+status = "deferred-v2"
+source = "lib/rules/protocols.js"
+reason = "Transparent xproxy failure semantics are not part of the v1 route model."
+
+[[unsupported]]
+capability = "plugin"
+status = "deferred-v2"
+source = "lib/rules/protocols.js"
+reason = "Plugin execution requires the future extension boundary."
+
+[[unsupported]]
+capability = "rulesFile"
+aliases = ["ruleFile", "ruleScript", "rulesScript", "reqScript", "reqRules"]
+status = "deferred-v2"
+source = "lib/rules/protocols.js"
+reason = "Request-time script and dynamic rule generation require a sandboxed extension model."
+
+[[unsupported]]
+capability = "resScript"
+aliases = ["resRules"]
+status = "deferred-v2"
+source = "lib/rules/protocols.js"
+reason = "Response-time script rule generation requires a sandboxed extension model."
+
+[[unsupported]]
+capability = "frameScript"
+status = "deferred-v2"
+source = "lib/rules/protocols.js"
+reason = "Programmable frame scripts require the future extension boundary."
+
+[[unsupported]]
+capability = "sniCallback"
+status = "deferred-v2"
+source = "docs/docs/rules/sniCallback.md"
+reason = "Dynamic SNI callbacks require the future extension boundary."
+
+[[unsupported]]
+capability = "tpl"
+status = "deferred-v2"
+source = "docs/docs/rules/tpl.md"
+reason = "General template engines are intentionally deferred beyond v1 mock interpolation."
+
+[[unsupported]]
+capability = "reqWrite"
+status = "deferred-v2"
+source = "docs/docs/rules/reqWrite.md"
+reason = "Request capture-to-file has separate security and lifecycle requirements."
+
+[[unsupported]]
+capability = "reqWriteRaw"
+status = "deferred-v2"
+source = "lib/rules/protocols.js"
+reason = "Raw request capture-to-file has separate security and lifecycle requirements."
+
+[[unsupported]]
+capability = "resWrite"
+status = "deferred-v2"
+source = "docs/docs/rules/resWrite.md"
+reason = "Response capture-to-file has separate security and lifecycle requirements."
+
+[[unsupported]]
+capability = "resWriteRaw"
+status = "deferred-v2"
+source = "lib/rules/protocols.js"
+reason = "Raw response capture-to-file has separate security and lifecycle requirements."
+
+[[unsupported]]
+capability = "reqCors"
+status = "deferred-v2"
+source = "docs/docs/rules/reqCors.md"
+reason = "v1 exposes response CORS only; request CORS mutation remains explicit backlog."
+
+[[unsupported]]
+capability = "pac"
+status = "deferred-v2"
+source = "docs/docs/rules/pac.md"
+reason = "PAC evaluation is not part of the v1 upstream route contract."
+
+[[unsupported]]
+capability = "style"
+status = "deferred-v2"
+source = "docs/docs/rules/style.md"
+reason = "UI styling has no data-plane action equivalent."
+
+[[unsupported]]
+capability = "log"
+status = "removed-v1"
+source = "docs/docs/rules/log.md"
+reason = "Script-like remote logging is replaced by structured trace output."
+
+[[unsupported]]
+capability = "weinre"
+status = "removed-v1"
+source = "docs/docs/rules/weinre.md"
+reason = "Embedded remote-debug tooling is intentionally excluded from rsproxy v1."

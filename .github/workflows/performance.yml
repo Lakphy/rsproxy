@@ -1,0 +1,78 @@
+name: Performance
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  schedule:
+    - cron: "41 2 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: criterion-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  criterion:
+    name: Criterion targets and regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check out source and comparison history
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Restore Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: criterion
+      - name: Resolve comparison commit
+        id: comparison
+        shell: bash
+        run: |
+          case "$GITHUB_EVENT_NAME" in
+            pull_request) base=$(jq -r '.pull_request.base.sha' "$GITHUB_EVENT_PATH") ;;
+            push) base=$(jq -r '.before' "$GITHUB_EVENT_PATH") ;;
+            *) base=$(git rev-parse HEAD^ 2>/dev/null || true) ;;
+          esac
+          if [[ -n "$base" ]] && [[ "$base" != 0000000000000000000000000000000000000000 ]] \
+            && git cat-file -e "$base^{commit}" \
+            && git show "$base:benches/criterion/run.sh" >/dev/null 2>&1; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+            echo "sha=$base" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Benchmark comparison commit
+        if: steps.comparison.outputs.enabled == 'true'
+        shell: bash
+        run: |
+          base="$RUNNER_TEMP/rsproxy-criterion-base"
+          git worktree add --detach "$base" "${{ steps.comparison.outputs.sha }}"
+          CARGO_TARGET_DIR="$RUNNER_TEMP/criterion-base-target" \
+          RSPROXY_CRITERION_DIR="$RUNNER_TEMP/criterion-base-target/criterion" \
+            "$base/benches/criterion/run.sh" "$RUNNER_TEMP/criterion-base.json"
+      - name: Benchmark current commit
+        run: benches/criterion/run.sh target/performance/criterion.json
+      - name: Enforce absolute Criterion targets
+        run: scripts/targets.sh criterion target/performance/criterion.json
+      - name: Block regressions above ten percent
+        if: steps.comparison.outputs.enabled == 'true'
+        run: scripts/targets.sh regression "$RUNNER_TEMP/criterion-base.json" target/performance/criterion.json 10
+      - name: Upload Criterion report
+        uses: actions/upload-artifact@v6
+        with:
+          name: criterion-${{ github.run_id }}
+          path: target/performance/criterion.json
+          if-no-files-found: error
+          retention-days: 30

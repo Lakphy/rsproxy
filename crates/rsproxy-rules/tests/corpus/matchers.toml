@@ -1,0 +1,213 @@
+[[case]]
+id = "matcher-domain-exact"
+spec = true
+rules = "example.test status(201)"
+expect_actions = ["status"]
+expect_rules = ["default:1"]
+expect_explain = ["default:1 status(201)"]
+[case.request]
+url = "http://example.test/"
+
+[[case]]
+id = "matcher-domain-excludes-subdomain"
+rules = "example.test status(201)"
+expect_actions = []
+expect_rules = []
+[case.request]
+url = "http://a.example.test/"
+
+[[case]]
+id = "matcher-one-label-subdomain"
+spec = true
+rules = "*.example.test status(202)"
+expect_actions = ["status"]
+expect_rules = ["default:1"]
+[case.request]
+url = "http://a.example.test/"
+
+[[case]]
+id = "matcher-one-label-rejects-nested"
+rules = "*.example.test status(202)"
+expect_actions = []
+expect_rules = []
+[case.request]
+url = "http://a.b.example.test/"
+
+[[case]]
+id = "matcher-suffix-includes-root"
+spec = true
+rules = "**.example.test status(203)"
+expect_actions = ["status"]
+expect_rules = ["default:1"]
+[case.request]
+url = "https://example.test/"
+
+[[case]]
+id = "matcher-suffix-includes-deep-subdomain"
+rules = "**.example.test status(203)"
+expect_actions = ["status"]
+expect_rules = ["default:1"]
+[case.request]
+url = "https://a.b.example.test/path"
+
+[[case]]
+id = "matcher-path-prefix-boundary"
+spec = true
+rules = "example.test/api status(204)"
+expect_actions = ["status"]
+expect_rules = ["default:1"]
+[case.request]
+url = "http://example.test/api/v1"
+
+[[case]]
+id = "matcher-path-prefix-rejects-partial-segment"
+rules = "example.test/api status(204)"
+expect_actions = []
+expect_rules = []
+[case.request]
+url = "http://example.test/apix"
+
+[[case]]
+id = "matcher-exact-without-query-allows-query"
+spec = true
+rules = "=http://example.test/api status(205)"
+expect_actions = ["status"]
+expect_rules = ["default:1"]
+[case.request]
+url = "http://example.test/api?mode=debug"
+
+[[case]]
+id = "matcher-exact-query-mismatch"
+rules = "=http://example.test/api?mode=debug status(205)"
+expect_actions = []
+expect_rules = []
+[case.request]
+url = "http://example.test/api?mode=prod"
+
+[[case]]
+id = "matcher-double-star-crosses-path-segments"
+spec = true
+rules = "example.test/api/** status(206)"
+expect_actions = ["status"]
+expect_rules = ["default:1"]
+[case.request]
+url = "http://example.test/api/a/b"
+
+[[case]]
+id = "matcher-scheme-mismatch"
+rules = "https://example.test status(207)"
+expect_actions = []
+expect_rules = []
+[case.request]
+url = "http://example.test/"
+
+[[case]]
+id = "matcher-effective-default-port"
+spec = true
+rules = "example.test:80 status(208)"
+expect_actions = ["status"]
+expect_rules = ["default:1"]
+[case.request]
+url = "http://example.test/"
+
+[[case]]
+id = "matcher-port-only"
+spec = true
+rules = ":8443 status(209)"
+expect_actions = ["status"]
+expect_rules = ["default:1"]
+[case.request]
+url = "https://service.test:8443/"
+
+[[case]]
+id = "matcher-ipv6-literal"
+rules = "[::1]:8080 status(210)"
+expect_actions = ["status"]
+expect_rules = ["default:1"]
+[case.request]
+url = "http://[::1]:8080/"
+
+[[case]]
+id = "matcher-punycode-domain"
+rules = "xn--bcher-kva.example status(211)"
+expect_actions = ["status"]
+expect_rules = ["default:1"]
+[case.request]
+url = "http://xn--bcher-kva.example/"
+
+[[case]]
+id = "matcher-regex-named-capture"
+spec = true
+rules = "/users\\/(?P<uid>\\d+)/ req.header(x-user: ${uid})"
+expect_actions = ["req.header"]
+expect_rules = ["default:1"]
+expect_explain = ["default:1 req.header(x-user: 42)"]
+[case.request]
+url = "http://example.test/users/42"
+
+[[case]]
+id = "matcher-negation-matches-outside-inner-domain"
+spec = true
+rules = "!private.example.test status(212)"
+expect_actions = ["status"]
+expect_rules = ["default:1"]
+[case.request]
+url = "http://public.example.test/"
+
+[[case]]
+id = "matcher-negation-rejects-inner-domain"
+rules = "!private.example.test status(212)"
+expect_actions = []
+expect_rules = []
+[case.request]
+url = "http://private.example.test/"
+
+[[case]]
+id = "matcher-single-star-stays-in-one-path-segment"
+rules = "example.test/api/*/item status(213)"
+expect_actions = ["status"]
+expect_rules = ["default:1"]
+[case.request]
+url = "http://example.test/api/one/item"
+
+[[case]]
+id = "matcher-single-star-rejects-cross-segment-path"
+rules = "example.test/api/*/item status(213)"
+expect_actions = []
+expect_rules = []
+[case.request]
+url = "http://example.test/api/one/two/item"
+
+[[case]]
+id = "matcher-query-glob-matches-each-component"
+rules = "example.test/search?mode=*&page=* status(214)"
+expect_actions = ["status"]
+expect_rules = ["default:1"]
+[case.request]
+url = "http://example.test/search?mode=debug&page=2"
+
+[[case]]
+id = "matcher-scheme-positive"
+spec = true
+rules = "https://example.test status(215)"
+expect_actions = ["status"]
+expect_rules = ["default:1"]
+[case.request]
+url = "https://example.test/"
+
+[[case]]
+id = "matcher-exact-default-port-equivalence"
+rules = "=http://example.test:80/api status(216)"
+expect_actions = ["status"]
+expect_rules = ["default:1"]
+[case.request]
+url = "http://example.test/api"
+
+[[case]]
+id = "matcher-regex-case-insensitive-numbered-capture"
+rules = '/\/ITEMS\/(\d+)/i req.header(x-item: $1)'
+expect_actions = ["req.header"]
+expect_rules = ["default:1"]
+expect_explain = ["default:1 req.header(x-item: 42)"]
+[case.request]
+url = "http://example.test/items/42"

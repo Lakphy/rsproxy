@@ -1,0 +1,2 @@
+**.example.test/api/** status(202) when method(GET, POST) when !header(authorization)
+example.test status(404) when any(url(*missing*), status(404))

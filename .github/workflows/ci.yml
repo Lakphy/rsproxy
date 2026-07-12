@@ -1,0 +1,114 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: "1"
+
+jobs:
+  workspace:
+    name: Workspace (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+          - windows-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Restore Rust cache
+        uses: Swatinem/rust-cache@v2
+      - name: Check all targets
+        run: cargo check --workspace --all-targets --locked
+      - name: Test all targets
+        run: cargo test --workspace --all-targets --no-fail-fast --locked
+      - name: Build release binaries
+        run: cargo build --release --workspace --locked
+
+  repository-contracts:
+    name: Repository contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Install stable Rust with quality tools
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - name: Install Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+      - name: Install Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.11
+      - name: Restore Rust cache
+        uses: Swatinem/rust-cache@v2
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+      - name: Run Clippy
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - name: Check repository structure
+        run: ./scripts/check.sh all
+      - name: Check shell syntax
+        run: find scripts benches -type f -name '*.sh' -exec sh -n {} \;
+      - name: Check fuzz target
+        run: cargo check --manifest-path fuzz/Cargo.toml --bin parse_resolve --locked
+      - name: Run protocol matrix
+        run: ./scripts/verify.sh matrix
+      - name: Run action contracts
+        run: ./scripts/verify.sh actions
+      - name: Run distribution and quality-gate contracts
+        run: |
+          ./scripts/verify.sh package
+          ./scripts/verify.sh coverage
+          ./scripts/verify.sh perf
+          ./scripts/verify.sh soak
+
+  coverage:
+    name: Production line coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Install stable Rust with coverage tools
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: llvm-tools-preview
+      - name: Restore Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: coverage
+      - name: Install cargo-llvm-cov
+        run: cargo install cargo-llvm-cov --version 0.6.21 --locked
+      - name: Enforce production line coverage
+        run: ./scripts/verify.sh coverage-report
+      - name: Upload coverage reports
+        uses: actions/upload-artifact@v6
+        with:
+          name: coverage-report
+          path: target/coverage
+          if-no-files-found: error
+          retention-days: 14

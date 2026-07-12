@@ -1,0 +1,30 @@
+{
+  "name": "@rsproxy/runtime",
+  "version": "0.1.0",
+  "description": "Platform resolver and native process launcher for rsproxy",
+  "license": "MIT",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./platform": "./lib/platform.js"
+  },
+  "files": [
+    "index.js",
+    "lib",
+    "README.md",
+    "LICENSE"
+  ],
+  "optionalDependencies": {
+    "@rsproxy/darwin-arm64": "0.1.0",
+    "@rsproxy/darwin-x64": "0.1.0",
+    "@rsproxy/linux-arm64-gnu": "0.1.0",
+    "@rsproxy/linux-arm64-musl": "0.1.0",
+    "@rsproxy/linux-x64-gnu": "0.1.0",
+    "@rsproxy/linux-x64-musl": "0.1.0",
+    "@rsproxy/win32-arm64-msvc": "0.1.0",
+    "@rsproxy/win32-x64-msvc": "0.1.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

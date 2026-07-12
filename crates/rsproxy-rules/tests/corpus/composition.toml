@@ -1,0 +1,56 @@
+[[case]]
+id = "composition-group-order"
+spec = true
+groups = [
+  { name = "first", text = "example.test status(201)" },
+  { name = "second", text = "example.test status(202)" },
+]
+expect_actions = ["status"]
+expect_rules = ["first:1"]
+[case.request]
+url = "http://example.test/"
+
+[[case]]
+id = "composition-important-cross-group"
+groups = [
+  { name = "first", text = "example.test status(201)" },
+  { name = "second", text = "example.test status(202) @important" },
+]
+expect_actions = ["status"]
+expect_rules = ["second:1"]
+[case.request]
+url = "http://example.test/"
+
+[[case]]
+id = "composition-disabled-line"
+rules = "example.test status(203) @disabled\nexample.test status(204)"
+expect_actions = ["status"]
+expect_rules = ["default:2"]
+[case.request]
+url = "http://example.test/"
+
+[[case]]
+id = "composition-stackable-headers"
+rules = "example.test req.header(x-first: 1)\nexample.test req.header(x-second: 2)"
+expect_actions = ["req.header", "req.header"]
+expect_rules = ["default:1", "default:2"]
+[case.request]
+url = "http://example.test/"
+
+[[case]]
+id = "composition-skip-family"
+spec = true
+rules = "example.test skip(status)\nexample.test status(205)\nexample.test req.header(x-kept: yes)"
+expect_actions = ["skip", "req.header"]
+expect_rules = ["default:1", "default:3"]
+[case.request]
+url = "http://example.test/"
+
+[[case]]
+id = "composition-failed-condition-does-not-claim-family"
+rules = "example.test status(206) when method(POST)\nexample.test status(207)"
+expect_actions = ["status"]
+expect_rules = ["default:2"]
+[case.request]
+method = "GET"
+url = "http://example.test/"

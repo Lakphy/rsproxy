@@ -1,0 +1,23 @@
+{
+  "name": "@rsproxy/cli",
+  "version": "0.1.0",
+  "description": "Programmable HTTP and HTTPS debugging proxy",
+  "license": "MIT",
+  "bin": {
+    "rsproxy": "bin/rsproxy.js"
+  },
+  "files": [
+    "bin",
+    "README.md",
+    "LICENSE"
+  ],
+  "dependencies": {
+    "@rsproxy/runtime": "0.1.0"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

@@ -1,0 +1,6 @@
+schema = "rsproxy.whistle-fixture/v1"
+upstream = "https://github.com/avwo/whistle"
+version = "2.10.5"
+commit = "0b4c4bdb78ff5c53ffcb5a823ca9b53d7e6269c4"
+license = "MIT"
+evidence_files = 75

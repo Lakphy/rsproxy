@@ -1,0 +1,35 @@
+[[case]]
+id = "template-request-context"
+spec = true
+rules = 'api.example.test req.header(x-vars: ${port}|${reqCookies.sid}|${host.replace(/\.example\.test$/, .internal)})'
+expect_actions = ["req.header"]
+expect_rules = ["default:1"]
+expect_explain = ["default:1 req.header(x-vars: 8443|request-cookie|api.internal)"]
+[case.request]
+method = "POST"
+url = "https://api.example.test:8443/items?q=1"
+headers = [["Cookie", "sid=request-cookie; theme=dark"]]
+
+[[case]]
+id = "template-response-context"
+spec = true
+rules = 'example.test res.header(x-vars: ${statusCode}|${resH.x-origin}|${resCookies.sid})'
+expect_actions = ["res.header"]
+expect_rules = ["default:1"]
+expect_explain = ["default:1 res.header(x-vars: 202|upstream|response-cookie)"]
+[case.request]
+url = "http://example.test/"
+[case.response]
+status = 202
+headers = [
+  ["X-Origin", "upstream"],
+  ["Set-Cookie", "sid=response-cookie; Path=/"],
+]
+
+[[case]]
+id = "error-template-replace-regex"
+spec = true
+rules = 'example.test req.header(x-value: ${host.replace(/[/, broken)})'
+error_codes = ["action"]
+error_groups = ["default"]
+error_lines = [1]

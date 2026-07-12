@@ -1,0 +1,1 @@
+/\/items\/(?P<kind>\w+)\/(\d+)/ host(@host, <host.txt>) upstream(@upstream) req.header(x-value: @header) res.header(x-value: <header.txt>) req.cookie(sid=@cookie) res.cors(origin=@origin, methods=<methods.txt>) url.rewrite(@from, <to.txt>) req.body.append(@tail) res.body.prepend(<prefix.bin>) tag("${kind}-$2")

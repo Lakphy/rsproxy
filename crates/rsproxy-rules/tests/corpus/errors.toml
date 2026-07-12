@@ -1,0 +1,80 @@
+[[case]]
+id = "error-syntax"
+spec = true
+rules = "example.test req.header(\"unterminated)"
+error_codes = ["syntax"]
+error_groups = ["default"]
+error_lines = [1]
+
+[[case]]
+id = "error-matcher"
+rules = ":0 status(200)"
+error_codes = ["matcher"]
+error_groups = ["default"]
+error_lines = [1]
+
+[[case]]
+id = "error-action"
+spec = true
+rules = "example.test unknown()"
+error_codes = ["action"]
+error_groups = ["default"]
+error_lines = [1]
+
+[[case]]
+id = "error-condition"
+rules = "example.test status(200) when unknown()"
+error_codes = ["condition"]
+error_groups = ["default"]
+error_lines = [1]
+
+[[case]]
+id = "error-property"
+rules = "example.test status(200) @unknown"
+error_codes = ["property"]
+error_groups = ["default"]
+error_lines = [1]
+
+[[case]]
+id = "error-source-group-and-line"
+groups = [
+  { name = "valid", text = "example.test status(200)" },
+  { name = "broken", text = "# comment\nexample.test unknown()" },
+]
+error_codes = ["action"]
+error_groups = ["broken"]
+error_lines = [2]
+
+[[case]]
+id = "error-matcher-condition-edge-parameters"
+rules = """
+example.test:not-a-port status(200)
+example.test:0 status(200)
+[::1]:bad status(200)
+://example.test status(200)
+=not-a-url status(200)
+example.test status(200) when method()
+example.test status(200) when clientIp()
+example.test status(200) when serverIp()
+example.test status(200) when status()
+example.test status(200) when header(~value)
+example.test status(200) when header(x-value ~ )
+example.test status(200) when res.header(~value)
+example.test status(200) when chance(1.1)
+example.test status(200) when chance(-0.1)
+example.test status(200) when env()
+example.test status(200) when any()
+example.test status(200) when body()
+"""
+error_codes = [
+  "matcher", "matcher", "matcher", "matcher", "matcher",
+  "condition", "condition", "condition", "condition", "condition",
+  "condition", "condition", "condition", "condition", "condition",
+  "condition", "condition",
+]
+error_groups = [
+  "default", "default", "default", "default", "default", "default",
+  "default", "default", "default", "default", "default", "default",
+  "default", "default", "default", "default", "default",
+]
+error_lines = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17]

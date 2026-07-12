@@ -1,0 +1,2 @@
+/\/users\/(?P<uid>\d+)/ req.header(x-user: ${uid}) req.body.replace(/token-(\d+)/, token=$1)
+/(?=https:\/\/).*example\.test/ tag(fancy-lookahead)

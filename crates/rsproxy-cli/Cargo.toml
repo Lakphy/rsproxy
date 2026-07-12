@@ -1,0 +1,59 @@
+[package]
+name = "rsproxy"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[features]
+bench-support = []
+
+[dependencies]
+rsproxy-rules = { path = "../rsproxy-rules" }
+rsproxy-trace = { path = "../rsproxy-trace" }
+arc-swap = "1"
+base64 = "0.22"
+bytes = "1"
+crossterm = "0.28"
+getrandom = "0.4"
+http-body = "1"
+http-body-util = "0.1"
+hickory-resolver = "0.26"
+hyper = { version = "1", features = ["client", "http1", "http2", "server"] }
+hyper-util = { version = "0.1", features = ["tokio"] }
+libc = "0.2"
+notify = "8"
+ratatui = "0.29"
+rcgen = { version = "0.14", features = ["pem", "x509-parser"] }
+rustls = "0.23"
+rustls-native-certs = "0.8"
+rustls-pemfile = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+tokio = { version = "1", features = ["io-util", "net", "rt-multi-thread", "sync", "time"] }
+time = { version = "0.3", features = ["formatting"] }
+toml = "1.1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+webpki-roots = "1"
+
+[target.'cfg(windows)'.dependencies]
+sha1 = "0.10"
+windows-sys = { version = "0.61", features = [
+    "Win32_Foundation",
+    "Win32_Networking_WinInet",
+    "Win32_Security",
+    "Win32_Storage_FileSystem",
+    "Win32_System_IO",
+    "Win32_System_Pipes",
+    "Win32_System_Threading",
+] }
+
+[dev-dependencies]
+criterion = "0.5.1"
+
+[[bench]]
+name = "certificates"
+harness = false
+required-features = ["bench-support"]

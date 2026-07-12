@@ -1,0 +1,1 @@
+example.test req.header(x-fuzz: ${host.replace(/[/, broken)})

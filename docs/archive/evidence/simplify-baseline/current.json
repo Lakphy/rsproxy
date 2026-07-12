@@ -1,0 +1,28 @@
+{
+  "schema": "rsproxy.e2e.performance/v1",
+  "driver": "oha",
+  "requests": 10000,
+  "concurrency": 32,
+  "direct": {
+    "requests_per_second": 85667.68861080206,
+    "p50_us": 247.41599999999997,
+    "p99_us": 1000.7079999999999,
+    "response_bytes": 10240000
+  },
+  "proxy": {
+    "requests_per_second": 36078.43632449126,
+    "p50_us": 688.25,
+    "p99_us": 3102.292,
+    "response_bytes": 10240000
+  },
+  "added_latency": {
+    "p50_us": 440.83400000000006,
+    "p99_us": 2101.584
+  },
+  "memory": {
+    "empty_rss_kib": 17648,
+    "full_trace_rss_kib": 30464,
+    "growth_kib": 12816
+  },
+  "whistle": null
+}

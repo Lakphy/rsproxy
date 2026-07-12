@@ -1,0 +1,20 @@
+use rsproxy_rules::{Action, RequestMeta, RuleSet};
+
+#[test]
+fn public_rules_api_parses_and_resolves_a_request() {
+    let rules =
+        RuleSet::parse("integration", "api.example.test status(201)").expect("rule should parse");
+    let request = RequestMeta {
+        method: "GET".to_string(),
+        url: "http://api.example.test/items".to_string(),
+        headers: Vec::new(),
+        body: Vec::new(),
+        client_ip: None,
+        server_ip: None,
+        template: Default::default(),
+    };
+
+    let result = rules.resolve(&request);
+    assert_eq!(result.matched_rules.len(), 1);
+    assert!(matches!(result.actions[0].action, Action::Status(201)));
+}

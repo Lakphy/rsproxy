@@ -1,0 +1,19 @@
+[package]
+name = "rsproxy-rules-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2024"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+rsproxy-rules = { path = "../crates/rsproxy-rules" }
+
+[[bin]]
+name = "parse_resolve"
+path = "fuzz_targets/parse_resolve.rs"
+test = false
+doc = false
+bench = false

@@ -1,0 +1,161 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: "1"
+
+jobs:
+  native:
+    name: Native package (${{ matrix.target }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+            musl: false
+          - os: ubuntu-24.04
+            target: x86_64-unknown-linux-musl
+            musl: true
+          - os: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+            musl: false
+          - os: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-musl
+            musl: true
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            musl: false
+          - os: macos-15-intel
+            target: x86_64-apple-darwin
+            musl: false
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            musl: false
+          - os: windows-11-arm
+            target: aarch64-pc-windows-msvc
+            musl: false
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Install Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+      - name: Install stable Rust target
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - name: Install musl linker
+        if: matrix.musl
+        run: sudo apt-get update && sudo apt-get install --yes musl-tools
+      - name: Restore Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: npm-${{ matrix.target }}
+      - name: Verify tag and package versions
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        run: |
+          version=$(node -p "require('./package.json').version")
+          cargo_version=$(awk '/^\[workspace.package\]$/{found=1;next} /^\[/{found=0} found && /^version = /{gsub(/"/, "", $3); print $3; exit}' Cargo.toml)
+          test "$version" = "$cargo_version"
+          test "$GITHUB_REF_NAME" = "v$version"
+      - name: Build native executable
+        run: cargo build --release -p rsproxy --bin rsproxy --target ${{ matrix.target }} --locked
+      - name: Verify native executable
+        shell: bash
+        run: |
+          suffix=
+          case "${{ matrix.target }}" in
+            *-windows-*) suffix=.exe ;;
+          esac
+          "target/${{ matrix.target }}/release/rsproxy${suffix}" --version
+      - name: Create npm native package
+        shell: bash
+        run: ./scripts/package-npm.sh native --target "${{ matrix.target }}" --manager npm
+      - name: Upload npm native package
+        uses: actions/upload-artifact@v6
+        with:
+          name: npm-${{ matrix.target }}
+          path: dist/npm/*.tgz
+          if-no-files-found: error
+          retention-days: 14
+
+  publish:
+    name: Publish npm and Bun packages
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: native
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Install Node with npm registry authentication
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+      - name: Download native packages
+        uses: actions/download-artifact@v6
+        with:
+          pattern: npm-*
+          path: dist/npm
+          merge-multiple: true
+      - name: Create runtime and launcher packages
+        run: ./scripts/package-npm.sh launchers --manager npm
+      - name: Verify publish inventory
+        shell: bash
+        run: |
+          version=$(node -p "require('./package.json').version")
+          test "$(find dist/npm -maxdepth 1 -type f -name '*.tgz' | wc -l | tr -d ' ')" = 11
+          for name in \
+            rsproxy-darwin-arm64 rsproxy-darwin-x64 \
+            rsproxy-linux-arm64-gnu rsproxy-linux-arm64-musl \
+            rsproxy-linux-x64-gnu rsproxy-linux-x64-musl \
+            rsproxy-win32-arm64-msvc rsproxy-win32-x64-msvc \
+            rsproxy-runtime rsproxy-cli rsproxy-bun
+          do
+            test -f "dist/npm/$name-$version.tgz"
+          done
+      - name: Publish native packages
+        shell: bash
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          version=$(node -p "require('./package.json').version")
+          for name in \
+            rsproxy-darwin-arm64 rsproxy-darwin-x64 \
+            rsproxy-linux-arm64-gnu rsproxy-linux-arm64-musl \
+            rsproxy-linux-x64-gnu rsproxy-linux-x64-musl \
+            rsproxy-win32-arm64-msvc rsproxy-win32-x64-msvc
+          do
+            npm publish "dist/npm/$name-$version.tgz" --access public --provenance
+          done
+      - name: Publish runtime and launchers
+        shell: bash
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          version=$(node -p "require('./package.json').version")
+          npm publish "dist/npm/rsproxy-runtime-$version.tgz" --access public --provenance
+          npm publish "dist/npm/rsproxy-cli-$version.tgz" --access public --provenance
+          npm publish "dist/npm/rsproxy-bun-$version.tgz" --access public --provenance

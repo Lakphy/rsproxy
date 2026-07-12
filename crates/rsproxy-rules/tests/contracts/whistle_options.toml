@@ -1,0 +1,307 @@
+[[classification]]
+protocol = "enable"
+options = ["hide"]
+status = "implemented"
+rsproxy = "example.test hide"
+expect_actions = ["hide"]
+reason = "The rsproxy hide action suppresses the matched session from Trace."
+
+[[classification]]
+protocol = "enable"
+options = ["clientIp"]
+status = "implemented"
+rsproxy = "example.test req.forwarded(${clientIp})"
+expect_actions = ["req.forwarded"]
+reason = "The client IP can be forwarded explicitly through X-Forwarded-For."
+
+[[classification]]
+protocol = "enable"
+options = ["clientCert"]
+status = "implemented"
+rsproxy = "example.test tls(client-cert=<client.pem>, client-key=<client-key.pem>)"
+expect_actions = ["tls"]
+reason = "Origin mTLS is selected by an explicit certificate and key pair."
+
+[[classification]]
+protocol = "enable"
+options = ["capture", "https", "captureIp"]
+status = "native-default"
+reason = "With a configured CA, default CONNECT policy inspects TLS hosts including literal IPs."
+
+[[classification]]
+protocol = "enable"
+options = ["h2", "http2"]
+status = "native-default"
+reason = "Downstream and origin ALPN automatically negotiate h2 whenever both peers support it."
+
+[[classification]]
+protocol = "enable"
+options = ["keepCSP", "keepAllCSP", "keepCache", "keepAllCache"]
+status = "native-default"
+reason = "rsproxy injection preserves existing CSP and cache response headers by default."
+
+[[classification]]
+protocol = "enable"
+options = ["keepClientId"]
+status = "native-default"
+reason = "Arbitrary client-id headers are preserved unless a rule explicitly removes them."
+
+[[classification]]
+protocol = "enable"
+options = ["socket"]
+status = "native-default"
+reason = "Unknown protocols detected inside CONNECT fall back to a byte tunnel in auto mode."
+
+[[classification]]
+protocol = "enable"
+options = ["bigData"]
+status = "process-config"
+configuration = ["--trace-body-limit"]
+reason = "Capture limits are explicit process configuration rather than a v1 per-rule action."
+
+[[classification]]
+protocol = "enable"
+options = ["abort", "abortReq", "abortRes", "auto2http", "br", "gzip", "deflate", "captureStream", "clientId", "flushHeaders", "forHttp", "forHttps", "httpH2", "showHost", "ignoreSend", "ignoreReceive", "pauseSend", "pauseReceive", "inspect", "proxyFirst", "proxyHost", "proxyTunnel", "safeHtml", "strictHtml", "multiClient", "requestWithMatchedRules", "responseWithMatchedRules", "tunnelHeadersFirst", "weakRule", "websocket"]
+status = "deferred-v2"
+reason = "These protocol, transfer, compression, and response-policy switches are outside the explicit v1 action set in the technical design."
+
+[[classification]]
+protocol = "enable"
+options = ["authCapture", "customParser", "forceReqWrite", "forceResWrite", "interceptConsole", "internalProxy", "useLocalHost", "useSafePort"]
+status = "deferred-v2"
+reason = "These options depend on plugins, script hooks, capture-to-file, or Whistle-internal routing."
+
+[[classification]]
+protocol = "enable"
+options = ["hideComposer", "hideCaptureError", "userLogin"]
+status = "removed-v1"
+reason = "These options target Whistle-specific Composer or management UI behavior."
+
+[[classification]]
+protocol = "disable"
+options = ["301"]
+status = "implemented"
+rsproxy = "example.test res.status(302) when status(301)"
+expect_actions = ["res.status"]
+reason = "A response-period status condition rewrites only 301 responses."
+
+[[classification]]
+protocol = "disable"
+options = ["ajax"]
+status = "implemented"
+rsproxy = "example.test req.header(-x-requested-with)"
+expect_actions = ["req.header"]
+reason = "The request header is removed explicitly."
+
+[[classification]]
+protocol = "disable"
+options = ["capture", "https"]
+status = "implemented"
+rsproxy = "example.test bypass"
+expect_actions = ["bypass"]
+reason = "The bypass action keeps a matched CONNECT tunnel out of MITM."
+
+[[classification]]
+protocol = "disable"
+options = ["clientId"]
+status = "implemented"
+rsproxy = "example.test req.header(-x-whistle-client-id)"
+expect_actions = ["req.header"]
+reason = "The client-id header is removed explicitly."
+
+[[classification]]
+protocol = "disable"
+options = ["clientIp"]
+status = "implemented"
+rsproxy = "example.test req.header(-x-forwarded-for)"
+expect_actions = ["req.header"]
+reason = "The forwarding header is removed explicitly."
+
+[[classification]]
+protocol = "disable"
+options = ["csp"]
+status = "implemented"
+rsproxy = "example.test res.header(-content-security-policy) res.header(-content-security-policy-report-only)"
+expect_actions = ["res.header", "res.header"]
+reason = "Both standard CSP response header forms are removed."
+
+[[classification]]
+protocol = "disable"
+options = ["cookies"]
+status = "implemented"
+rsproxy = "example.test delete(cookies)"
+expect_actions = ["delete"]
+reason = "The typed delete action clears request Cookie and response Set-Cookie headers."
+
+[[classification]]
+protocol = "disable"
+options = ["reqCookies"]
+status = "implemented"
+rsproxy = "example.test delete(reqCookies)"
+expect_actions = ["delete"]
+reason = "The typed delete action clears the request Cookie header."
+
+[[classification]]
+protocol = "disable"
+options = ["resCookies"]
+status = "implemented"
+rsproxy = "example.test delete(resCookies)"
+expect_actions = ["delete"]
+reason = "The typed delete action clears all response Set-Cookie headers."
+
+[[classification]]
+protocol = "disable"
+options = ["ua"]
+status = "implemented"
+rsproxy = "example.test req.header(-user-agent)"
+expect_actions = ["req.header"]
+reason = "The User-Agent request header is removed explicitly."
+
+[[classification]]
+protocol = "disable"
+options = ["referer"]
+status = "implemented"
+rsproxy = "example.test req.header(-referer)"
+expect_actions = ["req.header"]
+reason = "The Referer request header is removed explicitly."
+
+[[classification]]
+protocol = "disable"
+options = ["trailers"]
+status = "implemented"
+rsproxy = "example.test delete(trailers)"
+expect_actions = ["delete"]
+reason = "The typed delete action clears all response trailers."
+
+[[classification]]
+protocol = "disable"
+options = ["autoCors", "rejectUnauthorized", "secureOptions", "tunnelAuthHeader"]
+status = "native-default"
+reason = "rsproxy does not auto-add file CORS, validates origin TLS with safe defaults, and strips downstream proxy credentials before forwarding."
+
+[[classification]]
+protocol = "disable"
+options = ["bigData", "dnsCache"]
+status = "process-config"
+configuration = ["--trace-body-limit", "--dns-cache"]
+reason = "Capture and DNS-cache limits are explicit process configuration rather than v1 per-rule actions."
+
+[[classification]]
+protocol = "disable"
+options = ["keepAlive", "keepH2Session"]
+status = "deferred-v2"
+reason = "Per-rule connection-pool disable semantics are outside the explicit v1 action set."
+
+[[classification]]
+protocol = "disable"
+options = ["abort", "abortReq", "abortRes", "auto2http", "cache", "captureIp", "captureStream", "clientCert", "flushHeaders", "forHttp", "forHttps", "gzip", "h2", "http2", "httpH2", "hide", "proxyFirst", "proxyHost", "proxyTunnel", "keepCSP", "keepAllCSP", "keepCache", "keepAllCache", "keepClientId", "safeHtml", "strictHtml", "proxyConnection", "proxyUA", "requestWithMatchedRules", "responseWithMatchedRules", "timeout", "trailerHeader", "tunnelHeadersFirst", "weakRule"]
+status = "deferred-v2"
+reason = "These inverse protocol and policy switches are outside the explicit v1 action set and must not be approximated by broader actions."
+
+[[classification]]
+protocol = "disable"
+options = ["authCapture", "customParser", "forceReqWrite", "forceResWrite", "interceptConsole", "internalProxy", "useLocalHost", "useSafePort"]
+status = "deferred-v2"
+reason = "These options depend on plugins, script hooks, capture-to-file, or Whistle-internal routing."
+
+[[classification]]
+protocol = "disable"
+options = ["hideComposer", "hideCaptureError", "userLogin"]
+status = "removed-v1"
+reason = "These options target Whistle-specific Composer or management UI behavior."
+
+[[classification]]
+protocol = "delete"
+options = ["pathname"]
+status = "implemented"
+rsproxy = "example.test delete(pathname)"
+expect_actions = ["delete"]
+reason = "The complete request pathname is replaced by root while preserving the query."
+
+[[classification]]
+protocol = "delete"
+options = ["pathname.index"]
+status = "implemented"
+rsproxy = "example.test delete(pathname.0, pathname.-1, pathname.last)"
+expect_actions = ["delete"]
+reason = "Positive, negative, first, and trailing-slash-preserving last segment forms are typed."
+
+[[classification]]
+protocol = "delete"
+options = ["urlParams"]
+status = "implemented"
+rsproxy = "example.test delete(urlParams)"
+expect_actions = ["delete"]
+reason = "The complete URL query is removed."
+
+[[classification]]
+protocol = "delete"
+options = ["urlParams.*"]
+status = "implemented"
+rsproxy = "example.test delete(urlParams.secret)"
+expect_actions = ["delete"]
+reason = "A named URL query parameter is removed."
+
+[[classification]]
+protocol = "delete"
+options = ["reqHeaders.*"]
+status = "implemented"
+rsproxy = "example.test delete(reqHeaders.x-old)"
+expect_actions = ["delete"]
+reason = "A named request header is removed case-insensitively."
+
+[[classification]]
+protocol = "delete"
+options = ["resHeaders.*"]
+status = "implemented"
+rsproxy = "example.test delete(resHeaders.x-old)"
+expect_actions = ["delete"]
+reason = "A named response header is removed case-insensitively."
+
+[[classification]]
+protocol = "delete"
+options = ["reqBody"]
+status = "implemented"
+rsproxy = "example.test delete(reqBody)"
+expect_actions = ["delete"]
+reason = "A buffered request body is cleared with framing recalculated."
+
+[[classification]]
+protocol = "delete"
+options = ["resBody"]
+status = "implemented"
+rsproxy = "example.test delete(resBody)"
+expect_actions = ["delete"]
+reason = "A buffered response body is cleared with framing recalculated."
+
+[[classification]]
+protocol = "delete"
+options = ["reqType", "resType", "reqCharset", "resCharset"]
+status = "implemented"
+rsproxy = "example.test delete(reqType, resType, reqCharset, resCharset)"
+expect_actions = ["delete"]
+reason = "MIME and charset portions of request and response Content-Type are removed independently."
+
+[[classification]]
+protocol = "delete"
+options = ["reqCookies.*"]
+status = "implemented"
+rsproxy = "example.test delete(reqCookies.sid)"
+expect_actions = ["delete"]
+reason = "A named request cookie is removed."
+
+[[classification]]
+protocol = "delete"
+options = ["resCookies.*"]
+status = "implemented"
+rsproxy = "example.test delete(resCookies.sid)"
+expect_actions = ["delete"]
+reason = "A named Set-Cookie response field is removed."
+
+[[classification]]
+protocol = "delete"
+options = ["reqBody.*", "resBody.*"]
+status = "implemented"
+rsproxy = '''example.test delete(reqBody.profile.secret, reqBody.items[0], reqBody.meta.a\.b, resBody.payload.secret, resBody.items[1])'''
+expect_actions = ["delete"]
+reason = "Typed body paths delete nested JSON/JSONP properties and array items; request form fields use the decoded path name."

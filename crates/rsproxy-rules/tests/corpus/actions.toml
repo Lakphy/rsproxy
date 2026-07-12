@@ -1,0 +1,197 @@
+required_action_families = [
+  "host", "upstream", "direct", "mock", "status", "redirect",
+  "req.header", "res.header", "res.status", "req.method", "req.cookie",
+  "res.cookie", "req.ua", "req.referer", "req.auth", "req.forwarded",
+  "req.type", "req.charset", "res.cors", "res.type", "res.charset",
+  "res.merge", "res.trailer", "attachment", "cache", "tls",
+  "url.rewrite", "url.query", "delete", "req.body.set", "req.body.prepend",
+  "req.body.append", "req.body.replace", "res.body.set", "res.body.prepend",
+  "res.body.append", "res.body.replace", "inject", "delay.req", "delay.res",
+  "throttle.req", "throttle.res", "bypass", "hide", "tag", "skip",
+]
+
+[[case]]
+id = "action-routing-families"
+rules = "example.test host(127.0.0.1:18081, 127.0.0.1:18082) upstream(proxy://127.0.0.1:18083) direct"
+expect_actions = ["host", "upstream", "direct"]
+expect_rules = ["default:1"]
+[case.request]
+url = "http://example.test/"
+
+[[case]]
+id = "action-host-round-robin"
+spec = true
+rules = "example.test host(127.0.0.1:18081, 127.0.0.1:18082)"
+expect_actions = ["host"]
+expect_rules = ["default:1"]
+expect_explain = ["default:1 host(127.0.0.1:18081, 127.0.0.1:18082)"]
+[case.request]
+url = "http://example.test/"
+
+[[case]]
+id = "action-mock-inline-template"
+rules = 'example.test mock("hello-${hostname}-$1")'
+expect_actions = ["mock"]
+expect_rules = ["default:1"]
+[case.request]
+url = "http://example.test/"
+
+[[case]]
+id = "action-mock-file"
+rules = "example.test mock(<mocks/response.json>)"
+expect_actions = ["mock"]
+expect_rules = ["default:1"]
+[case.request]
+url = "http://example.test/"
+
+[[case]]
+id = "action-mock-reference"
+rules = "example.test mock(@fixture)"
+expect_actions = ["mock"]
+expect_rules = ["default:1"]
+[case.request]
+url = "http://example.test/"
+
+[[case]]
+id = "action-mock-raw"
+rules = 'example.test mock.raw("HTTP/1.1 207 Multi-Status\\r\\nX-Test: yes\\r\\n\\r\\nbody")'
+expect_actions = ["mock"]
+expect_rules = ["default:1"]
+[case.request]
+url = "http://example.test/"
+
+[[case]]
+id = "action-local-response-families"
+rules = "example.test status(410) redirect(https://new.example.test/${path}, 307)"
+expect_actions = ["status", "redirect"]
+expect_rules = ["default:1"]
+[case.request]
+url = "http://example.test/legacy"
+
+[[case]]
+id = "action-url-families"
+rules = 'example.test url.rewrite(/old, /new) url.query(mode=${method}, -token)'
+expect_actions = ["url.rewrite", "url.query"]
+expect_rules = ["default:1"]
+[case.request]
+url = "http://example.test/old?token=secret"
+
+[[case]]
+id = "action-delete-family"
+rules = '''example.test delete(pathname.0, pathname.last, urlParams.secret, reqHeaders.x-old, resHeaders.x-old, reqCookies.sid, resCookies.sid, reqBody, reqBody.profile.secret, reqBody.meta.a\.b, resBody, resBody.payload[0].secret, reqType, resCharset, trailer.x-old)'''
+expect_actions = ["delete"]
+expect_rules = ["default:1"]
+expect_explain = ['''default:1 delete(pathname.0, pathname.last, urlParams.secret, reqHeaders.x-old, resHeaders.x-old, reqCookies.sid, resCookies.sid, reqBody, reqBody.profile.secret, reqBody.meta.a\.b, resBody, resBody.payload[0].secret, reqType, resCharset, trailer.x-old)''']
+[case.request]
+url = "http://example.test/api/item?secret=yes"
+
+[[case]]
+id = "action-structured-value-sources"
+rules = '''example.test host(@host) upstream(<upstream.txt>) redirect(@location) req.header(x-ref: @header) req.method(<method.txt>) req.cookie(sid=@cookie) res.header(x-ref: <header.txt>) res.cookie(sid=@cookie; Path=<cookie-path.txt>) res.cors(origin=@origin, methods=<methods.txt>) res.type(@type) res.merge(<merge.json>) res.trailer(x-ref: @trailer) attachment(<filename.txt>) cache(max-age=@age) url.rewrite(@from, <to.txt>) url.query(value=@query) req.body.set(@request-body) res.body.set(<response.bin>) inject(html, @inject) tag(<tag.txt>)'''
+expect_actions = [
+  "host", "upstream", "redirect", "req.header", "req.method", "req.cookie",
+  "res.header", "res.cookie", "res.cors", "res.type", "res.merge",
+  "res.trailer", "attachment", "cache", "url.rewrite", "url.query",
+  "req.body.set", "res.body.set", "inject", "tag",
+]
+expect_rules = ["default:1"]
+[case.request]
+url = "http://example.test/items"
+
+[[case]]
+id = "action-request-rewrite-families"
+rules = '''example.test req.header(x-added: ${host}) req.header(-x-old) req.header(x-release ~ /v(\d+)/release-$1) req.method(POST) req.cookie(sid=${id}) req.cookie(-legacy) req.ua("rsproxy ${random}") req.referer(https://ref.test/${pathname}) req.auth(user:pass) req.forwarded(${clientIp}) req.type(application/json) req.charset(utf-8) req.body.set("base-${method}") req.body.prepend(@prefix) req.body.append(<tail.txt>) req.body.replace(/item-(\d+)/, item=$1)'''
+expect_actions = [
+  "req.header", "req.header", "req.header", "req.method", "req.cookie",
+  "req.cookie", "req.ua", "req.referer", "req.auth", "req.forwarded",
+  "req.type", "req.charset", "req.body.set", "req.body.prepend",
+  "req.body.append", "req.body.replace",
+]
+expect_rules = ["default:1"]
+[case.request]
+method = "GET"
+url = "http://example.test/items"
+client_ip = "192.0.2.10"
+body = "item-42"
+
+[[case]]
+id = "action-header-regex-replace"
+spec = true
+rules = 'example.test req.header(x-release ~ /v(\d+)/release-$1)'
+expect_actions = ["req.header"]
+expect_rules = ["default:1"]
+expect_explain = ['default:1 req.header(x-release ~ /v(\d+)/release-$1)']
+[case.request]
+url = "http://example.test/"
+
+[[case]]
+id = "action-response-rewrite-families"
+rules = '''example.test res.header(x-added: ${statusCode}) res.header(-server) res.header(x-release ~ /v(\d+)/release-$1) res.status(299) res.cookie(sid=${id}; Path=/; HttpOnly) res.cookie(-legacy) res.cors(${reqH.origin}, methods=GET POST, credentials=true) res.type(application/json) res.charset(utf-8) res.merge({"ok":true}) res.trailer(x-checksum: ${random}) res.trailer(-x-old) attachment(report.txt) cache(public, max-age=60) res.body.set("base-${statusCode}") res.body.prepend(@prefix) res.body.append(<tail.txt>) res.body.replace(/raw/i, rendered)'''
+expect_actions = [
+  "res.header", "res.header", "res.header", "res.status", "res.cookie",
+  "res.cookie", "res.cors", "res.type", "res.charset", "res.merge",
+  "res.trailer", "res.trailer", "attachment", "cache", "res.body.set",
+  "res.body.prepend", "res.body.append", "res.body.replace",
+]
+expect_rules = ["default:1"]
+[case.request]
+url = "http://example.test/"
+headers = [["Origin", "https://client.test"]]
+[case.response]
+status = 200
+headers = [["X-Release", "v1"]]
+
+[[case]]
+id = "action-inject-modes"
+rules = '''example.test inject(html, "<!--tail-->", append) inject(js, @bootstrap, prepend) inject(css, <theme.css>, replace)'''
+expect_actions = ["inject", "inject", "inject"]
+expect_rules = ["default:1"]
+[case.request]
+url = "http://example.test/"
+
+[[case]]
+id = "action-flow-control-families"
+rules = "example.test delay(req, 5ms) delay(res, 1s) throttle(req, 2KB/s) throttle(res, 1MB/s)"
+expect_actions = ["delay.req", "delay.res", "throttle.req", "throttle.res"]
+expect_rules = ["default:1"]
+[case.request]
+url = "http://example.test/"
+
+[[case]]
+id = "action-control-and-tls-families"
+rules = '''example.test tls(min=1.2, ciphers=TLS_AES_128_GCM_SHA256, client-cert=<client.pem>, client-key=<client-key.pem>) bypass hide tag(api:${path}) skip(req.header)'''
+expect_actions = ["tls", "bypass", "hide", "tag", "skip"]
+expect_rules = ["default:1"]
+[case.request]
+url = "https://example.test/api"
+
+[[case]]
+id = "error-header-replace-regex"
+spec = true
+rules = "example.test res.header(x-release ~ /[/release)"
+error_codes = ["action"]
+error_groups = ["default"]
+error_lines = [1]
+
+[[case]]
+id = "error-action-family-parameters"
+rules = """
+example.test host()
+example.test status(not-a-code)
+example.test delay(side, 1s)
+example.test unknown.action(value)
+"""
+error_codes = ["action", "action", "action", "action"]
+error_groups = ["default", "default", "default", "default"]
+error_lines = [1, 2, 3, 4]
+
+[[case]]
+id = "error-structured-value-boundaries"
+rules = """
+example.test req.header(x-value: @../escape)
+example.test tag(@bad/key)
+example.test mock(<>)
+"""
+error_codes = ["action", "action", "action"]
+error_groups = ["default", "default", "default"]
+error_lines = [1, 2, 3]

@@ -1,0 +1,10 @@
+{
+  "name": "rsproxy-whistle-benchmark-driver",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Pinned, isolated Whistle dependency for the rsproxy benchmark",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "whistle": "2.10.5"
+  }
+}

@@ -1,0 +1,23 @@
+[package]
+name = "rsproxy-rules"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+aho-corasick = "1"
+fancy-regex = "0.14"
+getrandom = "0.4"
+regex = "1"
+regex-syntax = "0.8"
+
+[dev-dependencies]
+criterion = "0.5.1"
+proptest = "1"
+serde = { version = "1", features = ["derive"] }
+toml = "1.1"
+
+[[bench]]
+name = "rules"
+harness = false
