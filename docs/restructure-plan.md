@@ -86,13 +86,14 @@ rsproxy-cli ──→ rsproxy-control ──→ rsproxy-engine ──→ rsproxy
 | `rule_store/`（组元数据、原子替换、watch、ArcSwap 快照） | `rsproxy-engine` | 运行时规则状态属于引擎 |
 | `app.rs` + `app/mitm_failures.rs` | **拆两半** | `ProxyConfig`/`SharedState`/MITM 缓存 → `rsproxy-engine`（更名 `engine::state`）；CLI 覆盖、`default_storage` 等装配逻辑 → `rsproxy-cli` |
 | `control/`（transport、auth、router、routes、query、replay、values） | `rsproxy-control` | |
-| `windows_pipe.rs` | `rsproxy-control` | 它是控制面传输，不是通用 IO |
+| `windows_pipe.rs` | `rsproxy-control` | 它是控制面传输，不是通用 IO；server/client 两半都在此 |
+| `cli/api.rs` + `cli/api_auth.rs`（控制面**客户端**：TCP/unix socket/named pipe 请求、token 认证） | `rsproxy-control` 的 `client` 模块 [D-18] | TUI 与全部 query 命令消费它；协议词汇与 server 同源，分开必然漂移 |
+| `json/`（含 HAR 导出） | `rsproxy-control` [D-17] | **修正**：并非纯 CLI 呈现层——`control/routes/{trace,status,replay}` 直接消费，它是控制 API 的响应形状所有者；cli 经 control 公共 API 复用 |
 | `cli/ca/`（证书、存储、平台信任链） | `rsproxy-platform` | 证书**生成**（`proxy/tls/certificates` 使用的部分）如与 CA 管理耦合，切分：生成留 engine，信任链安装归 platform |
 | `cli/system_proxy/`（macos/linux/windows） | `rsproxy-platform` | |
 | `cli/daemon/process.rs`（pidfile、跨平台 kill） | `rsproxy-platform` | daemon **编排**（绑定监听、发布 readiness）留在 cli |
 | `cli/`（args、help、completions、config、rules、trace、api、daemon 编排） | `rsproxy-cli` 重写 | Phase 3 用 clap 重做 |
-| `json/`（含 HAR 导出） | `rsproxy-cli` | 呈现层 |
-| `tui/` | `rsproxy-cli` | 呈现层 |
+| `tui/` | `rsproxy-cli` | 呈现层；注意它直接调用 `cli::api::api_request` 与 `cli::args`——迁移后改走 `rsproxy_control::client`，参数解析在 Phase 3 随 clap 重做 |
 | `logging.rs` | `rsproxy-cli` | 进程可观测性边界属于组合根 |
 | `benchmark_support.rs`、`examples/`、`benches/certificates.rs` | 跟随其测量对象所在 crate | |
 
@@ -141,6 +142,10 @@ cargo clippy --workspace --all-targets --locked -- -D warnings
    - `control/tests/`（迁移后为 `rsproxy-control` 集成测试）
    - `packages/npm/tests/*.test.js`
 4. 例外：`tests/cli_help.rs` 与 `tests/cli_completions.rs` 在 Phase 3 会因 clap 输出格式变化而重写——提前在 PR 描述中声明。
+5. 创建 `CHANGELOG.md`（Keep a Changelog 格式），首条目登记本次改革的破坏面（D-01）。
+   npm registry 已核实：`@rsproxy/cli` 返回 404，从未发布——破坏面确认无外部承受者。
+6. 流程纪律：Phase 2–6 的每个 PR 必须同步更新 `docs/architecture.md` 受影响章节，
+   不允许文档滞后到 Phase 7 一次性补——Phase 7 只做整合与润色 [D-19]。
 
 ### Phase 1 — Workspace 治理层（1 天）
 
@@ -171,8 +176,13 @@ cargo clippy --workspace --all-targets --locked -- -D warnings
    `rsproxy-cli`，同时声明 `[[bin]] name = "rsproxy"`。测试中的
    `CARGO_BIN_EXE_rsproxy` 按 bin 名生成，不受影响；`main.rs` 的
    `rsproxy::run_cli()` 改为 `rsproxy_cli::run_cli()`。
-4. CI 的 clippy 命令行保持不变（manifest lints 与 `-D warnings` 叠加无冲突）。
-5. 用 Phase 0 基线验证 release 产物：体积应下降（strip），吞吐不得回退 >10%（LTO 通常持平或略升）。
+   改名后全仓 grep 旧包名的字符串引用并逐一核对：`scripts/`（coverage、verify
+   的 `-p rsproxy` 类过滤器）、`.github/workflows/`、`packages/npm/scripts/package.mjs`。
+4. `workspace.package` 增加 `rust-version`（当前工具链实测的 MSRV；edition 2024
+   要求 ≥ 1.85）。分发型 CLI 声明 MSRV 是基线实践，CI 加一个 MSRV job 用该版本跑
+   `cargo check --workspace`。
+5. CI 的 clippy 命令行保持不变（manifest lints 与 `-D warnings` 叠加无冲突）。
+6. 用 Phase 0 基线验证 release 产物：体积应下降（strip），吞吐不得回退 >10%（LTO 通常持平或略升）。
 
 **回滚**：单 commit revert，无 API 影响。
 
@@ -197,9 +207,11 @@ cargo clippy --workspace --all-targets --locked -- -D warnings
 
 **2c. 提取 `rsproxy-control`**
 
-1. 迁移 `control/` + `windows_pipe.rs`。
+1. 迁移 `control/` + `windows_pipe.rs` + `json/`（响应形状，[D-17]）+
+   `cli/api.rs`、`cli/api_auth.rs`（重组为 `control::client`，[D-18]）。
+   crate 内部按 `server / client / shapes` 三个顶层模块组织，token 认证词汇两端共享。
 2. control 对 engine 的依赖面收窄成两个 trait 或显式类型：trace 查询走 `rsproxy-trace` 公共 API，replay 走 `engine::replay` 入口。
-3. `control/tests/` 随迁为 `rsproxy-control` 的测试。
+3. `control/tests/` 随迁为 `rsproxy-control` 的测试；`tui/` 与 CLI query 命令改从 `rsproxy_control::client` 引用。
 
 **2d. 提取 `rsproxy-platform`**
 
@@ -270,7 +282,7 @@ cargo clippy --workspace --all-targets --locked -- -D warnings
 
 ### Phase 7 — 文档重写与收尾（1 天）
 
-1. `docs/architecture.md` 重写：按 crate 分章，每章 = 边界声明 + 公共 API 面 + 内部子结构；§1.2 依赖图入文。
+1. `docs/architecture.md` 整合润色（各章已随 Phase 2–6 逐 PR 更新，见 [D-19]）：统一为按 crate 分章，每章 = 边界声明 + 公共 API 面 + 内部子结构；§1.2 依赖图入文。
 2. `README.md` 更新 workspace 树与构建命令（`cargo xtask check all`）。
 3. `docs/simplification-plan.md`、本文档移入 `docs/archive/`。
 4. 首次 `xtask release 0.2.0` [D-11]：改革完成即 bump 次版本号，标记 CLI 表面变更。
@@ -309,7 +321,7 @@ Phase 7  文档收尾            1 天     ──┘
 
 | # | 决策点 | 裁定 | 依据 |
 |---|--------|------|------|
-| D-01 | Phase 3 破坏面（help 文本变化、未知参数从静默忽略变报错、`cli_help`/`cli_completions` 测试重写）是否需要兼容垫片 | **全量接受，不做垫片** | 版本 0.1.0、`publish = false`、资格范围仅本机 macOS ARM64，不存在需要保护的外部用户；宽容解析是缺陷不是特性。CHANGELOG 标注即可 |
+| D-01 | Phase 3 破坏面（help 文本变化、未知参数从静默忽略变报错、`cli_help`/`cli_completions` 测试重写）是否需要兼容垫片 | **全量接受，不做垫片** | **已验证**：npm registry 对 `@rsproxy/cli` 返回 404（从未发布）；`publish = false`；资格范围仅本机 macOS ARM64。不存在外部承受者，宽容解析是缺陷不是特性。CHANGELOG 标注即可 |
 | D-02 | 退出码分配 | **2 = 用法错误，1 = 运行时失败，3 = daemon 状态冲突** | clap 对 usage 错误默认退出码为 2（亦是 bash misuse 惯例）；跟随工具与生态，不自定义再去覆写 clap 行为 |
 | D-03 | `--json` argv 嗅探去留 | **仅保留 clap 解析失败这一条路径**，其余全部走类型化字段 | 解析失败时类型化参数不存在，嗅探是该路径的唯一可行方案；其他路径保留嗅探就是保留隐患 |
 | D-04 | `panic = "abort"` | **永不启用**，从遗留项移除 | 数据面 9 处 per-connection `thread::spawn`，panic 隔离在单连接线程内是可靠性特性；abort 将单连接 bug 升级为整个 daemon 崩溃，对代理这种长驻进程是净损失 |
@@ -325,6 +337,9 @@ Phase 7  文档收尾            1 天     ──┘
 | D-14 | clap 多值参数等价性风险 | **逐个写等价断言再删旧实现**；清单已穷尽：`--dns-server`、`-H/--header`、`--response-header` 三个 | 已 grep 确认 `option_values` 全部调用点，不存在第四个多值参数 |
 | D-15 | 白盒测试降级为集成测试的判据 | **只降级"仅消费新 crate 公共 API 且不依赖测试内部构造器"的套件；存疑一律保留白盒** | 降级是编译并行度优化，不值得为它扩大公共 API 面（与 D-06 同理：API 面最小化优先） |
 | D-16 | engine 需要 CLI 侧能力时的通信模式 | **组合根注入：engine 定义 trait，cli 实现并传入**；禁止任何反向依赖 | 唯一不引入循环依赖的模式；trait 数量预期 ≤ 2（若超出，说明切分线画错，回到 §1.3 重审） |
+| D-17 | `json/`（含 HAR）归属 | **`rsproxy-control`，不是 cli** | 初稿有误：grep 证实 `control/routes/{trace,status,replay}` 直接消费 `crate::json`——它是控制 API 的响应形状所有者，放 cli 会让 control 编译失败；cli 的 human 呈现经 control 公共 API 复用 |
+| D-18 | 控制面客户端（`cli/api.rs`、`api_auth.rs`）归属 | **`rsproxy-control::client` 模块**，与 server 同 crate | 初稿遗漏该组件。TUI 与全部 query 命令依赖它；client/server 共享传输与 token 词汇（含 windows_pipe 两半），拆到不同 crate 必然协议漂移 |
+| D-19 | `docs/architecture.md` 更新时机 | **每个 Phase 的 PR 同步更新受影响章节**；Phase 7 只做整合润色 | 该文档是仓库的活设计文件（README 要求改跨模块行为前必读），滞后 4 个 Phase 等于让所有中间 PR 的 reviewer 拿着错误地图 |
 
 改革完成后的验收快照（写进最终 PR 描述）：
 
