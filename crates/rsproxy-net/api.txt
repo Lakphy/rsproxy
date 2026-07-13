@@ -1,0 +1,388 @@
+pub mod rsproxy_net
+pub enum rsproxy_net::BoundedBody
+pub rsproxy_net::BoundedBody::Complete(rsproxy_net::CollectedBody)
+pub rsproxy_net::BoundedBody::Overflow
+pub rsproxy_net::BoundedBody::Overflow::prefix: alloc::vec::Vec<u8>
+impl core::cmp::Eq for rsproxy_net::BoundedBody
+impl core::cmp::PartialEq for rsproxy_net::BoundedBody
+pub fn rsproxy_net::BoundedBody::eq(&self, &rsproxy_net::BoundedBody) -> bool
+impl core::fmt::Debug for rsproxy_net::BoundedBody
+pub fn rsproxy_net::BoundedBody::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for rsproxy_net::BoundedBody
+pub enum rsproxy_net::BoundedRequestBody
+pub rsproxy_net::BoundedRequestBody::Complete
+pub rsproxy_net::BoundedRequestBody::Complete::body: alloc::vec::Vec<u8>
+pub rsproxy_net::BoundedRequestBody::Complete::trailers: alloc::vec::Vec<(alloc::string::String, alloc::string::String)>
+pub rsproxy_net::BoundedRequestBody::Overflow
+pub rsproxy_net::BoundedRequestBody::Overflow::prefix: alloc::vec::Vec<u8>
+pub rsproxy_net::BoundedRequestBody::Overflow::reader: rsproxy_net::RequestBodyReader
+impl core::fmt::Debug for rsproxy_net::BoundedRequestBody
+pub fn rsproxy_net::BoundedRequestBody::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub enum rsproxy_net::DownstreamH2RequestFrame
+pub rsproxy_net::DownstreamH2RequestFrame::Data(bytes::bytes::Bytes)
+pub rsproxy_net::DownstreamH2RequestFrame::Trailers(alloc::vec::Vec<(alloc::string::String, alloc::string::String)>)
+impl core::fmt::Debug for rsproxy_net::DownstreamH2RequestFrame
+pub fn rsproxy_net::DownstreamH2RequestFrame::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub enum rsproxy_net::DownstreamH2ResponseFrame
+pub rsproxy_net::DownstreamH2ResponseFrame::Data(bytes::bytes::Bytes)
+pub rsproxy_net::DownstreamH2ResponseFrame::Trailers(alloc::vec::Vec<(alloc::string::String, alloc::string::String)>)
+impl core::fmt::Debug for rsproxy_net::DownstreamH2ResponseFrame
+pub fn rsproxy_net::DownstreamH2ResponseFrame::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub enum rsproxy_net::H2Body
+pub rsproxy_net::H2Body::Buffered
+pub rsproxy_net::H2Body::Streaming
+impl core::clone::Clone for rsproxy_net::H2Body
+pub fn rsproxy_net::H2Body::clone(&self) -> rsproxy_net::H2Body
+impl core::cmp::Eq for rsproxy_net::H2Body
+impl core::cmp::PartialEq for rsproxy_net::H2Body
+pub fn rsproxy_net::H2Body::eq(&self, &rsproxy_net::H2Body) -> bool
+impl core::fmt::Debug for rsproxy_net::H2Body
+pub fn rsproxy_net::H2Body::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for rsproxy_net::H2Body
+impl core::marker::StructuralPartialEq for rsproxy_net::H2Body
+pub enum rsproxy_net::H2Connected
+pub rsproxy_net::H2Connected::Response(rsproxy_net::UpstreamH2Response)
+pub rsproxy_net::H2Connected::Streaming(rsproxy_net::StreamingH2Request)
+pub enum rsproxy_net::H2Outcome
+pub rsproxy_net::H2Outcome::Connect(rsproxy_net::H2Connector)
+pub rsproxy_net::H2Outcome::Response(rsproxy_net::UpstreamH2Response)
+pub rsproxy_net::H2Outcome::Streaming(rsproxy_net::StreamingH2Request)
+#[non_exhaustive] pub enum rsproxy_net::NetError
+pub rsproxy_net::NetError::Io
+pub rsproxy_net::NetError::Io::context: alloc::string::String
+pub rsproxy_net::NetError::Io::source: core::io::error::Error
+pub rsproxy_net::NetError::Protocol
+pub rsproxy_net::NetError::Protocol::kind: rsproxy_net::ProtocolErrorKind
+pub rsproxy_net::NetError::Protocol::message: alloc::string::String
+pub rsproxy_net::NetError::Protocol::stage: rsproxy_net::NetStage
+pub rsproxy_net::NetError::Timeout
+pub rsproxy_net::NetError::Timeout::stage: rsproxy_net::NetStage
+pub rsproxy_net::NetError::Timeout::timeout_ms: u64
+impl core::error::Error for rsproxy_net::NetError
+pub fn rsproxy_net::NetError::source(&self) -> core::option::Option<&(dyn core::error::Error + 'static)>
+impl core::fmt::Debug for rsproxy_net::NetError
+pub fn rsproxy_net::NetError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for rsproxy_net::NetError
+pub fn rsproxy_net::NetError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+#[non_exhaustive] pub enum rsproxy_net::NetStage
+pub rsproxy_net::NetStage::Accept
+pub rsproxy_net::NetStage::Connect
+pub rsproxy_net::NetStage::Dns
+pub rsproxy_net::NetStage::PoolWait
+pub rsproxy_net::NetStage::Request
+pub rsproxy_net::NetStage::RequestTotal
+pub rsproxy_net::NetStage::Response
+pub rsproxy_net::NetStage::Shutdown
+pub rsproxy_net::NetStage::Tls
+pub rsproxy_net::NetStage::Ttfb
+pub rsproxy_net::NetStage::Tunnel
+pub rsproxy_net::NetStage::WebSocket
+impl core::clone::Clone for rsproxy_net::NetStage
+pub fn rsproxy_net::NetStage::clone(&self) -> rsproxy_net::NetStage
+impl core::cmp::Eq for rsproxy_net::NetStage
+impl core::cmp::PartialEq for rsproxy_net::NetStage
+pub fn rsproxy_net::NetStage::eq(&self, &rsproxy_net::NetStage) -> bool
+impl core::fmt::Debug for rsproxy_net::NetStage
+pub fn rsproxy_net::NetStage::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for rsproxy_net::NetStage
+pub fn rsproxy_net::NetStage::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for rsproxy_net::NetStage
+impl core::marker::StructuralPartialEq for rsproxy_net::NetStage
+#[non_exhaustive] pub enum rsproxy_net::ProtocolErrorKind
+pub rsproxy_net::ProtocolErrorKind::Handshake
+pub rsproxy_net::ProtocolErrorKind::InvalidFraming
+pub rsproxy_net::ProtocolErrorKind::LimitExceeded
+pub rsproxy_net::ProtocolErrorKind::MalformedMessage
+pub rsproxy_net::ProtocolErrorKind::UnexpectedMessage
+pub rsproxy_net::ProtocolErrorKind::UnsupportedVersion
+impl core::clone::Clone for rsproxy_net::ProtocolErrorKind
+pub fn rsproxy_net::ProtocolErrorKind::clone(&self) -> rsproxy_net::ProtocolErrorKind
+impl core::cmp::Eq for rsproxy_net::ProtocolErrorKind
+impl core::cmp::PartialEq for rsproxy_net::ProtocolErrorKind
+pub fn rsproxy_net::ProtocolErrorKind::eq(&self, &rsproxy_net::ProtocolErrorKind) -> bool
+impl core::fmt::Debug for rsproxy_net::ProtocolErrorKind
+pub fn rsproxy_net::ProtocolErrorKind::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for rsproxy_net::ProtocolErrorKind
+pub fn rsproxy_net::ProtocolErrorKind::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for rsproxy_net::ProtocolErrorKind
+impl core::marker::StructuralPartialEq for rsproxy_net::ProtocolErrorKind
+pub enum rsproxy_net::RequestBodyFraming
+pub rsproxy_net::RequestBodyFraming::Chunked
+pub rsproxy_net::RequestBodyFraming::ContentLength(usize)
+pub rsproxy_net::RequestBodyFraming::None
+impl rsproxy_net::RequestBodyFraming
+pub fn rsproxy_net::RequestBodyFraming::has_body(self) -> bool
+impl core::clone::Clone for rsproxy_net::RequestBodyFraming
+pub fn rsproxy_net::RequestBodyFraming::clone(&self) -> rsproxy_net::RequestBodyFraming
+impl core::cmp::Eq for rsproxy_net::RequestBodyFraming
+impl core::cmp::PartialEq for rsproxy_net::RequestBodyFraming
+pub fn rsproxy_net::RequestBodyFraming::eq(&self, &rsproxy_net::RequestBodyFraming) -> bool
+impl core::fmt::Debug for rsproxy_net::RequestBodyFraming
+pub fn rsproxy_net::RequestBodyFraming::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for rsproxy_net::RequestBodyFraming
+impl core::marker::StructuralPartialEq for rsproxy_net::RequestBodyFraming
+pub enum rsproxy_net::RequestBodyRead
+pub rsproxy_net::RequestBodyRead::Data(usize)
+pub rsproxy_net::RequestBodyRead::End(alloc::vec::Vec<(alloc::string::String, alloc::string::String)>)
+impl core::cmp::Eq for rsproxy_net::RequestBodyRead
+impl core::cmp::PartialEq for rsproxy_net::RequestBodyRead
+pub fn rsproxy_net::RequestBodyRead::eq(&self, &rsproxy_net::RequestBodyRead) -> bool
+impl core::fmt::Debug for rsproxy_net::RequestBodyRead
+pub fn rsproxy_net::RequestBodyRead::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for rsproxy_net::RequestBodyRead
+pub enum rsproxy_net::UpstreamBodyFrame
+pub rsproxy_net::UpstreamBodyFrame::Data(bytes::bytes::Bytes)
+pub rsproxy_net::UpstreamBodyFrame::Trailers(alloc::vec::Vec<(alloc::string::String, alloc::string::String)>)
+impl core::fmt::Debug for rsproxy_net::UpstreamBodyFrame
+pub fn rsproxy_net::UpstreamBodyFrame::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub struct rsproxy_net::AsyncIo<S: rsproxy_net::ReadyIo>
+impl<S: rsproxy_net::ReadyIo> rsproxy_net::AsyncIo<S>
+pub fn rsproxy_net::AsyncIo<S>::new(S) -> core::io::error::Result<Self>
+impl<S: rsproxy_net::ReadyIo> tokio::io::async_read::AsyncRead for rsproxy_net::AsyncIo<S>
+pub fn rsproxy_net::AsyncIo<S>::poll_read(core::pin::Pin<&mut Self>, &mut core::task::wake::Context<'_>, &mut tokio::io::read_buf::ReadBuf<'_>) -> core::task::poll::Poll<core::io::error::Result<()>>
+impl<S: rsproxy_net::ReadyIo> tokio::io::async_write::AsyncWrite for rsproxy_net::AsyncIo<S>
+pub fn rsproxy_net::AsyncIo<S>::poll_flush(core::pin::Pin<&mut Self>, &mut core::task::wake::Context<'_>) -> core::task::poll::Poll<core::result::Result<(), core::io::error::Error>>
+pub fn rsproxy_net::AsyncIo<S>::poll_shutdown(core::pin::Pin<&mut Self>, &mut core::task::wake::Context<'_>) -> core::task::poll::Poll<core::result::Result<(), core::io::error::Error>>
+pub fn rsproxy_net::AsyncIo<S>::poll_write(core::pin::Pin<&mut Self>, &mut core::task::wake::Context<'_>, &[u8]) -> core::task::poll::Poll<core::result::Result<usize, core::io::error::Error>>
+pub struct rsproxy_net::CollectedBody
+pub rsproxy_net::CollectedBody::body: alloc::vec::Vec<u8>
+pub rsproxy_net::CollectedBody::trailers: alloc::vec::Vec<(alloc::string::String, alloc::string::String)>
+impl core::cmp::Eq for rsproxy_net::CollectedBody
+impl core::cmp::PartialEq for rsproxy_net::CollectedBody
+pub fn rsproxy_net::CollectedBody::eq(&self, &rsproxy_net::CollectedBody) -> bool
+impl core::fmt::Debug for rsproxy_net::CollectedBody
+pub fn rsproxy_net::CollectedBody::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for rsproxy_net::CollectedBody
+pub struct rsproxy_net::DnsConfig
+pub rsproxy_net::DnsConfig::cache_ttl: core::time::Duration
+pub rsproxy_net::DnsConfig::servers: alloc::vec::Vec<core::net::socket_addr::SocketAddr>
+pub rsproxy_net::DnsConfig::timeout: core::time::Duration
+impl core::clone::Clone for rsproxy_net::DnsConfig
+pub fn rsproxy_net::DnsConfig::clone(&self) -> rsproxy_net::DnsConfig
+impl core::cmp::Eq for rsproxy_net::DnsConfig
+impl core::cmp::PartialEq for rsproxy_net::DnsConfig
+pub fn rsproxy_net::DnsConfig::eq(&self, &rsproxy_net::DnsConfig) -> bool
+impl core::fmt::Debug for rsproxy_net::DnsConfig
+pub fn rsproxy_net::DnsConfig::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for rsproxy_net::DnsConfig
+pub struct rsproxy_net::DnsResolver
+impl rsproxy_net::DnsResolver
+pub fn rsproxy_net::DnsResolver::new(&rsproxy_net::DnsConfig) -> rsproxy_net::NetResult<Self>
+pub fn rsproxy_net::DnsResolver::resolve_socket_addrs(&self, &str) -> core::io::error::Result<alloc::vec::Vec<core::net::socket_addr::SocketAddr>>
+pub fn rsproxy_net::DnsResolver::resolve_socket_addrs_with_timeout(&self, &str, core::time::Duration) -> core::io::error::Result<alloc::vec::Vec<core::net::socket_addr::SocketAddr>>
+pub fn rsproxy_net::DnsResolver::stats(&self) -> rsproxy_net::DnsStatsSnapshot
+pub struct rsproxy_net::DnsStatsSnapshot
+pub rsproxy_net::DnsStatsSnapshot::failures: u64
+pub rsproxy_net::DnsStatsSnapshot::literal_bypasses: u64
+pub rsproxy_net::DnsStatsSnapshot::lookups: u64
+pub rsproxy_net::DnsStatsSnapshot::successes: u64
+pub rsproxy_net::DnsStatsSnapshot::timeouts: u64
+impl core::clone::Clone for rsproxy_net::DnsStatsSnapshot
+pub fn rsproxy_net::DnsStatsSnapshot::clone(&self) -> rsproxy_net::DnsStatsSnapshot
+impl core::cmp::Eq for rsproxy_net::DnsStatsSnapshot
+impl core::cmp::PartialEq for rsproxy_net::DnsStatsSnapshot
+pub fn rsproxy_net::DnsStatsSnapshot::eq(&self, &rsproxy_net::DnsStatsSnapshot) -> bool
+impl core::default::Default for rsproxy_net::DnsStatsSnapshot
+pub fn rsproxy_net::DnsStatsSnapshot::default() -> rsproxy_net::DnsStatsSnapshot
+impl core::fmt::Debug for rsproxy_net::DnsStatsSnapshot
+pub fn rsproxy_net::DnsStatsSnapshot::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for rsproxy_net::DnsStatsSnapshot
+impl core::marker::StructuralPartialEq for rsproxy_net::DnsStatsSnapshot
+pub struct rsproxy_net::DownstreamH2Config
+pub rsproxy_net::DownstreamH2Config::max_header_count: usize
+pub rsproxy_net::DownstreamH2Config::max_header_size: usize
+impl core::clone::Clone for rsproxy_net::DownstreamH2Config
+pub fn rsproxy_net::DownstreamH2Config::clone(&self) -> rsproxy_net::DownstreamH2Config
+impl core::cmp::Eq for rsproxy_net::DownstreamH2Config
+impl core::cmp::PartialEq for rsproxy_net::DownstreamH2Config
+pub fn rsproxy_net::DownstreamH2Config::eq(&self, &rsproxy_net::DownstreamH2Config) -> bool
+impl core::fmt::Debug for rsproxy_net::DownstreamH2Config
+pub fn rsproxy_net::DownstreamH2Config::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for rsproxy_net::DownstreamH2Config
+impl core::marker::StructuralPartialEq for rsproxy_net::DownstreamH2Config
+pub struct rsproxy_net::DownstreamH2Request
+pub rsproxy_net::DownstreamH2Request::authority: alloc::string::String
+pub rsproxy_net::DownstreamH2Request::body: tokio::sync::mpsc::bounded::Receiver<core::io::error::Result<rsproxy_net::DownstreamH2RequestFrame>>
+pub rsproxy_net::DownstreamH2Request::head: rsproxy_net::RequestHead
+impl core::fmt::Debug for rsproxy_net::DownstreamH2Request
+pub fn rsproxy_net::DownstreamH2Request::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub struct rsproxy_net::DownstreamH2Response
+pub rsproxy_net::DownstreamH2Response::body: tokio::sync::mpsc::bounded::Receiver<core::io::error::Result<rsproxy_net::DownstreamH2ResponseFrame>>
+pub rsproxy_net::DownstreamH2Response::head: rsproxy_net::DownstreamH2ResponseHead
+impl core::fmt::Debug for rsproxy_net::DownstreamH2Response
+pub fn rsproxy_net::DownstreamH2Response::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub struct rsproxy_net::DownstreamH2ResponseHead
+pub rsproxy_net::DownstreamH2ResponseHead::headers: alloc::vec::Vec<(alloc::string::String, alloc::string::String)>
+pub rsproxy_net::DownstreamH2ResponseHead::status: u16
+impl core::fmt::Debug for rsproxy_net::DownstreamH2ResponseHead
+pub fn rsproxy_net::DownstreamH2ResponseHead::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub struct rsproxy_net::H2Config
+pub rsproxy_net::H2Config::deadline: rsproxy_net::RequestDeadline
+pub rsproxy_net::H2Config::max_active_streams_per_key: usize
+pub rsproxy_net::H2Config::max_header_count: usize
+pub rsproxy_net::H2Config::max_header_size: usize
+pub rsproxy_net::H2Config::pool_wait_timeout: core::time::Duration
+pub rsproxy_net::H2Config::ttfb_timeout: core::time::Duration
+impl core::clone::Clone for rsproxy_net::H2Config
+pub fn rsproxy_net::H2Config::clone(&self) -> rsproxy_net::H2Config
+impl core::marker::Copy for rsproxy_net::H2Config
+pub struct rsproxy_net::H2Connector
+impl rsproxy_net::H2Connector
+pub fn rsproxy_net::H2Connector::connect<S: rsproxy_net::ReadyIo>(self, S) -> core::io::error::Result<rsproxy_net::H2Connected>
+pub struct rsproxy_net::H2DispatchRequest<'a>
+pub rsproxy_net::H2DispatchRequest::body: rsproxy_net::H2Body
+pub rsproxy_net::H2DispatchRequest::config: rsproxy_net::H2Config
+pub rsproxy_net::H2DispatchRequest::pool_key: &'a str
+pub rsproxy_net::H2DispatchRequest::request: rsproxy_net::UpstreamH2Request
+pub struct rsproxy_net::KeyedActivity
+impl core::default::Default for rsproxy_net::KeyedActivity
+pub fn rsproxy_net::KeyedActivity::default() -> rsproxy_net::KeyedActivity
+impl rsproxy_net::ActivityStore for rsproxy_net::KeyedActivity
+pub fn rsproxy_net::KeyedActivity::active_for(&self, &str) -> usize
+pub fn rsproxy_net::KeyedActivity::release(&mut self, &str)
+pub fn rsproxy_net::KeyedActivity::reserve(&mut self, &str)
+pub struct rsproxy_net::PoolWaitSpec
+pub rsproxy_net::PoolWaitSpec::limit_label: &'static str
+pub rsproxy_net::PoolWaitSpec::stage: &'static str
+impl core::clone::Clone for rsproxy_net::PoolWaitSpec
+pub fn rsproxy_net::PoolWaitSpec::clone(&self) -> rsproxy_net::PoolWaitSpec
+impl core::marker::Copy for rsproxy_net::PoolWaitSpec
+pub struct rsproxy_net::RawRequest
+pub rsproxy_net::RawRequest::body: alloc::vec::Vec<u8>
+pub rsproxy_net::RawRequest::headers: alloc::vec::Vec<(alloc::string::String, alloc::string::String)>
+pub rsproxy_net::RawRequest::method: alloc::string::String
+pub rsproxy_net::RawRequest::target: alloc::string::String
+pub rsproxy_net::RawRequest::trailers: alloc::vec::Vec<(alloc::string::String, alloc::string::String)>
+pub rsproxy_net::RawRequest::version: alloc::string::String
+impl core::clone::Clone for rsproxy_net::RawRequest
+pub fn rsproxy_net::RawRequest::clone(&self) -> rsproxy_net::RawRequest
+impl core::fmt::Debug for rsproxy_net::RawRequest
+pub fn rsproxy_net::RawRequest::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub struct rsproxy_net::RawResponseHead
+pub rsproxy_net::RawResponseHead::headers: alloc::vec::Vec<(alloc::string::String, alloc::string::String)>
+pub rsproxy_net::RawResponseHead::reason: alloc::string::String
+pub rsproxy_net::RawResponseHead::status: u16
+pub rsproxy_net::RawResponseHead::version: alloc::string::String
+impl core::clone::Clone for rsproxy_net::RawResponseHead
+pub fn rsproxy_net::RawResponseHead::clone(&self) -> rsproxy_net::RawResponseHead
+impl core::fmt::Debug for rsproxy_net::RawResponseHead
+pub fn rsproxy_net::RawResponseHead::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub struct rsproxy_net::RequestBodyReader
+impl rsproxy_net::RequestBodyReader
+pub fn rsproxy_net::RequestBodyReader::framing(&self) -> rsproxy_net::RequestBodyFraming
+pub fn rsproxy_net::RequestBodyReader::new(rsproxy_net::RequestBodyFraming) -> Self
+pub fn rsproxy_net::RequestBodyReader::read<R: std::io::Read + ?core::marker::Sized>(&mut self, &mut R, &mut [u8], usize, usize) -> core::io::error::Result<rsproxy_net::RequestBodyRead>
+impl core::fmt::Debug for rsproxy_net::RequestBodyReader
+pub fn rsproxy_net::RequestBodyReader::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub struct rsproxy_net::RequestDeadline
+impl rsproxy_net::RequestDeadline
+pub fn rsproxy_net::RequestDeadline::budget(self, core::time::Duration) -> core::io::error::Result<rsproxy_net::TimeoutBudget>
+pub fn rsproxy_net::RequestDeadline::new(core::time::Duration) -> core::io::error::Result<Self>
+pub fn rsproxy_net::RequestDeadline::remaining(self) -> core::io::error::Result<core::time::Duration>
+pub fn rsproxy_net::RequestDeadline::sleep(self, core::time::Duration) -> core::io::error::Result<()>
+pub fn rsproxy_net::RequestDeadline::timeout_error(self) -> core::io::error::Error
+impl core::clone::Clone for rsproxy_net::RequestDeadline
+pub fn rsproxy_net::RequestDeadline::clone(&self) -> rsproxy_net::RequestDeadline
+impl core::fmt::Debug for rsproxy_net::RequestDeadline
+pub fn rsproxy_net::RequestDeadline::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for rsproxy_net::RequestDeadline
+pub struct rsproxy_net::RequestHead
+pub rsproxy_net::RequestHead::body: rsproxy_net::RequestBodyFraming
+pub rsproxy_net::RequestHead::request: rsproxy_net::RawRequest
+impl core::fmt::Debug for rsproxy_net::RequestHead
+pub fn rsproxy_net::RequestHead::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub struct rsproxy_net::StreamingH2Request
+impl rsproxy_net::StreamingH2Request
+pub fn rsproxy_net::StreamingH2Request::close_body(&mut self)
+pub fn rsproxy_net::StreamingH2Request::finish(self, core::time::Duration, rsproxy_net::RequestDeadline) -> core::io::error::Result<rsproxy_net::UpstreamH2Response>
+pub fn rsproxy_net::StreamingH2Request::send_data(&self, bytes::bytes::Bytes, rsproxy_net::RequestDeadline) -> core::io::error::Result<bool>
+pub fn rsproxy_net::StreamingH2Request::send_error(&self, &core::io::error::Error, rsproxy_net::RequestDeadline) -> core::io::error::Result<bool>
+pub fn rsproxy_net::StreamingH2Request::send_trailers(&self, alloc::vec::Vec<(alloc::string::String, alloc::string::String)>, rsproxy_net::RequestDeadline) -> core::io::error::Result<bool>
+impl core::ops::drop::Drop for rsproxy_net::StreamingH2Request
+pub fn rsproxy_net::StreamingH2Request::drop(&mut self)
+pub struct rsproxy_net::TimeoutBudget
+impl rsproxy_net::TimeoutBudget
+pub fn rsproxy_net::TimeoutBudget::map_timeout(self, core::io::error::Error) -> core::io::error::Error
+pub fn rsproxy_net::TimeoutBudget::timeout(self) -> core::time::Duration
+pub fn rsproxy_net::TimeoutBudget::timeout_error(self, impl core::ops::function::FnOnce(core::time::Duration) -> core::io::error::Error) -> core::io::error::Error
+impl core::clone::Clone for rsproxy_net::TimeoutBudget
+pub fn rsproxy_net::TimeoutBudget::clone(&self) -> rsproxy_net::TimeoutBudget
+impl core::fmt::Debug for rsproxy_net::TimeoutBudget
+pub fn rsproxy_net::TimeoutBudget::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for rsproxy_net::TimeoutBudget
+pub struct rsproxy_net::UpstreamBody
+impl rsproxy_net::UpstreamBody
+pub fn rsproxy_net::UpstreamBody::collect_bounded(&mut self, usize) -> core::io::error::Result<rsproxy_net::BoundedBody>
+pub fn rsproxy_net::UpstreamBody::next(&mut self) -> core::option::Option<core::io::error::Result<rsproxy_net::UpstreamBodyFrame>>
+pub fn rsproxy_net::UpstreamBody::receive_ms(&self) -> core::option::Option<u64>
+impl core::fmt::Debug for rsproxy_net::UpstreamBody
+pub fn rsproxy_net::UpstreamBody::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub struct rsproxy_net::UpstreamH2Request
+pub rsproxy_net::UpstreamH2Request::body: alloc::vec::Vec<u8>
+pub rsproxy_net::UpstreamH2Request::headers: alloc::vec::Vec<(alloc::string::String, alloc::string::String)>
+pub rsproxy_net::UpstreamH2Request::method: alloc::string::String
+pub rsproxy_net::UpstreamH2Request::trailers: alloc::vec::Vec<(alloc::string::String, alloc::string::String)>
+pub rsproxy_net::UpstreamH2Request::uri: alloc::string::String
+impl core::clone::Clone for rsproxy_net::UpstreamH2Request
+pub fn rsproxy_net::UpstreamH2Request::clone(&self) -> rsproxy_net::UpstreamH2Request
+impl core::fmt::Debug for rsproxy_net::UpstreamH2Request
+pub fn rsproxy_net::UpstreamH2Request::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub struct rsproxy_net::UpstreamH2Response
+pub rsproxy_net::UpstreamH2Response::body: rsproxy_net::UpstreamBody
+pub rsproxy_net::UpstreamH2Response::headers: alloc::vec::Vec<(alloc::string::String, alloc::string::String)>
+pub rsproxy_net::UpstreamH2Response::pool_wait_ms: u64
+pub rsproxy_net::UpstreamH2Response::request_send_ms: u64
+pub rsproxy_net::UpstreamH2Response::reused_connection: bool
+pub rsproxy_net::UpstreamH2Response::status: u16
+pub rsproxy_net::UpstreamH2Response::ttfb_ms: u64
+impl core::fmt::Debug for rsproxy_net::UpstreamH2Response
+pub fn rsproxy_net::UpstreamH2Response::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub trait rsproxy_net::ActivityStore
+pub fn rsproxy_net::ActivityStore::active_for(&self, &str) -> usize
+pub fn rsproxy_net::ActivityStore::release(&mut self, &str)
+pub fn rsproxy_net::ActivityStore::reserve(&mut self, &str)
+impl rsproxy_net::ActivityStore for rsproxy_net::KeyedActivity
+pub fn rsproxy_net::KeyedActivity::active_for(&self, &str) -> usize
+pub fn rsproxy_net::KeyedActivity::release(&mut self, &str)
+pub fn rsproxy_net::KeyedActivity::reserve(&mut self, &str)
+pub trait rsproxy_net::ReadyIo: std::io::Read + std::io::Write + core::marker::Send + core::marker::Unpin + 'static
+pub fn rsproxy_net::ReadyIo::begin_shutdown(&mut self)
+pub fn rsproxy_net::ReadyIo::raw_fd(&self) -> std::os::fd::raw::RawFd
+pub fn rsproxy_net::ReadyIo::set_nonblocking(&mut self, bool) -> core::io::error::Result<()>
+pub fn rsproxy_net::ReadyIo::shutdown_write(&mut self) -> core::io::error::Result<()>
+impl rsproxy_net::ReadyIo for rustls::stream::StreamOwned<rustls::client::client_conn::connection::ClientConnection, std::net::tcp::TcpStream>
+pub fn rustls::stream::StreamOwned<rustls::client::client_conn::connection::ClientConnection, std::net::tcp::TcpStream>::begin_shutdown(&mut self)
+pub fn rustls::stream::StreamOwned<rustls::client::client_conn::connection::ClientConnection, std::net::tcp::TcpStream>::raw_fd(&self) -> std::os::fd::raw::RawFd
+pub fn rustls::stream::StreamOwned<rustls::client::client_conn::connection::ClientConnection, std::net::tcp::TcpStream>::set_nonblocking(&mut self, bool) -> core::io::error::Result<()>
+pub fn rustls::stream::StreamOwned<rustls::client::client_conn::connection::ClientConnection, std::net::tcp::TcpStream>::shutdown_write(&mut self) -> core::io::error::Result<()>
+impl rsproxy_net::ReadyIo for rustls::stream::StreamOwned<rustls::server::server_conn::connection::ServerConnection, std::net::tcp::TcpStream>
+pub fn rustls::stream::StreamOwned<rustls::server::server_conn::connection::ServerConnection, std::net::tcp::TcpStream>::begin_shutdown(&mut self)
+pub fn rustls::stream::StreamOwned<rustls::server::server_conn::connection::ServerConnection, std::net::tcp::TcpStream>::raw_fd(&self) -> std::os::fd::raw::RawFd
+pub fn rustls::stream::StreamOwned<rustls::server::server_conn::connection::ServerConnection, std::net::tcp::TcpStream>::set_nonblocking(&mut self, bool) -> core::io::error::Result<()>
+pub fn rustls::stream::StreamOwned<rustls::server::server_conn::connection::ServerConnection, std::net::tcp::TcpStream>::shutdown_write(&mut self) -> core::io::error::Result<()>
+impl rsproxy_net::ReadyIo for std::net::tcp::TcpStream
+pub fn std::net::tcp::TcpStream::begin_shutdown(&mut self)
+pub fn std::net::tcp::TcpStream::raw_fd(&self) -> std::os::fd::raw::RawFd
+pub fn std::net::tcp::TcpStream::set_nonblocking(&mut self, bool) -> core::io::error::Result<()>
+pub fn std::net::tcp::TcpStream::shutdown_write(&mut self) -> core::io::error::Result<()>
+pub fn rsproxy_net::acquire_slot<T: rsproxy_net::ActivityStore>(&std::sync::poison::mutex::Mutex<T>, &std::sync::poison::condvar::Condvar, &str, usize, core::time::Duration, std::time::Instant, rsproxy_net::PoolWaitSpec) -> core::io::error::Result<u64>
+pub fn rsproxy_net::dispatch(rsproxy_net::H2DispatchRequest<'_>) -> core::io::error::Result<rsproxy_net::H2Outcome>
+pub fn rsproxy_net::h2_runtime() -> core::io::error::Result<&'static tokio::runtime::runtime::Runtime>
+pub fn rsproxy_net::header<'a>(&'a [(alloc::string::String, alloc::string::String)], &str) -> core::option::Option<&'a str>
+pub fn rsproxy_net::is_request_total_timeout(&core::io::error::Error) -> bool
+pub fn rsproxy_net::read_request<R: std::io::Read + ?core::marker::Sized>(&mut R, usize, usize) -> core::io::error::Result<core::option::Option<rsproxy_net::RawRequest>>
+pub fn rsproxy_net::read_request_body_bounded<R: std::io::Read + ?core::marker::Sized>(&mut R, rsproxy_net::RequestBodyFraming, usize, usize, usize) -> core::io::error::Result<rsproxy_net::BoundedRequestBody>
+pub fn rsproxy_net::read_request_head<R: std::io::Read + ?core::marker::Sized>(&mut R, usize, usize) -> core::io::error::Result<core::option::Option<rsproxy_net::RequestHead>>
+pub fn rsproxy_net::read_request_head_tcp(&mut std::net::tcp::TcpStream, usize, usize) -> core::io::error::Result<core::option::Option<rsproxy_net::RequestHead>>
+pub fn rsproxy_net::read_response_head<R: std::io::Read + ?core::marker::Sized>(&mut R, usize, usize) -> core::io::error::Result<rsproxy_net::RawResponseHead>
+pub fn rsproxy_net::read_response_head_buffered<R: std::io::BufRead + ?core::marker::Sized>(&mut R, usize, usize) -> core::io::error::Result<rsproxy_net::RawResponseHead>
+pub fn rsproxy_net::reason_phrase(u16) -> &'static str
+pub fn rsproxy_net::remove_header(&mut alloc::vec::Vec<(alloc::string::String, alloc::string::String)>, &str)
+pub fn rsproxy_net::serve_downstream_h2<S, H, F>(S, alloc::string::String, rsproxy_net::DownstreamH2Config, H) -> core::io::error::Result<()> where S: rsproxy_net::ReadyIo, H: core::ops::function::Fn(rsproxy_net::DownstreamH2Request) -> F + core::clone::Clone + core::marker::Send + core::marker::Sync + 'static, F: core::future::future::Future<Output = core::io::error::Result<rsproxy_net::DownstreamH2Response>> + core::marker::Send + 'static
+pub fn rsproxy_net::set_header(&mut alloc::vec::Vec<(alloc::string::String, alloc::string::String)>, &str, alloc::string::String)
+pub fn rsproxy_net::validate_request_trailers(&[(alloc::string::String, alloc::string::String)], usize, usize) -> core::io::error::Result<()>
+pub fn rsproxy_net::write_response<W: std::io::Write + ?core::marker::Sized>(&mut W, u16, &str, &[(alloc::string::String, alloc::string::String)], &[u8]) -> core::io::error::Result<()>
+pub fn rsproxy_net::write_response_head<W: std::io::Write + ?core::marker::Sized>(&mut W, &rsproxy_net::RawResponseHead, &[(alloc::string::String, alloc::string::String)]) -> core::io::error::Result<()>
+pub fn rsproxy_net::write_response_head_with_connection<W: std::io::Write + ?core::marker::Sized>(&mut W, &rsproxy_net::RawResponseHead, &[(alloc::string::String, alloc::string::String)], bool) -> core::io::error::Result<()>
+pub fn rsproxy_net::write_response_with_version_and_connection<W: std::io::Write + ?core::marker::Sized>(&mut W, &str, u16, &str, &[(alloc::string::String, alloc::string::String)], &[u8], bool) -> core::io::error::Result<()>
+pub type rsproxy_net::NetResult<T> = core::result::Result<T, rsproxy_net::NetError>

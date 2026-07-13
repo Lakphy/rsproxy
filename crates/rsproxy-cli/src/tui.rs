@@ -21,7 +21,7 @@ use format::*;
 use render::render_frame;
 use state::*;
 
-pub fn tui_cmd(args: TuiArgs, json: bool) -> CliResult<()> {
+pub(crate) fn tui_cmd(args: TuiArgs, json: bool) -> CliResult<()> {
     let api = runtime_config(&RuntimeArgs::from_client(args.client))?.api;
     let limit = args.limit.unwrap_or(20);
     let filter = args.filter.unwrap_or_default();

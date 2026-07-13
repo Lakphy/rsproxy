@@ -4,15 +4,15 @@ use std::path::PathBuf;
 use super::ClientArgs;
 
 #[derive(Args)]
-pub struct RulesArgs {
+pub(crate) struct RulesArgs {
     #[command(flatten)]
-    pub client: ClientArgs,
+    pub(crate) client: ClientArgs,
     #[command(subcommand)]
-    pub command: RulesCommand,
+    pub(crate) command: RulesCommand,
 }
 
 #[derive(Subcommand)]
-pub enum RulesCommand {
+pub(crate) enum RulesCommand {
     /// Validate rules read from FILE or stdin.
     Check(RulesCheckArgs),
     /// List rule groups.
@@ -40,75 +40,75 @@ pub enum RulesCommand {
 }
 
 #[derive(Args)]
-pub struct RulesListArgs {}
+pub(crate) struct RulesListArgs {}
 
 #[derive(Args)]
-pub struct RulesCheckArgs {
-    pub file: Option<PathBuf>,
+pub(crate) struct RulesCheckArgs {
+    pub(crate) file: Option<PathBuf>,
 }
 
 #[derive(Args)]
-pub struct OptionalGroupArgs {
+pub(crate) struct OptionalGroupArgs {
     #[arg(default_value = "default")]
-    pub group: String,
+    pub(crate) group: String,
 }
 
 #[derive(Args)]
-pub struct RequiredGroupArgs {
-    pub group: String,
+pub(crate) struct RequiredGroupArgs {
+    pub(crate) group: String,
 }
 
 #[derive(Args)]
-pub struct RulesSetArgs {
+pub(crate) struct RulesSetArgs {
     #[arg(default_value = "default")]
-    pub group: String,
+    pub(crate) group: String,
     #[arg(long)]
-    pub file: Option<PathBuf>,
+    pub(crate) file: Option<PathBuf>,
 }
 
 #[derive(Args)]
-pub struct RulesSourceArgs {
+pub(crate) struct RulesSourceArgs {
     #[arg(long)]
-    pub file: Option<PathBuf>,
+    pub(crate) file: Option<PathBuf>,
 }
 
 #[derive(Clone, Default, Args)]
-pub struct RequestArgs {
+pub(crate) struct RequestArgs {
     #[arg(short = 'X', long, default_value = "GET")]
-    pub method: String,
+    pub(crate) method: String,
     #[arg(short = 'H', long, action = ArgAction::Append)]
-    pub header: Vec<String>,
+    pub(crate) header: Vec<String>,
     #[arg(short = 'd', long)]
-    pub body: Option<String>,
+    pub(crate) body: Option<String>,
     #[arg(long)]
-    pub client_ip: Option<String>,
+    pub(crate) client_ip: Option<String>,
     #[arg(long)]
-    pub server_ip: Option<String>,
+    pub(crate) server_ip: Option<String>,
 }
 
 #[derive(Args)]
-pub struct RulesTestArgs {
-    pub url: String,
+pub(crate) struct RulesTestArgs {
+    pub(crate) url: String,
     #[command(flatten)]
-    pub request: RequestArgs,
+    pub(crate) request: RequestArgs,
     #[arg(long)]
-    pub response_status: Option<String>,
+    pub(crate) response_status: Option<String>,
     #[arg(long, action = ArgAction::Append)]
-    pub response_header: Vec<String>,
+    pub(crate) response_header: Vec<String>,
 }
 
 #[derive(Args)]
-pub struct RulesBenchArgs {
+pub(crate) struct RulesBenchArgs {
     /// URL to benchmark (may also be supplied with --url).
-    pub positional_url: Option<String>,
+    pub(crate) positional_url: Option<String>,
     #[arg(long)]
-    pub url: Option<String>,
+    pub(crate) url: Option<String>,
     #[command(flatten)]
-    pub request: RequestArgs,
+    pub(crate) request: RequestArgs,
     #[command(flatten)]
-    pub source: RulesSourceArgs,
+    pub(crate) source: RulesSourceArgs,
     #[arg(short = 'n', long)]
-    pub iterations: Option<usize>,
+    pub(crate) iterations: Option<usize>,
     #[arg(long)]
-    pub warmup: Option<usize>,
+    pub(crate) warmup: Option<usize>,
 }

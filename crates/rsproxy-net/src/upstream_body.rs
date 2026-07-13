@@ -9,16 +9,19 @@ const BODY_CHANNEL_CAPACITY: usize = 8;
 pub(crate) type UpstreamBodySender = mpsc::Sender<io::Result<UpstreamBodyFrame>>;
 
 #[cfg(feature = "test-support")]
+/// Test-only handle for reading elapsed upstream body receive time.
 pub struct TestReceiveTimer(TransferTimer);
 
 #[cfg(feature = "test-support")]
 impl TestReceiveTimer {
+    /// Stops the timer if necessary and returns elapsed milliseconds.
     pub fn finish(&self) -> u64 {
         self.0.finish()
     }
 }
 
 #[cfg(feature = "test-support")]
+/// Creates a test body channel whose receive duration can be inspected.
 pub fn test_timed_upstream_body_channel() -> (
     mpsc::Sender<io::Result<UpstreamBodyFrame>>,
     UpstreamBody,
@@ -29,11 +32,15 @@ pub fn test_timed_upstream_body_channel() -> (
 }
 
 #[derive(Debug)]
+/// One ordered frame received from an upstream response body.
 pub enum UpstreamBodyFrame {
+    /// A non-empty body data fragment.
     Data(Bytes),
+    /// Terminal response trailers.
     Trailers(Vec<(String, String)>),
 }
 
+/// Blocking consumer for the bounded channel driven by an upstream protocol task.
 pub struct UpstreamBody {
     receiver: mpsc::Receiver<io::Result<UpstreamBodyFrame>>,
     pending: Option<io::Result<UpstreamBodyFrame>>,
@@ -41,19 +48,29 @@ pub struct UpstreamBody {
 }
 
 #[derive(Debug, PartialEq, Eq)]
+/// A fully buffered upstream body and its terminal trailers.
 pub struct CollectedBody {
+    /// Concatenated data-frame bytes.
     pub body: Vec<u8>,
+    /// Trailer fields in received order.
     pub trailers: Vec<(String, String)>,
 }
 
 #[derive(Debug, PartialEq, Eq)]
+/// Result of buffering an upstream body under a byte limit.
 pub enum BoundedBody {
+    /// The entire body and trailers fit within the limit.
     Complete(CollectedBody),
-    Overflow { prefix: Vec<u8> },
+    /// The limit was reached while unread frames remain on the body stream.
+    Overflow {
+        /// At most `limit` leading body bytes retained for inspection.
+        prefix: Vec<u8>,
+    },
 }
 
 impl UpstreamBody {
     #[cfg(any(test, feature = "test-support"))]
+    /// Creates a test-support channel without receive-time instrumentation.
     pub fn channel() -> (mpsc::Sender<io::Result<UpstreamBodyFrame>>, Self) {
         let (sender, receiver) = mpsc::channel(BODY_CHANNEL_CAPACITY);
         (
@@ -81,6 +98,7 @@ impl UpstreamBody {
     }
 
     #[cfg(any(test, feature = "test-support"))]
+    /// Creates a closed test body stream from already collected data.
     pub fn from_collected(body: Vec<u8>, trailers: Vec<(String, String)>) -> Self {
         let (sender, stream) = Self::channel();
         if !body.is_empty() {
@@ -97,6 +115,7 @@ impl UpstreamBody {
         stream
     }
 
+    /// Returns milliseconds since timed channel creation, if timing is enabled.
     pub fn receive_ms(&self) -> Option<u64> {
         self.receive_timer
             .as_ref()
@@ -104,6 +123,7 @@ impl UpstreamBody {
     }
 
     #[allow(clippy::should_implement_trait)]
+    /// Blocks until the next frame arrives or all senders have closed.
     pub fn next(&mut self) -> Option<io::Result<UpstreamBodyFrame>> {
         self.pending
             .take()
@@ -111,6 +131,7 @@ impl UpstreamBody {
     }
 
     #[cfg(any(test, feature = "test-support"))]
+    /// Drains every frame into memory without imposing a byte limit.
     pub fn collect(mut self) -> io::Result<CollectedBody> {
         let mut body = Vec::new();
         let mut trailers = Vec::new();
@@ -123,6 +144,7 @@ impl UpstreamBody {
         Ok(CollectedBody { body, trailers })
     }
 
+    /// Buffers up to `limit` bytes while preserving unread overflow for later calls.
     pub fn collect_bounded(&mut self, limit: usize) -> io::Result<BoundedBody> {
         let mut body = Vec::with_capacity(limit.min(64 * 1024));
         let mut trailers = Vec::new();

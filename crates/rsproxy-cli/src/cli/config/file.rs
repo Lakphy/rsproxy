@@ -78,113 +78,122 @@ impl FileConfig {
             config.api = api;
         }
         if let Some(storage) = self.storage {
-            config.storage = storage;
+            config.engine_mut().storage = storage;
         }
         if let Some(watch) = self.watch {
-            config.rules_watch = watch;
+            config.engine_mut().rules_watch = watch;
         }
         if let Some(value) = self.watch_debounce_ms {
-            config.rules_watch_debounce = positive_millis(value, "watch_debounce_ms")?;
+            config.engine_mut().rules_watch_debounce = positive_millis(value, "watch_debounce_ms")?;
         }
         if let Some(token) = self.api_token {
             config.api_token = Some(validate_api_token(&token)?);
         }
         if let Some(auth) = self.proxy_auth {
-            config.proxy_auth = Some(parse_proxy_auth(&auth)?);
+            config.engine_mut().proxy_auth = Some(parse_proxy_auth(&auth)?);
         }
         if let Some(value) = self.max_header_size {
-            config.max_header_size = value.parse("max_header_size")?;
+            config.engine_mut().max_header_size = value.parse("max_header_size")?;
         }
         if let Some(value) = self.max_header_count {
-            config.max_header_count = positive_usize(value, "max_header_count")?;
+            config.engine_mut().max_header_count = positive_usize(value, "max_header_count")?;
         }
         if let Some(value) = self.body_buffer_limit {
-            config.body_buffer_limit =
+            config.engine_mut().body_buffer_limit =
                 positive_size(value.parse("body_buffer_limit")?, "body_buffer_limit")?;
         }
         if let Some(value) = self.trace_body_limit {
-            config.trace_body_limit = value.parse("trace_body_limit")?;
+            config.engine_mut().trace_body_limit = value.parse("trace_body_limit")?;
         }
         if let Some(filter) = self.trace_filter {
             apply_trace_filter(config, &filter)?;
         }
         if let Some(capacity) = self.trace_queue_capacity {
-            config.trace_queue_capacity = positive_usize(capacity, "trace_queue_capacity")?;
+            config.engine_mut().trace_queue_capacity =
+                positive_usize(capacity, "trace_queue_capacity")?;
         }
         if let Some(value) = self.trace_mem_budget {
-            config.trace_memory_budget =
+            config.engine_mut().trace_memory_budget =
                 positive_size(value.parse("trace_mem_budget")?, "trace_mem_budget")?;
         }
         if let Some(value) = self.trace_segment_size {
-            config.trace_spill_segment_size =
+            config.engine_mut().trace_spill_segment_size =
                 positive_size(value.parse("trace_segment_size")?, "trace_segment_size")?;
         }
         if let Some(value) = self.trace_disk_budget {
-            config.trace_disk_budget = value.parse("trace_disk_budget")?;
+            config.engine_mut().trace_disk_budget = value.parse("trace_disk_budget")?;
         }
         if let Some(compression) = self.trace_spill_compression {
-            config.trace_spill_compression = parse_trace_spill_compression(&compression)?;
+            config.engine_mut().trace_spill_compression =
+                parse_trace_spill_compression(&compression)?;
         }
         if let Some(no_mitm) = self.no_mitm {
-            config.no_mitm = no_mitm;
+            config.engine_mut().no_mitm = no_mitm;
         }
         if let Some(strict_mitm) = self.strict_mitm {
-            config.strict_mitm = strict_mitm;
+            config.engine_mut().strict_mitm = strict_mitm;
         }
         if let Some(capacity) = self.mitm_cert_cache_capacity {
-            config.mitm_cert_cache_capacity = capacity;
+            config.engine_mut().mitm_cert_cache_capacity = capacity;
         }
         if let Some(capacity) = self.mitm_failure_cache_capacity {
-            config.mitm_failure_cache_capacity = capacity;
+            config.engine_mut().mitm_failure_cache_capacity = capacity;
         }
         if let Some(value) = self.mitm_failure_ttl_seconds {
-            config.mitm_failure_ttl = positive_seconds(value, "mitm_failure_ttl_seconds")?;
+            config.engine_mut().mitm_failure_ttl =
+                positive_seconds(value, "mitm_failure_ttl_seconds")?;
         }
         if let Some(value) = self.connect_probe_timeout_ms {
-            config.connect_probe_timeout = positive_millis(value, "connect_probe_timeout_ms")?;
+            config.engine_mut().connect_probe_timeout =
+                positive_millis(value, "connect_probe_timeout_ms")?;
         }
         if let Some(value) = self.h1_pool_max_active_per_key {
-            config.h1_pool_max_active_per_key =
+            config.engine_mut().h1_pool_max_active_per_key =
                 positive_usize(value, "h1_pool_max_active_per_key")?;
         }
         if let Some(value) = self.h1_pool_wait_timeout_ms {
-            config.h1_pool_wait_timeout = positive_millis(value, "h1_pool_wait_timeout_ms")?;
+            config.engine_mut().h1_pool_wait_timeout =
+                positive_millis(value, "h1_pool_wait_timeout_ms")?;
         }
         if let Some(value) = self.h2_pool_max_active_streams_per_key {
-            config.h2_pool_max_active_streams_per_key =
+            config.engine_mut().h2_pool_max_active_streams_per_key =
                 positive_usize(value, "h2_pool_max_active_streams_per_key")?;
         }
         if let Some(value) = self.h2_pool_wait_timeout_ms {
-            config.h2_pool_wait_timeout = positive_millis(value, "h2_pool_wait_timeout_ms")?;
+            config.engine_mut().h2_pool_wait_timeout =
+                positive_millis(value, "h2_pool_wait_timeout_ms")?;
         }
         if let Some(value) = self.dns_timeout_ms {
-            config.dns_timeout = positive_millis(value, "dns_timeout_ms")?;
+            config.engine_mut().dns_timeout = positive_millis(value, "dns_timeout_ms")?;
         }
         if let Some(value) = self.dns_cache_seconds {
-            config.dns_cache_ttl = Duration::from_secs(value);
+            config.engine_mut().dns_cache_ttl = Duration::from_secs(value);
         }
         if let Some(servers) = self.dns_server {
-            config.dns_servers = dns::parse_dns_servers(&servers)?;
+            config.engine_mut().dns_servers = dns::parse_dns_servers(&servers)?;
         }
         if let Some(value) = self.tcp_connect_timeout_ms {
-            config.tcp_connect_timeout = positive_millis(value, "tcp_connect_timeout_ms")?;
+            config.engine_mut().tcp_connect_timeout =
+                positive_millis(value, "tcp_connect_timeout_ms")?;
         }
         if let Some(value) = self.client_tls_handshake_timeout_ms {
-            config.client_tls_handshake_timeout =
+            config.engine_mut().client_tls_handshake_timeout =
                 positive_millis(value, "client_tls_handshake_timeout_ms")?;
         }
         if let Some(value) = self.upstream_tls_handshake_timeout_ms {
-            config.upstream_tls_handshake_timeout =
+            config.engine_mut().upstream_tls_handshake_timeout =
                 positive_millis(value, "upstream_tls_handshake_timeout_ms")?;
         }
         if let Some(value) = self.upstream_ttfb_timeout_ms {
-            config.upstream_ttfb_timeout = positive_millis(value, "upstream_ttfb_timeout_ms")?;
+            config.engine_mut().upstream_ttfb_timeout =
+                positive_millis(value, "upstream_ttfb_timeout_ms")?;
         }
         if let Some(value) = self.request_timeout_ms {
-            config.request_total_timeout = positive_millis(value, "request_timeout_ms")?;
+            config.engine_mut().request_total_timeout =
+                positive_millis(value, "request_timeout_ms")?;
         }
         if self.no_trace_body == Some(true) {
-            config.trace_body_limit = 0;
+            config.engine_mut().trace_body_limit = 0;
         }
         Ok(())
     }

@@ -1,5 +1,6 @@
 [package]
 name = "rsproxy-control"
+description = "Local control API and client data shapes for managing a running rsproxy engine."
 version.workspace = true
 edition.workspace = true
 license.workspace = true

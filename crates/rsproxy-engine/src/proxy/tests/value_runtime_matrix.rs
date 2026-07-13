@@ -16,14 +16,14 @@ fn every_value_slot_resolves_all_runtime_source_and_capture_forms() {
         std::process::id(),
         rsproxy_trace::now_millis()
     ));
-    std::fs::create_dir_all(storage.join("values")).unwrap();
-    std::fs::create_dir_all(storage.join("files")).unwrap();
-    std::fs::write(
+    fs::create_dir_all(storage.join("values")).unwrap();
+    fs::create_dir_all(storage.join("files")).unwrap();
+    fs::write(
         storage.join("values/shared"),
         b"reference-${host}-$2-${kind}",
     )
     .unwrap();
-    std::fs::write(storage.join("files/value.txt"), b"file-${host}-$2-${kind}").unwrap();
+    fs::write(storage.join("files/value.txt"), b"file-${host}-$2-${kind}").unwrap();
     let mut state = test_state();
     state.config.storage = storage.clone();
     let request = meta("http://example.test/items/42");
@@ -58,10 +58,9 @@ fn every_value_slot_resolves_all_runtime_source_and_capture_forms() {
         for source in &sources {
             let action = slot.action.replace("{value}", source.syntax);
             let rule = format!(r"/\/(?P<kind>items)\/(\d+)/ {action}");
-            let rules =
-                rsproxy_rules::RuleSet::parse("runtime-matrix", &rule).unwrap_or_else(|errors| {
-                    panic!("{} with {}: {errors:?}", slot.name, source.syntax)
-                });
+            let rules = RuleSet::parse("runtime-matrix", &rule).unwrap_or_else(|errors| {
+                panic!("{} with {}: {errors:?}", slot.name, source.syntax)
+            });
             let resolved = rules.resolve(&request);
             let item = resolved
                 .actions
@@ -79,7 +78,7 @@ fn every_value_slot_resolves_all_runtime_source_and_capture_forms() {
             );
         }
     }
-    let _ = std::fs::remove_dir_all(storage);
+    let _ = fs::remove_dir_all(storage);
 }
 
 #[test]
@@ -87,7 +86,7 @@ fn every_value_slot_rejects_an_invalid_reference_key() {
     for slot in VALUE_SLOTS {
         let action = slot.action.replace("{value}", "@../escape");
         let rule = format!("example.test {action}");
-        let errors = match rsproxy_rules::RuleSet::parse("runtime-matrix", &rule) {
+        let errors = match RuleSet::parse("runtime-matrix", &rule) {
             Ok(_) => panic!("{} accepted invalid reference", slot.name),
             Err(errors) => errors,
         };

@@ -1,3 +1,6 @@
+//! Behavioral smoke tests for the rules facade.
+#![allow(clippy::unwrap_used)]
+
 use rsproxy_rules::{
     Action, DeleteBodyPath, HostPool, RequestMeta, RuleModelError, RuleSet, UrlParts, Value,
 };

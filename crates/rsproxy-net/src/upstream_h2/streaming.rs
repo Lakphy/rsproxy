@@ -9,6 +9,7 @@ pub(super) enum H2StreamingDispatch {
     Connect(H2PoolLease),
 }
 
+/// In-flight HTTP/2 request whose body is supplied frame by frame.
 pub struct StreamingH2Request {
     body: Option<H2RequestBodySender>,
     response: Option<JoinHandle<io::Result<UpstreamH2Response>>>,
@@ -17,6 +18,9 @@ pub struct StreamingH2Request {
 }
 
 impl StreamingH2Request {
+    /// Sends one data frame within the caller's request-total deadline.
+    ///
+    /// Returns `false` after the body channel has already been closed.
     pub fn send_data(&self, data: Bytes, deadline: RequestDeadline) -> io::Result<bool> {
         let Some(body) = self.body.as_ref() else {
             return Ok(false);
@@ -24,6 +28,7 @@ impl StreamingH2Request {
         body.send_data(data, deadline)
     }
 
+    /// Sends terminal request trailers within the caller's total deadline.
     pub fn send_trailers(
         &self,
         trailers: Vec<(String, String)>,
@@ -35,6 +40,7 @@ impl StreamingH2Request {
         body.send_trailers(trailers, deadline)
     }
 
+    /// Propagates a producer error to the request-body task within the deadline.
     pub fn send_error(&self, error: &io::Error, deadline: RequestDeadline) -> io::Result<bool> {
         let Some(body) = self.body.as_ref() else {
             return Ok(false);
@@ -42,10 +48,15 @@ impl StreamingH2Request {
         body.send_error(error, deadline)
     }
 
+    /// Closes the request body channel without waiting for response headers.
     pub fn close_body(&mut self) {
         self.body.take();
     }
 
+    /// Closes the body and waits for response headers.
+    ///
+    /// TTFB timing starts when this call begins waiting and is clipped to the
+    /// request-total deadline created by the caller.
     pub fn finish(
         mut self,
         ttfb_timeout: Duration,

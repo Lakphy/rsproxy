@@ -20,12 +20,17 @@ use tokio::time::{Sleep, sleep};
 #[cfg(not(unix))]
 const IO_RETRY_DELAY: Duration = Duration::from_millis(1);
 
+/// Blocking stream operations that [`AsyncIo`] can drive from Tokio readiness.
 pub trait ReadyIo: Read + Write + Send + Unpin + 'static {
+    /// Switches the underlying transport between blocking and nonblocking mode.
     fn set_nonblocking(&mut self, nonblocking: bool) -> io::Result<()>;
+    /// Starts protocol-level shutdown, such as emitting a TLS close notification.
     fn begin_shutdown(&mut self);
+    /// Closes the transport's write half after pending protocol bytes are flushed.
     fn shutdown_write(&mut self) -> io::Result<()>;
 
     #[cfg(unix)]
+    /// Returns the descriptor registered with Tokio's readiness reactor.
     fn raw_fd(&self) -> RawFd;
 }
 
@@ -95,6 +100,7 @@ impl<S: ReadyIo> AsRawFd for ReadyFd<S> {
 }
 
 #[cfg(unix)]
+/// Adapts a blocking TCP or TLS stream to Tokio's asynchronous I/O traits.
 pub struct AsyncIo<S: ReadyIo> {
     inner: AsyncFd<ReadyFd<S>>,
     shutdown_started: bool,
@@ -102,6 +108,7 @@ pub struct AsyncIo<S: ReadyIo> {
 
 #[cfg(unix)]
 impl<S: ReadyIo> AsyncIo<S> {
+    /// Enables nonblocking mode and registers `inner` with the Tokio reactor.
     pub fn new(mut inner: S) -> io::Result<Self> {
         inner.set_nonblocking(true)?;
         Ok(Self {
@@ -200,6 +207,7 @@ impl<S: ReadyIo> AsyncWrite for AsyncIo<S> {
 }
 
 #[cfg(not(unix))]
+/// Adapts a blocking TCP or TLS stream to Tokio's asynchronous I/O traits.
 pub struct AsyncIo<S: ReadyIo> {
     inner: S,
     read_wait: Option<Pin<Box<Sleep>>>,
@@ -209,6 +217,7 @@ pub struct AsyncIo<S: ReadyIo> {
 
 #[cfg(not(unix))]
 impl<S: ReadyIo> AsyncIo<S> {
+    /// Enables nonblocking mode and initializes readiness-retry state.
     pub fn new(mut inner: S) -> io::Result<Self> {
         inner.set_nonblocking(true)?;
         Ok(Self {

@@ -8,7 +8,12 @@ pub(in crate::proxy) fn mitm_server_config(
     state: &SharedState,
     host: &str,
 ) -> io::Result<(Arc<ServerConfig>, bool)> {
-    if let Some(config) = state.mitm_cert_cache.lock().unwrap().get(host) {
+    if let Some(config) = state
+        .mitm_cert_cache
+        .lock()
+        .expect("MITM certificate cache lock poisoned")
+        .get(host)
+    {
         return Ok((config, true));
     }
     let ca_material = state.config.ca_material.as_ref().ok_or_else(|| {
@@ -26,7 +31,7 @@ pub(in crate::proxy) fn mitm_server_config(
     state
         .mitm_cert_cache
         .lock()
-        .unwrap()
+        .expect("MITM certificate cache lock poisoned")
         .insert(host.to_string(), Arc::clone(&config));
     Ok((config, false))
 }

@@ -100,7 +100,7 @@ impl Fixture {
             );
             match contract.file {
                 "ci.yml" => source.push_str(
-                    "      - uses: EmbarkStudios/cargo-deny-action@v2\n      - run: cargo xtask check all\n      - run: cargo xtask check all\n",
+                    "      - uses: EmbarkStudios/cargo-deny-action@v2\n      - run: cargo xtask check all\n",
                 ),
                 "performance.yml" => source.push_str(
                     "      - run: cargo xtask targets criterion target/performance/criterion.json\n      - run: cargo xtask targets regression \"$RUNNER_TEMP/criterion-base.json\" target/performance/criterion.json 10\n",

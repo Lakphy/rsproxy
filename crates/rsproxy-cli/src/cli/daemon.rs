@@ -59,13 +59,16 @@ pub(super) fn run_server(args: &RuntimeArgs) -> CliResult<()> {
         .map(|path| path.display().to_string())
         .unwrap_or_else(|| "defaults".to_string());
     let api_auth = if config.api_token.is_some() {
-        format!("token:{}", api_token_path(&config.storage).display())
+        format!(
+            "token:{}",
+            api_token_path(&config.engine().storage).display()
+        )
     } else {
         "peer".to_string()
     };
-    let mitm_mode = if config.no_mitm {
+    let mitm_mode = if config.engine().no_mitm {
         "disabled"
-    } else if config.strict_mitm {
+    } else if config.engine().strict_mitm {
         "strict"
     } else {
         "auto"
@@ -75,12 +78,12 @@ pub(super) fn run_server(args: &RuntimeArgs) -> CliResult<()> {
         proxy_host = %config.host,
         proxy_port = config.port,
         control = %api_display(&config.api),
-        storage = %config.storage.display(),
+        storage = %config.engine().storage.display(),
         config = %config_source,
         api_auth = %api_auth,
         mitm_mode,
-        rules_watch = config.rules_watch,
-        rules_watch_debounce_ms = config.rules_watch_debounce.as_millis() as u64,
+        rules_watch = config.engine().rules_watch,
+        rules_watch_debounce_ms = config.engine().rules_watch_debounce.as_millis() as u64,
         "rsproxy running"
     );
     let error = listener_exit_rx
@@ -95,11 +98,11 @@ pub(super) fn start_server(args: &RuntimeArgs) -> CliResult<()> {
     validate_daemon_addresses(&config)?;
     prepare_server_api_auth(&mut config)?;
     set_api_token(config.api_token.clone());
-    fs::create_dir_all(config.storage.join("run")).map_err(|source| {
+    fs::create_dir_all(config.engine().storage.join("run")).map_err(|source| {
         CliError::io(
             format!(
                 "create runtime directory {}",
-                config.storage.join("run").display()
+                config.engine().storage.join("run").display()
             ),
             source,
         )
@@ -135,7 +138,7 @@ pub(super) fn start_server(args: &RuntimeArgs) -> CliResult<()> {
         }
     }
 
-    let log_path = config.storage.join("run/rsproxy.log");
+    let log_path = config.engine().storage.join("run/rsproxy.log");
     let log = OpenOptions::new()
         .create(true)
         .append(true)
@@ -190,7 +193,10 @@ pub(super) fn start_server(args: &RuntimeArgs) -> CliResult<()> {
                     .map(|path| path.display().to_string())
                     .unwrap_or_else(|| "defaults".to_string()),
                 if config.api_token.is_some() {
-                    format!("token:{}", api_token_path(&config.storage).display())
+                    format!(
+                        "token:{}",
+                        api_token_path(&config.engine().storage).display()
+                    )
                 } else {
                     "peer".to_string()
                 },
@@ -263,7 +269,7 @@ pub(super) fn stop_server(args: &RuntimeArgs) -> CliResult<()> {
 }
 
 pub(super) fn pid_path(config: &AppConfig) -> PathBuf {
-    config.storage.join("run/rsproxy.pid")
+    config.engine().storage.join("run/rsproxy.pid")
 }
 
 fn remove_runtime_files(config: &AppConfig, pid_path: &Path) {
@@ -310,7 +316,7 @@ fn daemon_status(config: &AppConfig) -> Option<serde_json::Value> {
     let status = serde_json::from_str::<serde_json::Value>(&body).ok()?;
     (status.get("status").and_then(|value| value.as_str()) == Some("running")
         && status.get("storage").and_then(|value| value.as_str())
-            == Some(config.storage.to_string_lossy().as_ref()))
+            == Some(config.engine().storage.to_string_lossy().as_ref()))
     .then_some(status)
 }
 

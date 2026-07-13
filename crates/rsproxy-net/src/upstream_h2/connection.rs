@@ -60,14 +60,18 @@ pub(super) async fn connect_sender<S: ReadyIo>(
         };
     let generation = NEXT_GENERATION.fetch_add(1, Ordering::Relaxed);
     let state = h2_pool();
-    state.inner.lock().unwrap().insert(
-        pool_key.clone(),
-        PoolEntry {
-            generation,
-            sender: sender.clone(),
-            last_used: Instant::now(),
-        },
-    );
+    state
+        .inner
+        .lock()
+        .expect("HTTP/2 pool lock poisoned")
+        .insert(
+            pool_key.clone(),
+            PoolEntry {
+                generation,
+                sender: sender.clone(),
+                last_used: Instant::now(),
+            },
+        );
     state.available.notify_all();
     spawn_idle_eviction(pool_key.clone(), generation);
     let connection_key = pool_key.clone();

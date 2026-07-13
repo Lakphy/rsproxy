@@ -1,5 +1,6 @@
 [package]
 name = "rsproxy-engine"
+description = "Runtime proxy engine that composes networking, rules, and tracing for rsproxy."
 version.workspace = true
 edition.workspace = true
 license.workspace = true

@@ -4,7 +4,7 @@ use std::collections::BTreeMap;
 #[test]
 fn host_pool_routes_requests_in_round_robin_order() {
     let request = meta("http://origin.test/path");
-    let rules = rsproxy_rules::RuleSet::parse(
+    let rules = RuleSet::parse(
         "default",
         "origin.test host(127.0.0.1:18081, 127.0.0.1:18082, 127.0.0.1:18083)",
     )
@@ -28,7 +28,7 @@ fn host_pool_routes_requests_in_round_robin_order() {
 
 #[test]
 fn host_pool_is_balanced_under_concurrent_selection() {
-    let rules = rsproxy_rules::RuleSet::parse(
+    let rules = RuleSet::parse(
         "default",
         "origin.test host(a.test:80, b.test:80, c.test:80)",
     )
@@ -38,7 +38,7 @@ fn host_pool_is_balanced_under_concurrent_selection() {
     };
     let pool = pool.clone();
 
-    let selected = std::thread::scope(|scope| {
+    let selected = thread::scope(|scope| {
         let handles = (0..12)
             .map(|_| {
                 let pool = pool.clone();

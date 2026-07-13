@@ -14,18 +14,31 @@ private parsers, pools and protocol state machines. Files under a crate-level
 API. Keeping both layers is intentional; moving every test into one top-level
 directory would either expose internals or lose focused unit coverage.
 
+Pure black-box suites within a crate are modules of one `tests/it/main.rs`
+harness, which preserves public-only compilation while paying the linker cost
+once. `public_api.rs` remains a separate facade smoke contract. CLI daemon,
+product-matrix and large-stream targets remain isolated because their process,
+port and resource lifecycles rely on binary-level separation.
+
 ```text
 crates/rsproxy-cli/
   src/cli/command.rs                 clap derive 命令树、typed 参数与多值等价性
   src/cli/tests/                     CLI 参数、配置与命令适配器白盒测试
   tests/                             executable/public black-box tests
-    cli_help.rs                       所有 command/subcommand 帮助快速退出且无副作用
-    cli_completions.rs                Bash/Zsh/Fish/PowerShell 生成与错误合同
+    it/                               轻量 CLI 黑盒测试的单一链接 harness
+      main.rs                         轻量 suites 的 Cargo integration target 入口
+      cli_help.rs                     所有 command/subcommand 帮助快速退出且无副作用
+      cli_completions.rs              Bash/Zsh/Fish/PowerShell 生成与错误合同
+      cli_json_contracts.rs           查询 JSON shape 与单文档错误 schema
+      cli_logging.rs                  stderr NDJSON 启动/监听事件与端口 0 黑盒合同
+      cli_rule_groups.rs              离线规则组生命周期合同
+      cli_trace_follow.rs             live NDJSON follow、heartbeat 与 count 合同
     cli_daemon_lifecycle.rs           真实 daemon 启停/重启/恢复/bind/PID 身份矩阵
-    cli_json_contracts.rs             查询 JSON shape 与单文档错误 schema
-    cli_product_matrix/               values/CA/proxy/trace/replay/TUI 产品路径
-    cli_logging.rs                    stderr NDJSON 启动/监听事件与端口 0 黑盒合同
+    cli_daemon_lifecycle/             daemon target 的进程测试支持
+    cli_product_matrix.rs             values/CA/proxy/trace/replay/TUI 产品路径入口
+    cli_product_matrix/               product-matrix target 的 offline/online/support 模块
     large_stream_resource.rs         release 代理 1GiB、RSS 与 trace 资源验收（显式运行）
+    large_stream_resource/           large-stream target 的进程测试支持
 crates/rsproxy-control/
   src/client/tests.rs                请求、follow 与 token 发现/持久化客户端合同
   src/server/tests/                  auth、query、routes、resources 与断连分类
@@ -34,7 +47,7 @@ crates/rsproxy-control/
 crates/rsproxy-platform/
   src/ca/trust/macos/tests.rs        macOS security 子进程与错误分类
   src/system_proxy/tests.rs          macOS/Linux/Windows plan、rollback 与输出合同
-  tests/{ca,errors,process}.rs        仅经公开 facade 的 CA/error/PID/path 合同
+  tests/it/{ca,errors,process}.rs     单一 harness 中的公开 CA/error/PID/path 合同
   tests/public_api.rs                CA/trust、process、proxy 与 Unix path 的 5 项 facade 合同
 crates/rsproxy-engine/
   src/state/tests/                   运行期缓存容量、LRU 与 TTL 测试
@@ -60,7 +73,7 @@ crates/rsproxy-engine/
   src/proxy/h2_bridge/tests/         h2 请求适配与响应 framing 状态机
   src/proxy/tunnel/tests.rs          tunnel 双向字节事件与无 payload preview 合同
   src/proxy/tests/h1_forward.rs      pooled HTTP/1 framing, reuse and trace behavior
-  tests/{errors,rule_store}.rs        typed source chain 与公开 RuleStore 生命周期
+  tests/it/{errors,rule_store}.rs     单一 harness 中的 typed error 与 RuleStore 合同
   tests/public_api.rs                engine facade 的 handle/状态/规则/serve 公开合同
   benches/certificates.rs            MITM 证书签发/磁盘缓存/内存配置缓存基准
   examples/
@@ -72,35 +85,36 @@ crates/rsproxy-net/
   src/transfer_timing/tests.rs       单调传输计时器的 EOF/drop/冻结语义
   src/upstream_body/tests.rs         bounded frame collection and continuation
   src/upstream_h2/tests/             message, request body, streaming, pool and timeout behaviors
-  tests/{dns,errors}.rs              公开 resolver/cache 与 typed error 合同
-  tests/http_{buffered,tcp}_head.rs  公开 HTTP head 快/缓冲路径与 framing 边界
-  tests/request_deadline.rs          公开总 deadline 与 stage budget 归因
+  tests/it/{dns,errors}.rs           单一 harness 中的 resolver/cache 与 typed error 合同
+  tests/it/http_{buffered,tcp}_head.rs  HTTP head 快/缓冲路径与 framing 边界
+  tests/it/request_deadline.rs       公开总 deadline 与 stage budget 归因
   tests/public_api.rs                net facade 的公开黑盒编译与行为合同
 crates/rsproxy-rules/
   src/tests/                          private parser/resolver unit tests
     body_planning.rs                  candidate body-dependency planning
     conditions/                      request-period and response-period conditions
   tests/corpus/                       86 个 matcher/condition/action/composition/error case
-  tests/corpus.rs                     runner 与 37 个 DSL-spec 双向锚点
-  tests/properties.rs                 生成式合法/近似合法/任意输入不变量
-  tests/fuzz_seeds.rs                 cargo test 中回放版本化 fuzz seeds
-  tests/complexity.rs                 64KB hostile/scaling 时间预算门禁
-  tests/value_sources.rs              公开 Value 语法与 key 边界
-  tests/value_matrix.rs               40 个结构化值字段的四来源矩阵
+  tests/it/                            纯 CPU 公开合同的单一链接 harness
+    corpus.rs                          runner 与 37 个 DSL-spec 双向锚点
+    properties.rs                      生成式合法/近似合法/任意输入不变量
+    fuzz_seeds.rs                      cargo test 中回放版本化 fuzz seeds
+    complexity.rs                      64KB hostile/scaling 时间预算门禁
+    value_sources.rs                   公开 Value 语法与 key 边界
+    value_matrix.rs                    40 个结构化值字段的四来源矩阵
+    whistle_migration.rs               Whistle 源注册表与 action 映射 runner
+    whistle_options.rs                 Whistle option 分类与实现配方 runner
   tests/contracts/                     非 corpus 的迁移/option TOML 合同
     whistle_migration.toml             whistle 96-name 源注册表与 46-family 映射
     whistle_options.toml               56 enable/66 disable/16 delete 分类
   tests/fixtures/whistle-2.10.5/       75 个只读上游证据、MIT 许可与 SHA-256
-  tests/whistle_migration.rs           源注册表与 action 映射 runner
-  tests/whistle_options.rs             文档 option 分类与实现配方 runner
   tests/support/fuzz_harness.rs        seed test 与 libFuzzer 共用 harness
-  tests/                              public RuleSet API tests
+  tests/public_api.rs                  public RuleSet API tests
 crates/rsproxy-trace/
   src/tests/collector.rs              队列溢出、查询屏障、内存预算、并发与关闭
   src/tests/events.rs                 增量事件、乱序/并发、丢弃校正与 pending 预算
   src/tests/spill_read.rs             collector 外读取、append/clear/eviction 快照竞态
   src/tests/mod.rs                    spill 轮转、恢复、压缩与损坏记录
-  tests/                              public TraceStore API tests
+  tests/public_api.rs                  public TraceStore API tests
 crates/xtask/
   src/check/tests/                  lines/layout/Whistle/typed-error/workflow 正反合同
   src/release/tests.rs                版本同步、targets 派生、只读 check 与事务前置校验
@@ -196,8 +210,8 @@ The larger suites are grouped by behavior rather than by implementation function
 - `rsproxy-net/src/http/tests/mod.rs`: private/test-support HTTP/1 request body,
   framing, trailer, writer and header-limit behavior. Public buffered and TCP
   head-reader behavior lives in
-  `rsproxy-net/tests/{http_buffered_head,http_tcp_head}.rs`.
-- `rsproxy-net/tests/dns.rs`: resolver configuration, cache behavior,
+  `rsproxy-net/tests/it/{http_buffered_head,http_tcp_head}.rs`.
+- `rsproxy-net/tests/it/dns.rs`: resolver configuration, cache behavior,
   literal-address bypass and DNS statistics through the public facade.
 - `rsproxy-net/src/downstream_h2/tests/mod.rs`: downstream H2 wire conversion,
   bounded request/response frames, validation and generic handler service
@@ -217,28 +231,28 @@ The larger suites are grouped by behavior rather than by implementation function
   type-checks the listener `serve` entry point without private module access.
 - `rsproxy-rules/src/tests/`: actions grouped by behavior, body-dependency
   planning, conditions, indexing and regular expressions.
-- `rsproxy-rules/tests/corpus.rs`: runs 86 public cases and requires all 37
+- `rsproxy-rules/tests/it/corpus.rs`: runs 86 public cases and requires all 37
   specification anchors to resolve bidirectionally. Edge cases cover malformed
   authority/exact URL input, path/query glob boundaries, condition parameter
   validation, and response-dependent negation before/after a response snapshot.
-- `rsproxy-rules/tests/properties.rs`: 256-case generated valid-rule reparse,
+- `rsproxy-rules/tests/it/properties.rs`: 256-case generated valid-rule reparse,
   structured near-valid failures and bounded arbitrary-input API traversal.
-- `rsproxy-rules/tests/fuzz_seeds.rs`: replays the exact seed corpus used by the
+- `rsproxy-rules/tests/it/fuzz_seeds.rs`: replays the exact seed corpus used by the
   `parse_resolve` libFuzzer target through their shared harness.
-- `rsproxy-rules/tests/value_matrix.rs`: parses 40 structured value slots with
+- `rsproxy-rules/tests/it/value_matrix.rs`: parses 40 structured value slots with
   inline, template/capture, `@key`, and `<file>` sources (160 combinations).
-- `rsproxy-rules/tests/value_sources.rs`: verifies public AST classification,
+- `rsproxy-rules/tests/it/value_sources.rs`: verifies public AST classification,
   quoted-literal behavior, key length/character boundaries, and parse errors.
-- `rsproxy-rules/tests/whistle_migration.rs`: requires 46 source-backed supported
+- `rsproxy-rules/tests/it/whistle_migration.rs`: requires 46 source-backed supported
   mappings to cover exactly `Action::FAMILIES`, parses Whistle's 74 canonical
   protocols and 22 explicit aliases from the pinned 2.10.5 evidence fixture,
   and requires every name to be supported or explicitly deferred/removed.
-- `rsproxy-rules/tests/whistle_options.rs`: extracts 56 `enable`, 66 `disable`,
+- `rsproxy-rules/tests/it/whistle_options.rs`: extracts 56 `enable`, 66 `disable`,
   and 16 `delete` option classes from the same immutable fixture, requires an
   exact classification, parses/resolves every recipe marked implemented, and
   checks every `process-config` reference against real CLI help. Milestone-scoped
   deferred labels are rejected; out-of-v1 behavior must remain explicit v2.
-- `rsproxy-rules/tests/complexity.rs`: exercises valid, malformed, many-rule,
+- `rsproxy-rules/tests/it/complexity.rs`: exercises valid, malformed, many-rule,
   and fancy-regex inputs at the 64KB fuzz limit under finite time/scaling budgets.
 - `rsproxy-trace/src/tests/collector.rs`: deterministically blocks the collector
   to verify nonblocking queue overflow, ordered query barriers, capacity-aware
@@ -254,15 +268,15 @@ The larger suites are grouped by behavior rather than by implementation function
   A generation token prevents stale corruption reports from undoing clear.
 - `rsproxy-trace/src/tests/mod.rs`: spill rotation, recovery, compression and
   corruption handling through the actor-backed public store facade.
-- `rsproxy-cli/tests/cli_rule_groups.rs`: executable-level offline group
+- `rsproxy-cli/tests/it/cli_rule_groups.rs`: executable-level offline group
   set/list/disable/enable/test/remove lifecycle.
-- `rsproxy-cli/tests/cli_trace_follow.rs`: executable-level live NDJSON follow,
+- `rsproxy-cli/tests/it/cli_trace_follow.rs`: executable-level live NDJSON follow,
   heartbeat handling and `--count` termination against a fake control API.
-- `rsproxy-cli/tests/cli_logging.rs`: starts the real executable with ephemeral
+- `rsproxy-cli/tests/it/cli_logging.rs`: starts the real executable with ephemeral
   proxy/control ports, parses stderr NDJSON, and verifies stable startup,
   trust-root and bound-address events. It also prevents process logs from
   contaminating stdout command contracts.
-- `rsproxy-cli/tests/cli_help.rs`: runs root, lifecycle, API, rules, values,
+- `rsproxy-cli/tests/it/cli_help.rs`: runs root, lifecycle, API, rules, values,
   trace, TUI, replay, CA, system-proxy and completion help for every supported
   subcommand through the real executable with a watchdog; help must succeed
   before runtime side effects, while unknown commands retain nonzero errors.
@@ -271,14 +285,14 @@ The larger suites are grouped by behavior rather than by implementation function
   abnormal-kill recovery, malformed pidfiles, occupied listener cleanup,
   ephemeral-port rejection and refusal to kill an unrelated live PID. Its
   Windows-only case uses the authenticated named-pipe transport.
-- `rsproxy-cli/tests/cli_json_contracts.rs`: verifies exact query object keys and
+- `rsproxy-cli/tests/it/cli_json_contracts.rs`: verifies exact query object keys and
   scalar shapes for rules, values, CA, status, trace and system-proxy plans;
   unknown, missing, unavailable and broken-config failures each emit one
   `rsproxy.cli.error/v1` document on stderr.
 - `rsproxy-cli/tests/cli_product_matrix/`: splits offline values/CA/proxy and
   online trace/replay/TUI product paths into responsibility-named files behind
   one integration-test entry point.
-- `rsproxy-cli/tests/cli_completions.rs`: validates Bash, Zsh, Fish and
+- `rsproxy-cli/tests/it/cli_completions.rs`: validates Bash, Zsh, Fish and
   PowerShell scripts plus unsupported-shell errors without touching storage.
 - `rsproxy-cli/tests/large_stream_resource.rs`: ignored-by-default release
   acceptance test that streams 1GiB from a real TCP origin through a spawned
@@ -292,27 +306,28 @@ Run one layer or behavior group while iterating:
 ```sh
 cargo test -p rsproxy-rules --lib tests::actions::
 cargo test -p rsproxy-rules --lib tests::body_planning::
-cargo test -p rsproxy-rules --test corpus
-cargo test -p rsproxy-rules --test complexity
-cargo test -p rsproxy-rules --test properties
-cargo test -p rsproxy-rules --test fuzz_seeds
-cargo test -p rsproxy-rules --test value_matrix
-cargo test -p rsproxy-rules --test value_sources
-cargo test -p rsproxy-rules --test whistle_migration
-cargo test -p rsproxy-rules --test whistle_options
+cargo test -p rsproxy-rules --test it corpus::
+cargo test -p rsproxy-rules --test it complexity::
+cargo test -p rsproxy-rules --test it properties::
+cargo test -p rsproxy-rules --test it fuzz_seeds::
+cargo test -p rsproxy-rules --test it value_matrix::
+cargo test -p rsproxy-rules --test it value_sources::
+cargo test -p rsproxy-rules --test it whistle_migration::
+cargo test -p rsproxy-rules --test it whistle_options::
 cargo test -p rsproxy-rules --test public_api
 cargo test -p rsproxy-net --lib http::tests::
 cargo test -p rsproxy-net --lib downstream_h2::tests::
 cargo test -p rsproxy-net --lib upstream_h2::tests::
 cargo test -p rsproxy-net --lib transfer_timing::tests::
-cargo test -p rsproxy-net --test dns --test errors
-cargo test -p rsproxy-net --test http_buffered_head --test http_tcp_head
-cargo test -p rsproxy-net --test request_deadline
+cargo test -p rsproxy-net --test it dns::
+cargo test -p rsproxy-net --test it http_buffered_head::
+cargo test -p rsproxy-net --test it http_tcp_head::
+cargo test -p rsproxy-net --test it request_deadline::
 cargo test -p rsproxy-net --test public_api
 cargo test -p rsproxy-control --lib
 cargo test -p rsproxy-control --test public_api
 cargo test -p rsproxy-platform --lib
-cargo test -p rsproxy-platform --test ca --test errors --test process
+cargo test -p rsproxy-platform --test it
 cargo test -p rsproxy-platform --test public_api
 cargo test -p rsproxy-engine --lib rule_store::watch::tests::
 cargo test -p rsproxy-engine --lib proxy::tests::request_streaming::
@@ -327,7 +342,7 @@ cargo test -p rsproxy-engine --lib proxy::tests::value_actions::
 cargo test -p rsproxy-engine --lib proxy::tests::value_runtime_matrix::
 cargo test -p rsproxy-engine --lib proxy::tests::action_effects::
 cargo test -p rsproxy-engine --lib proxy::request_util::tests::
-cargo test -p rsproxy-engine --test errors --test rule_store
+cargo test -p rsproxy-engine --test it
 cargo test -p rsproxy-engine --test public_api
 cargo test -p rsproxy-trace --all-targets
 cargo test -p xtask --all-targets

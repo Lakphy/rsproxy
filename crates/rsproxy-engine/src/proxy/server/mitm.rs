@@ -47,11 +47,15 @@ pub(super) fn handle_connect_mitm(
             return Ok(());
         }
     };
-    state.mitm_failures.lock().unwrap().clear(&host);
+    state
+        .mitm_failures
+        .lock()
+        .expect("MITM failure cache lock poisoned")
+        .clear(&host);
     let client_tls = server_tls_record("client_mitm_tls", &host, handshake_ms, &connection);
     let mut tls = StreamOwned::new(connection, client);
     if tls.conn.alpn_protocol() == Some(H2_ALPN) {
-        return crate::proxy::h2_bridge::serve_h2_mitm(
+        return h2_bridge::serve_h2_mitm(
             tls,
             state,
             connect_session.client,
@@ -60,13 +64,13 @@ pub(super) fn handle_connect_mitm(
             initial_flags,
         );
     }
-    super::inner_http::serve(
+    inner_http::serve(
         &mut tls,
         state,
         target,
         connect_session,
         hidden,
-        super::inner_http::ConnectHttpMode::Mitm {
+        inner_http::ConnectHttpMode::Mitm {
             client_tls,
             first_flags: initial_flags,
         },
@@ -98,7 +102,12 @@ fn record_handshake_failure(
     }
     if state.config.strict_mitm {
         session.flags.push("mitm-fallback-disabled".to_string());
-    } else if state.mitm_failures.lock().unwrap().remember(host) {
+    } else if state
+        .mitm_failures
+        .lock()
+        .expect("MITM failure cache lock poisoned")
+        .remember(host)
+    {
         session.flags.push("mitm-fallback-remembered".to_string());
     }
 }

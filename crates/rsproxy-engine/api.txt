@@ -1,0 +1,310 @@
+pub mod rsproxy_engine
+pub mod rsproxy_engine::state
+pub struct rsproxy_engine::state::ProxyConfig
+pub rsproxy_engine::state::ProxyConfig::body_buffer_limit: usize
+pub rsproxy_engine::state::ProxyConfig::ca_material: core::option::Option<rsproxy_engine::CaMaterial>
+pub rsproxy_engine::state::ProxyConfig::client_tls_handshake_timeout: core::time::Duration
+pub rsproxy_engine::state::ProxyConfig::connect_probe_timeout: core::time::Duration
+pub rsproxy_engine::state::ProxyConfig::dns_cache_ttl: core::time::Duration
+pub rsproxy_engine::state::ProxyConfig::dns_servers: alloc::vec::Vec<core::net::socket_addr::SocketAddr>
+pub rsproxy_engine::state::ProxyConfig::dns_timeout: core::time::Duration
+pub rsproxy_engine::state::ProxyConfig::h1_pool_max_active_per_key: usize
+pub rsproxy_engine::state::ProxyConfig::h1_pool_wait_timeout: core::time::Duration
+pub rsproxy_engine::state::ProxyConfig::h2_pool_max_active_streams_per_key: usize
+pub rsproxy_engine::state::ProxyConfig::h2_pool_wait_timeout: core::time::Duration
+pub rsproxy_engine::state::ProxyConfig::max_header_count: usize
+pub rsproxy_engine::state::ProxyConfig::max_header_size: usize
+pub rsproxy_engine::state::ProxyConfig::mitm_cert_cache_capacity: usize
+pub rsproxy_engine::state::ProxyConfig::mitm_failure_cache_capacity: usize
+pub rsproxy_engine::state::ProxyConfig::mitm_failure_ttl: core::time::Duration
+pub rsproxy_engine::state::ProxyConfig::no_mitm: bool
+pub rsproxy_engine::state::ProxyConfig::proxy_auth: core::option::Option<alloc::string::String>
+pub rsproxy_engine::state::ProxyConfig::request_total_timeout: core::time::Duration
+pub rsproxy_engine::state::ProxyConfig::rules_watch: bool
+pub rsproxy_engine::state::ProxyConfig::rules_watch_debounce: core::time::Duration
+pub rsproxy_engine::state::ProxyConfig::storage: std::path::PathBuf
+pub rsproxy_engine::state::ProxyConfig::strict_mitm: bool
+pub rsproxy_engine::state::ProxyConfig::tcp_connect_timeout: core::time::Duration
+pub rsproxy_engine::state::ProxyConfig::trace_body_limit: usize
+pub rsproxy_engine::state::ProxyConfig::trace_disk_budget: usize
+pub rsproxy_engine::state::ProxyConfig::trace_exclude_media_body: bool
+pub rsproxy_engine::state::ProxyConfig::trace_memory_budget: usize
+pub rsproxy_engine::state::ProxyConfig::trace_queue_capacity: usize
+pub rsproxy_engine::state::ProxyConfig::trace_spill_compression: rsproxy_trace::spill::TraceSpillCompression
+pub rsproxy_engine::state::ProxyConfig::trace_spill_segment_size: usize
+pub rsproxy_engine::state::ProxyConfig::upstream_tls_handshake_timeout: core::time::Duration
+pub rsproxy_engine::state::ProxyConfig::upstream_ttfb_timeout: core::time::Duration
+impl rsproxy_engine::state::ProxyConfig
+pub fn rsproxy_engine::state::ProxyConfig::new(impl core::convert::Into<std::path::PathBuf>) -> Self
+impl core::clone::Clone for rsproxy_engine::state::ProxyConfig
+pub fn rsproxy_engine::state::ProxyConfig::clone(&self) -> rsproxy_engine::state::ProxyConfig
+impl core::default::Default for rsproxy_engine::state::ProxyConfig
+pub fn rsproxy_engine::state::ProxyConfig::default() -> Self
+impl core::fmt::Debug for rsproxy_engine::state::ProxyConfig
+pub fn rsproxy_engine::state::ProxyConfig::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub struct rsproxy_engine::state::SharedState
+impl rsproxy_engine::state::SharedState
+pub fn rsproxy_engine::state::SharedState::handle(&self) -> rsproxy_engine::EngineHandle
+pub fn rsproxy_engine::state::SharedState::new(rsproxy_engine::state::ProxyConfig) -> rsproxy_engine::EngineResult<Self>
+impl core::clone::Clone for rsproxy_engine::state::SharedState
+pub fn rsproxy_engine::state::SharedState::clone(&self) -> rsproxy_engine::state::SharedState
+#[non_exhaustive] pub enum rsproxy_engine::EngineError
+pub rsproxy_engine::EngineError::Certificate(rcgen::error::Error)
+pub rsproxy_engine::EngineError::InvalidInput(alloc::string::String)
+pub rsproxy_engine::EngineError::Io
+pub rsproxy_engine::EngineError::Io::context: alloc::string::String
+pub rsproxy_engine::EngineError::Io::source: core::io::error::Error
+pub rsproxy_engine::EngineError::Net(rsproxy_net::error::NetError)
+pub rsproxy_engine::EngineError::RuleModel(rsproxy_rules::error::RuleModelError)
+pub rsproxy_engine::EngineError::RuleStore(rsproxy_engine::RuleStoreError)
+pub rsproxy_engine::EngineError::Unsupported(alloc::string::String)
+impl core::convert::From<rcgen::error::Error> for rsproxy_engine::EngineError
+pub fn rsproxy_engine::EngineError::from(rcgen::error::Error) -> Self
+impl core::convert::From<rsproxy_engine::RuleStoreError> for rsproxy_engine::EngineError
+pub fn rsproxy_engine::EngineError::from(rsproxy_engine::RuleStoreError) -> Self
+impl core::convert::From<rsproxy_net::error::NetError> for rsproxy_engine::EngineError
+pub fn rsproxy_engine::EngineError::from(rsproxy_net::error::NetError) -> Self
+impl core::convert::From<rsproxy_rules::error::RuleModelError> for rsproxy_engine::EngineError
+pub fn rsproxy_engine::EngineError::from(rsproxy_rules::error::RuleModelError) -> Self
+impl core::error::Error for rsproxy_engine::EngineError
+pub fn rsproxy_engine::EngineError::source(&self) -> core::option::Option<&(dyn core::error::Error + 'static)>
+impl core::fmt::Debug for rsproxy_engine::EngineError
+pub fn rsproxy_engine::EngineError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for rsproxy_engine::EngineError
+pub fn rsproxy_engine::EngineError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub enum rsproxy_engine::RuleStoreError
+pub rsproxy_engine::RuleStoreError::Invalid(alloc::string::String)
+pub rsproxy_engine::RuleStoreError::Io
+pub rsproxy_engine::RuleStoreError::Io::context: alloc::string::String
+pub rsproxy_engine::RuleStoreError::Io::source: core::io::error::Error
+pub rsproxy_engine::RuleStoreError::NotFound(alloc::string::String)
+pub rsproxy_engine::RuleStoreError::Parse(alloc::vec::Vec<rsproxy_rules::error::RuleError>)
+pub rsproxy_engine::RuleStoreError::Watch(notify::error::Error)
+impl core::convert::From<rsproxy_engine::RuleStoreError> for rsproxy_engine::EngineError
+pub fn rsproxy_engine::EngineError::from(rsproxy_engine::RuleStoreError) -> Self
+impl core::error::Error for rsproxy_engine::RuleStoreError
+pub fn rsproxy_engine::RuleStoreError::source(&self) -> core::option::Option<&(dyn core::error::Error + 'static)>
+impl core::fmt::Debug for rsproxy_engine::RuleStoreError
+pub fn rsproxy_engine::RuleStoreError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for rsproxy_engine::RuleStoreError
+pub fn rsproxy_engine::RuleStoreError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub struct rsproxy_engine::CaMaterial
+impl rsproxy_engine::CaMaterial
+pub fn rsproxy_engine::CaMaterial::certificate_pem(&self) -> &str
+pub fn rsproxy_engine::CaMaterial::from_pem(impl core::convert::Into<alloc::sync::Arc<str>>, impl core::convert::Into<alloc::sync::Arc<str>>) -> Self
+pub fn rsproxy_engine::CaMaterial::private_key_pem(&self) -> &str
+impl core::clone::Clone for rsproxy_engine::CaMaterial
+pub fn rsproxy_engine::CaMaterial::clone(&self) -> rsproxy_engine::CaMaterial
+impl core::cmp::Eq for rsproxy_engine::CaMaterial
+impl core::cmp::PartialEq for rsproxy_engine::CaMaterial
+pub fn rsproxy_engine::CaMaterial::eq(&self, &rsproxy_engine::CaMaterial) -> bool
+impl core::fmt::Debug for rsproxy_engine::CaMaterial
+pub fn rsproxy_engine::CaMaterial::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for rsproxy_engine::CaMaterial
+pub struct rsproxy_engine::DnsStatusSnapshot
+pub rsproxy_engine::DnsStatusSnapshot::failures: u64
+pub rsproxy_engine::DnsStatusSnapshot::literal_bypasses: u64
+pub rsproxy_engine::DnsStatusSnapshot::lookups: u64
+pub rsproxy_engine::DnsStatusSnapshot::successes: u64
+pub rsproxy_engine::DnsStatusSnapshot::timeouts: u64
+impl core::clone::Clone for rsproxy_engine::DnsStatusSnapshot
+pub fn rsproxy_engine::DnsStatusSnapshot::clone(&self) -> rsproxy_engine::DnsStatusSnapshot
+impl core::cmp::Eq for rsproxy_engine::DnsStatusSnapshot
+impl core::cmp::PartialEq for rsproxy_engine::DnsStatusSnapshot
+pub fn rsproxy_engine::DnsStatusSnapshot::eq(&self, &rsproxy_engine::DnsStatusSnapshot) -> bool
+impl core::default::Default for rsproxy_engine::DnsStatusSnapshot
+pub fn rsproxy_engine::DnsStatusSnapshot::default() -> rsproxy_engine::DnsStatusSnapshot
+impl core::fmt::Debug for rsproxy_engine::DnsStatusSnapshot
+pub fn rsproxy_engine::DnsStatusSnapshot::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for rsproxy_engine::DnsStatusSnapshot
+impl core::marker::StructuralPartialEq for rsproxy_engine::DnsStatusSnapshot
+pub struct rsproxy_engine::EngineConfigStatus
+pub rsproxy_engine::EngineConfigStatus::body_buffer_limit: usize
+pub rsproxy_engine::EngineConfigStatus::client_tls_handshake_timeout: core::time::Duration
+pub rsproxy_engine::EngineConfigStatus::connect_probe_timeout: core::time::Duration
+pub rsproxy_engine::EngineConfigStatus::dns_cache_ttl: core::time::Duration
+pub rsproxy_engine::EngineConfigStatus::dns_servers: alloc::vec::Vec<core::net::socket_addr::SocketAddr>
+pub rsproxy_engine::EngineConfigStatus::dns_timeout: core::time::Duration
+pub rsproxy_engine::EngineConfigStatus::h1_pool_max_active_per_key: usize
+pub rsproxy_engine::EngineConfigStatus::h1_pool_wait_timeout: core::time::Duration
+pub rsproxy_engine::EngineConfigStatus::h2_pool_max_active_streams_per_key: usize
+pub rsproxy_engine::EngineConfigStatus::h2_pool_wait_timeout: core::time::Duration
+pub rsproxy_engine::EngineConfigStatus::mitm_cert_cache_capacity: usize
+pub rsproxy_engine::EngineConfigStatus::mitm_failure_cache_capacity: usize
+pub rsproxy_engine::EngineConfigStatus::mitm_failure_ttl: core::time::Duration
+pub rsproxy_engine::EngineConfigStatus::no_mitm: bool
+pub rsproxy_engine::EngineConfigStatus::request_total_timeout: core::time::Duration
+pub rsproxy_engine::EngineConfigStatus::rules_watch: bool
+pub rsproxy_engine::EngineConfigStatus::rules_watch_debounce: core::time::Duration
+pub rsproxy_engine::EngineConfigStatus::storage: std::path::PathBuf
+pub rsproxy_engine::EngineConfigStatus::strict_mitm: bool
+pub rsproxy_engine::EngineConfigStatus::tcp_connect_timeout: core::time::Duration
+pub rsproxy_engine::EngineConfigStatus::upstream_tls_handshake_timeout: core::time::Duration
+pub rsproxy_engine::EngineConfigStatus::upstream_ttfb_timeout: core::time::Duration
+impl core::clone::Clone for rsproxy_engine::EngineConfigStatus
+pub fn rsproxy_engine::EngineConfigStatus::clone(&self) -> rsproxy_engine::EngineConfigStatus
+impl core::cmp::Eq for rsproxy_engine::EngineConfigStatus
+impl core::cmp::PartialEq for rsproxy_engine::EngineConfigStatus
+pub fn rsproxy_engine::EngineConfigStatus::eq(&self, &rsproxy_engine::EngineConfigStatus) -> bool
+impl core::fmt::Debug for rsproxy_engine::EngineConfigStatus
+pub fn rsproxy_engine::EngineConfigStatus::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for rsproxy_engine::EngineConfigStatus
+pub struct rsproxy_engine::EngineHandle
+impl rsproxy_engine::EngineHandle
+pub fn rsproxy_engine::EngineHandle::replay(&self, &rsproxy_trace::model::Session) -> rsproxy_engine::EngineResult<rsproxy_engine::ReplayResponse>
+pub fn rsproxy_engine::EngineHandle::rules(&self) -> &rsproxy_engine::RuleStore
+pub fn rsproxy_engine::EngineHandle::status_snapshot(&self) -> rsproxy_engine::EngineStatusSnapshot
+pub fn rsproxy_engine::EngineHandle::trace_store(&self) -> rsproxy_trace::store::TraceStore
+impl core::clone::Clone for rsproxy_engine::EngineHandle
+pub fn rsproxy_engine::EngineHandle::clone(&self) -> rsproxy_engine::EngineHandle
+pub struct rsproxy_engine::EngineStatusSnapshot
+pub rsproxy_engine::EngineStatusSnapshot::config: rsproxy_engine::EngineConfigStatus
+pub rsproxy_engine::EngineStatusSnapshot::dns: rsproxy_engine::DnsStatusSnapshot
+pub rsproxy_engine::EngineStatusSnapshot::mitm_failure_entries: usize
+pub rsproxy_engine::EngineStatusSnapshot::started_ms: u64
+pub rsproxy_engine::EngineStatusSnapshot::upstream_roots: core::option::Option<rsproxy_engine::UpstreamRootStatus>
+impl core::clone::Clone for rsproxy_engine::EngineStatusSnapshot
+pub fn rsproxy_engine::EngineStatusSnapshot::clone(&self) -> rsproxy_engine::EngineStatusSnapshot
+impl core::fmt::Debug for rsproxy_engine::EngineStatusSnapshot
+pub fn rsproxy_engine::EngineStatusSnapshot::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub struct rsproxy_engine::IssuedLeafCertificate
+pub rsproxy_engine::IssuedLeafCertificate::certificate_pem: alloc::string::String
+pub rsproxy_engine::IssuedLeafCertificate::chain_pem: alloc::string::String
+pub rsproxy_engine::IssuedLeafCertificate::private_key_pem: alloc::string::String
+impl core::clone::Clone for rsproxy_engine::IssuedLeafCertificate
+pub fn rsproxy_engine::IssuedLeafCertificate::clone(&self) -> rsproxy_engine::IssuedLeafCertificate
+impl core::cmp::Eq for rsproxy_engine::IssuedLeafCertificate
+impl core::cmp::PartialEq for rsproxy_engine::IssuedLeafCertificate
+pub fn rsproxy_engine::IssuedLeafCertificate::eq(&self, &rsproxy_engine::IssuedLeafCertificate) -> bool
+impl core::fmt::Debug for rsproxy_engine::IssuedLeafCertificate
+pub fn rsproxy_engine::IssuedLeafCertificate::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for rsproxy_engine::IssuedLeafCertificate
+pub struct rsproxy_engine::ProxyConfig
+pub rsproxy_engine::ProxyConfig::body_buffer_limit: usize
+pub rsproxy_engine::ProxyConfig::ca_material: core::option::Option<rsproxy_engine::CaMaterial>
+pub rsproxy_engine::ProxyConfig::client_tls_handshake_timeout: core::time::Duration
+pub rsproxy_engine::ProxyConfig::connect_probe_timeout: core::time::Duration
+pub rsproxy_engine::ProxyConfig::dns_cache_ttl: core::time::Duration
+pub rsproxy_engine::ProxyConfig::dns_servers: alloc::vec::Vec<core::net::socket_addr::SocketAddr>
+pub rsproxy_engine::ProxyConfig::dns_timeout: core::time::Duration
+pub rsproxy_engine::ProxyConfig::h1_pool_max_active_per_key: usize
+pub rsproxy_engine::ProxyConfig::h1_pool_wait_timeout: core::time::Duration
+pub rsproxy_engine::ProxyConfig::h2_pool_max_active_streams_per_key: usize
+pub rsproxy_engine::ProxyConfig::h2_pool_wait_timeout: core::time::Duration
+pub rsproxy_engine::ProxyConfig::max_header_count: usize
+pub rsproxy_engine::ProxyConfig::max_header_size: usize
+pub rsproxy_engine::ProxyConfig::mitm_cert_cache_capacity: usize
+pub rsproxy_engine::ProxyConfig::mitm_failure_cache_capacity: usize
+pub rsproxy_engine::ProxyConfig::mitm_failure_ttl: core::time::Duration
+pub rsproxy_engine::ProxyConfig::no_mitm: bool
+pub rsproxy_engine::ProxyConfig::proxy_auth: core::option::Option<alloc::string::String>
+pub rsproxy_engine::ProxyConfig::request_total_timeout: core::time::Duration
+pub rsproxy_engine::ProxyConfig::rules_watch: bool
+pub rsproxy_engine::ProxyConfig::rules_watch_debounce: core::time::Duration
+pub rsproxy_engine::ProxyConfig::storage: std::path::PathBuf
+pub rsproxy_engine::ProxyConfig::strict_mitm: bool
+pub rsproxy_engine::ProxyConfig::tcp_connect_timeout: core::time::Duration
+pub rsproxy_engine::ProxyConfig::trace_body_limit: usize
+pub rsproxy_engine::ProxyConfig::trace_disk_budget: usize
+pub rsproxy_engine::ProxyConfig::trace_exclude_media_body: bool
+pub rsproxy_engine::ProxyConfig::trace_memory_budget: usize
+pub rsproxy_engine::ProxyConfig::trace_queue_capacity: usize
+pub rsproxy_engine::ProxyConfig::trace_spill_compression: rsproxy_trace::spill::TraceSpillCompression
+pub rsproxy_engine::ProxyConfig::trace_spill_segment_size: usize
+pub rsproxy_engine::ProxyConfig::upstream_tls_handshake_timeout: core::time::Duration
+pub rsproxy_engine::ProxyConfig::upstream_ttfb_timeout: core::time::Duration
+impl rsproxy_engine::state::ProxyConfig
+pub fn rsproxy_engine::state::ProxyConfig::new(impl core::convert::Into<std::path::PathBuf>) -> Self
+impl core::clone::Clone for rsproxy_engine::state::ProxyConfig
+pub fn rsproxy_engine::state::ProxyConfig::clone(&self) -> rsproxy_engine::state::ProxyConfig
+impl core::default::Default for rsproxy_engine::state::ProxyConfig
+pub fn rsproxy_engine::state::ProxyConfig::default() -> Self
+impl core::fmt::Debug for rsproxy_engine::state::ProxyConfig
+pub fn rsproxy_engine::state::ProxyConfig::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub struct rsproxy_engine::ReplayResponse
+pub rsproxy_engine::ReplayResponse::body_head: alloc::vec::Vec<u8>
+pub rsproxy_engine::ReplayResponse::headers: alloc::vec::Vec<(alloc::string::String, alloc::string::String)>
+pub rsproxy_engine::ReplayResponse::response_bytes: usize
+pub rsproxy_engine::ReplayResponse::status: u16
+impl core::clone::Clone for rsproxy_engine::ReplayResponse
+pub fn rsproxy_engine::ReplayResponse::clone(&self) -> rsproxy_engine::ReplayResponse
+impl core::cmp::Eq for rsproxy_engine::ReplayResponse
+impl core::cmp::PartialEq for rsproxy_engine::ReplayResponse
+pub fn rsproxy_engine::ReplayResponse::eq(&self, &rsproxy_engine::ReplayResponse) -> bool
+impl core::fmt::Debug for rsproxy_engine::ReplayResponse
+pub fn rsproxy_engine::ReplayResponse::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for rsproxy_engine::ReplayResponse
+pub struct rsproxy_engine::RuleGroup
+pub rsproxy_engine::RuleGroup::enabled: bool
+pub rsproxy_engine::RuleGroup::name: alloc::string::String
+pub rsproxy_engine::RuleGroup::text: alloc::string::String
+impl core::clone::Clone for rsproxy_engine::RuleGroup
+pub fn rsproxy_engine::RuleGroup::clone(&self) -> rsproxy_engine::RuleGroup
+impl core::cmp::Eq for rsproxy_engine::RuleGroup
+impl core::cmp::PartialEq for rsproxy_engine::RuleGroup
+pub fn rsproxy_engine::RuleGroup::eq(&self, &rsproxy_engine::RuleGroup) -> bool
+impl core::fmt::Debug for rsproxy_engine::RuleGroup
+pub fn rsproxy_engine::RuleGroup::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for rsproxy_engine::RuleGroup
+pub struct rsproxy_engine::RuleSnapshot
+pub rsproxy_engine::RuleSnapshot::compiled: rsproxy_rules::model::RuleSet
+pub rsproxy_engine::RuleSnapshot::groups: alloc::vec::Vec<rsproxy_engine::RuleGroup>
+impl rsproxy_engine::RuleSnapshot
+pub fn rsproxy_engine::RuleSnapshot::group(&self, &str) -> core::option::Option<&rsproxy_engine::RuleGroup>
+impl core::clone::Clone for rsproxy_engine::RuleSnapshot
+pub fn rsproxy_engine::RuleSnapshot::clone(&self) -> rsproxy_engine::RuleSnapshot
+impl core::fmt::Debug for rsproxy_engine::RuleSnapshot
+pub fn rsproxy_engine::RuleSnapshot::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub struct rsproxy_engine::RuleStore
+impl rsproxy_engine::RuleStore
+pub fn rsproxy_engine::RuleStore::load(&std::path::Path) -> core::result::Result<Self, rsproxy_engine::RuleStoreError>
+pub fn rsproxy_engine::RuleStore::remove_group(&self, &str) -> core::result::Result<alloc::sync::Arc<rsproxy_engine::RuleSnapshot>, rsproxy_engine::RuleStoreError>
+pub fn rsproxy_engine::RuleStore::set_enabled(&self, &str, bool) -> core::result::Result<alloc::sync::Arc<rsproxy_engine::RuleSnapshot>, rsproxy_engine::RuleStoreError>
+pub fn rsproxy_engine::RuleStore::set_group(&self, &str, alloc::string::String) -> core::result::Result<alloc::sync::Arc<rsproxy_engine::RuleSnapshot>, rsproxy_engine::RuleStoreError>
+pub fn rsproxy_engine::RuleStore::snapshot(&self) -> alloc::sync::Arc<rsproxy_engine::RuleSnapshot>
+pub fn rsproxy_engine::RuleStore::validate_name(&str) -> core::result::Result<(), rsproxy_engine::RuleStoreError>
+impl rsproxy_engine::RuleStore
+pub fn rsproxy_engine::RuleStore::watch_status(&self) -> rsproxy_engine::RuleWatchStatus
+impl core::clone::Clone for rsproxy_engine::RuleStore
+pub fn rsproxy_engine::RuleStore::clone(&self) -> rsproxy_engine::RuleStore
+pub struct rsproxy_engine::RuleWatchStatus
+pub rsproxy_engine::RuleWatchStatus::dropped_events: u64
+pub rsproxy_engine::RuleWatchStatus::events: u64
+pub rsproxy_engine::RuleWatchStatus::failures: u64
+pub rsproxy_engine::RuleWatchStatus::last_error: core::option::Option<alloc::string::String>
+pub rsproxy_engine::RuleWatchStatus::last_reload_ms: core::option::Option<u64>
+pub rsproxy_engine::RuleWatchStatus::reloads: u64
+impl core::clone::Clone for rsproxy_engine::RuleWatchStatus
+pub fn rsproxy_engine::RuleWatchStatus::clone(&self) -> rsproxy_engine::RuleWatchStatus
+impl core::cmp::Eq for rsproxy_engine::RuleWatchStatus
+impl core::cmp::PartialEq for rsproxy_engine::RuleWatchStatus
+pub fn rsproxy_engine::RuleWatchStatus::eq(&self, &rsproxy_engine::RuleWatchStatus) -> bool
+impl core::default::Default for rsproxy_engine::RuleWatchStatus
+pub fn rsproxy_engine::RuleWatchStatus::default() -> rsproxy_engine::RuleWatchStatus
+impl core::fmt::Debug for rsproxy_engine::RuleWatchStatus
+pub fn rsproxy_engine::RuleWatchStatus::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for rsproxy_engine::RuleWatchStatus
+pub struct rsproxy_engine::SharedState
+impl rsproxy_engine::state::SharedState
+pub fn rsproxy_engine::state::SharedState::handle(&self) -> rsproxy_engine::EngineHandle
+pub fn rsproxy_engine::state::SharedState::new(rsproxy_engine::state::ProxyConfig) -> rsproxy_engine::EngineResult<Self>
+impl core::clone::Clone for rsproxy_engine::state::SharedState
+pub fn rsproxy_engine::state::SharedState::clone(&self) -> rsproxy_engine::state::SharedState
+pub struct rsproxy_engine::UpstreamRootStatus
+pub rsproxy_engine::UpstreamRootStatus::native_duplicates: usize
+pub rsproxy_engine::UpstreamRootStatus::native_errors: usize
+pub rsproxy_engine::UpstreamRootStatus::native_loaded: usize
+pub rsproxy_engine::UpstreamRootStatus::native_rejected: usize
+pub rsproxy_engine::UpstreamRootStatus::total_roots: usize
+pub rsproxy_engine::UpstreamRootStatus::webpki_roots: usize
+impl core::clone::Clone for rsproxy_engine::UpstreamRootStatus
+pub fn rsproxy_engine::UpstreamRootStatus::clone(&self) -> rsproxy_engine::UpstreamRootStatus
+impl core::cmp::Eq for rsproxy_engine::UpstreamRootStatus
+impl core::cmp::PartialEq for rsproxy_engine::UpstreamRootStatus
+pub fn rsproxy_engine::UpstreamRootStatus::eq(&self, &rsproxy_engine::UpstreamRootStatus) -> bool
+impl core::fmt::Debug for rsproxy_engine::UpstreamRootStatus
+pub fn rsproxy_engine::UpstreamRootStatus::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for rsproxy_engine::UpstreamRootStatus
+pub fn rsproxy_engine::issue_leaf_certificate(&str, &str, &str) -> rsproxy_engine::EngineResult<rsproxy_engine::IssuedLeafCertificate>
+pub fn rsproxy_engine::serve(std::net::tcp::TcpListener, rsproxy_engine::state::SharedState) -> rsproxy_engine::EngineResult<()>
+pub type rsproxy_engine::EngineResult<T> = core::result::Result<T, rsproxy_engine::EngineError>

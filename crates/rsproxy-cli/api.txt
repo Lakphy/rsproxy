@@ -1,0 +1,164 @@
+pub mod rsproxy_cli
+pub mod rsproxy_cli::cli
+pub struct rsproxy_cli::cli::ParsedCli
+pub rsproxy_cli::cli::ParsedCli::json: bool
+impl clap_builder::derive::Args for rsproxy_cli::ParsedCli
+pub fn rsproxy_cli::ParsedCli::augment_args<'b>(clap_builder::builder::command::Command) -> clap_builder::builder::command::Command
+pub fn rsproxy_cli::ParsedCli::augment_args_for_update<'b>(clap_builder::builder::command::Command) -> clap_builder::builder::command::Command
+pub fn rsproxy_cli::ParsedCli::group_id() -> core::option::Option<clap_builder::util::id::Id>
+impl clap_builder::derive::CommandFactory for rsproxy_cli::ParsedCli
+pub fn rsproxy_cli::ParsedCli::command<'b>() -> clap_builder::builder::command::Command
+pub fn rsproxy_cli::ParsedCli::command_for_update<'b>() -> clap_builder::builder::command::Command
+impl clap_builder::derive::FromArgMatches for rsproxy_cli::ParsedCli
+pub fn rsproxy_cli::ParsedCli::from_arg_matches(&clap_builder::parser::matches::arg_matches::ArgMatches) -> core::result::Result<Self, clap_builder::Error>
+pub fn rsproxy_cli::ParsedCli::from_arg_matches_mut(&mut clap_builder::parser::matches::arg_matches::ArgMatches) -> core::result::Result<Self, clap_builder::Error>
+pub fn rsproxy_cli::ParsedCli::update_from_arg_matches(&mut self, &clap_builder::parser::matches::arg_matches::ArgMatches) -> core::result::Result<(), clap_builder::Error>
+pub fn rsproxy_cli::ParsedCli::update_from_arg_matches_mut(&mut self, &mut clap_builder::parser::matches::arg_matches::ArgMatches) -> core::result::Result<(), clap_builder::Error>
+impl clap_builder::derive::Parser for rsproxy_cli::ParsedCli
+pub fn rsproxy_cli::cli::parse_cli() -> core::result::Result<rsproxy_cli::ParsedCli, clap_builder::Error>
+pub fn rsproxy_cli::cli::run_cli() -> rsproxy_cli::CliResult<()>
+pub fn rsproxy_cli::cli::run_parsed(rsproxy_cli::ParsedCli) -> rsproxy_cli::CliResult<()>
+pub enum rsproxy_cli::CliError
+pub rsproxy_cli::CliError::Clap(clap_builder::Error)
+pub rsproxy_cli::CliError::Config(rsproxy_cli::ConfigError)
+pub rsproxy_cli::CliError::Control(rsproxy_control::error::ControlError)
+pub rsproxy_cli::CliError::DaemonConflict(rsproxy_cli::DaemonConflict)
+pub rsproxy_cli::CliError::DaemonExited
+pub rsproxy_cli::CliError::DaemonExited::log_path: std::path::PathBuf
+pub rsproxy_cli::CliError::DaemonExited::status: std::process::ExitStatus
+pub rsproxy_cli::CliError::DaemonReadinessTimeout
+pub rsproxy_cli::CliError::DaemonReadinessTimeout::log_path: std::path::PathBuf
+pub rsproxy_cli::CliError::DaemonReadinessTimeout::pid: u32
+pub rsproxy_cli::CliError::DaemonStopTimeout
+pub rsproxy_cli::CliError::DaemonStopTimeout::pid: u32
+pub rsproxy_cli::CliError::Engine(rsproxy_engine::error::EngineError)
+pub rsproxy_cli::CliError::ExternalCommand
+pub rsproxy_cli::CliError::ExternalCommand::command: alloc::string::String
+pub rsproxy_cli::CliError::ExternalCommand::status: std::process::ExitStatus
+pub rsproxy_cli::CliError::InvalidPlatformOutcome
+pub rsproxy_cli::CliError::InvalidPlatformOutcome::detail: &'static str
+pub rsproxy_cli::CliError::InvalidRuleOperation
+pub rsproxy_cli::CliError::Io
+pub rsproxy_cli::CliError::Io::context: alloc::string::String
+pub rsproxy_cli::CliError::Io::source: core::io::error::Error
+pub rsproxy_cli::CliError::Json
+pub rsproxy_cli::CliError::Json::context: &'static str
+pub rsproxy_cli::CliError::Json::source: serde_json::error::Error
+pub rsproxy_cli::CliError::ListenerStopped
+pub rsproxy_cli::CliError::ListenerStopped::listener: &'static str
+pub rsproxy_cli::CliError::ListenerSupervision
+pub rsproxy_cli::CliError::ListenerSupervision::source: std::sync::mpsc::RecvError
+pub rsproxy_cli::CliError::Logging(rsproxy_cli::LoggingError)
+pub rsproxy_cli::CliError::Platform(rsproxy_platform::error::PlatformError)
+pub rsproxy_cli::CliError::RuleDiagnostics(rsproxy_cli::RuleDiagnostics)
+pub rsproxy_cli::CliError::RuleModel(rsproxy_rules::error::RuleModelError)
+pub rsproxy_cli::CliError::RuleStore(rsproxy_engine::rule_store::RuleStoreError)
+pub rsproxy_cli::CliError::Usage(alloc::string::String)
+impl rsproxy_cli::CliError
+pub const fn rsproxy_cli::CliError::code(&self) -> &'static str
+pub const fn rsproxy_cli::CliError::exit_code(&self) -> i32
+pub fn rsproxy_cli::CliError::io(impl core::convert::Into<alloc::string::String>, core::io::error::Error) -> Self
+impl core::convert::From<clap_builder::error::Error> for rsproxy_cli::CliError
+pub fn rsproxy_cli::CliError::from(clap_builder::Error) -> Self
+impl core::convert::From<rsproxy_cli::ConfigError> for rsproxy_cli::CliError
+pub fn rsproxy_cli::CliError::from(rsproxy_cli::ConfigError) -> Self
+impl core::convert::From<rsproxy_cli::DaemonConflict> for rsproxy_cli::CliError
+pub fn rsproxy_cli::CliError::from(rsproxy_cli::DaemonConflict) -> Self
+impl core::convert::From<rsproxy_cli::LoggingError> for rsproxy_cli::CliError
+pub fn rsproxy_cli::CliError::from(rsproxy_cli::LoggingError) -> Self
+impl core::convert::From<rsproxy_cli::RuleDiagnostics> for rsproxy_cli::CliError
+pub fn rsproxy_cli::CliError::from(rsproxy_cli::RuleDiagnostics) -> Self
+impl core::convert::From<rsproxy_control::error::ControlError> for rsproxy_cli::CliError
+pub fn rsproxy_cli::CliError::from(rsproxy_control::error::ControlError) -> Self
+impl core::convert::From<rsproxy_engine::error::EngineError> for rsproxy_cli::CliError
+pub fn rsproxy_cli::CliError::from(rsproxy_engine::error::EngineError) -> Self
+impl core::convert::From<rsproxy_engine::rule_store::RuleStoreError> for rsproxy_cli::CliError
+pub fn rsproxy_cli::CliError::from(rsproxy_engine::rule_store::RuleStoreError) -> Self
+impl core::convert::From<rsproxy_platform::error::PlatformError> for rsproxy_cli::CliError
+pub fn rsproxy_cli::CliError::from(rsproxy_platform::error::PlatformError) -> Self
+impl core::convert::From<rsproxy_rules::error::RuleModelError> for rsproxy_cli::CliError
+pub fn rsproxy_cli::CliError::from(rsproxy_rules::error::RuleModelError) -> Self
+impl core::error::Error for rsproxy_cli::CliError
+pub fn rsproxy_cli::CliError::source(&self) -> core::option::Option<&(dyn core::error::Error + 'static)>
+impl core::fmt::Debug for rsproxy_cli::CliError
+pub fn rsproxy_cli::CliError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for rsproxy_cli::CliError
+pub fn rsproxy_cli::CliError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub enum rsproxy_cli::ConfigError
+pub rsproxy_cli::ConfigError::Invalid(alloc::string::String)
+pub rsproxy_cli::ConfigError::InvalidInteger
+pub rsproxy_cli::ConfigError::InvalidInteger::field: &'static str
+pub rsproxy_cli::ConfigError::InvalidInteger::input: alloc::string::String
+pub rsproxy_cli::ConfigError::InvalidInteger::source: core::num::error::ParseIntError
+pub rsproxy_cli::ConfigError::Parse
+pub rsproxy_cli::ConfigError::Parse::path: std::path::PathBuf
+pub rsproxy_cli::ConfigError::Parse::source: toml::de::error::Error
+pub rsproxy_cli::ConfigError::Read
+pub rsproxy_cli::ConfigError::Read::path: std::path::PathBuf
+pub rsproxy_cli::ConfigError::Read::source: core::io::error::Error
+impl core::convert::From<rsproxy_cli::ConfigError> for rsproxy_cli::CliError
+pub fn rsproxy_cli::CliError::from(rsproxy_cli::ConfigError) -> Self
+impl core::error::Error for rsproxy_cli::ConfigError
+pub fn rsproxy_cli::ConfigError::source(&self) -> core::option::Option<&(dyn core::error::Error + 'static)>
+impl core::fmt::Debug for rsproxy_cli::ConfigError
+pub fn rsproxy_cli::ConfigError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for rsproxy_cli::ConfigError
+pub fn rsproxy_cli::ConfigError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub enum rsproxy_cli::DaemonConflict
+pub rsproxy_cli::DaemonConflict::AlreadyRunning
+pub rsproxy_cli::DaemonConflict::AlreadyRunning::pid: u32
+pub rsproxy_cli::DaemonConflict::AlreadyRunning::pid_path: std::path::PathBuf
+pub rsproxy_cli::DaemonConflict::IdentityMismatch
+pub rsproxy_cli::DaemonConflict::IdentityMismatch::operation: &'static str
+pub rsproxy_cli::DaemonConflict::IdentityMismatch::pid: u32
+pub rsproxy_cli::DaemonConflict::IdentityMismatch::pid_path: std::path::PathBuf
+pub rsproxy_cli::DaemonConflict::NotRunning
+pub rsproxy_cli::DaemonConflict::NotRunning::pid_path: std::path::PathBuf
+impl core::convert::From<rsproxy_cli::DaemonConflict> for rsproxy_cli::CliError
+pub fn rsproxy_cli::CliError::from(rsproxy_cli::DaemonConflict) -> Self
+impl core::error::Error for rsproxy_cli::DaemonConflict
+impl core::fmt::Debug for rsproxy_cli::DaemonConflict
+pub fn rsproxy_cli::DaemonConflict::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for rsproxy_cli::DaemonConflict
+pub fn rsproxy_cli::DaemonConflict::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub enum rsproxy_cli::LoggingError
+pub rsproxy_cli::LoggingError::InvalidFilter
+pub rsproxy_cli::LoggingError::InvalidFilter::filter: alloc::string::String
+pub rsproxy_cli::LoggingError::InvalidFilter::source: tracing_subscriber::filter::directive::ParseError
+pub rsproxy_cli::LoggingError::InvalidFormat
+pub rsproxy_cli::LoggingError::InvalidFormat::value: alloc::string::String
+impl core::convert::From<rsproxy_cli::LoggingError> for rsproxy_cli::CliError
+pub fn rsproxy_cli::CliError::from(rsproxy_cli::LoggingError) -> Self
+impl core::error::Error for rsproxy_cli::LoggingError
+pub fn rsproxy_cli::LoggingError::source(&self) -> core::option::Option<&(dyn core::error::Error + 'static)>
+impl core::fmt::Debug for rsproxy_cli::LoggingError
+pub fn rsproxy_cli::LoggingError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for rsproxy_cli::LoggingError
+pub fn rsproxy_cli::LoggingError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub struct rsproxy_cli::ParsedCli
+pub rsproxy_cli::ParsedCli::json: bool
+impl clap_builder::derive::Args for rsproxy_cli::ParsedCli
+pub fn rsproxy_cli::ParsedCli::augment_args<'b>(clap_builder::builder::command::Command) -> clap_builder::builder::command::Command
+pub fn rsproxy_cli::ParsedCli::augment_args_for_update<'b>(clap_builder::builder::command::Command) -> clap_builder::builder::command::Command
+pub fn rsproxy_cli::ParsedCli::group_id() -> core::option::Option<clap_builder::util::id::Id>
+impl clap_builder::derive::CommandFactory for rsproxy_cli::ParsedCli
+pub fn rsproxy_cli::ParsedCli::command<'b>() -> clap_builder::builder::command::Command
+pub fn rsproxy_cli::ParsedCli::command_for_update<'b>() -> clap_builder::builder::command::Command
+impl clap_builder::derive::FromArgMatches for rsproxy_cli::ParsedCli
+pub fn rsproxy_cli::ParsedCli::from_arg_matches(&clap_builder::parser::matches::arg_matches::ArgMatches) -> core::result::Result<Self, clap_builder::Error>
+pub fn rsproxy_cli::ParsedCli::from_arg_matches_mut(&mut clap_builder::parser::matches::arg_matches::ArgMatches) -> core::result::Result<Self, clap_builder::Error>
+pub fn rsproxy_cli::ParsedCli::update_from_arg_matches(&mut self, &clap_builder::parser::matches::arg_matches::ArgMatches) -> core::result::Result<(), clap_builder::Error>
+pub fn rsproxy_cli::ParsedCli::update_from_arg_matches_mut(&mut self, &mut clap_builder::parser::matches::arg_matches::ArgMatches) -> core::result::Result<(), clap_builder::Error>
+impl clap_builder::derive::Parser for rsproxy_cli::ParsedCli
+pub struct rsproxy_cli::RuleDiagnostics(pub alloc::vec::Vec<rsproxy_rules::error::RuleError>)
+impl core::convert::From<rsproxy_cli::RuleDiagnostics> for rsproxy_cli::CliError
+pub fn rsproxy_cli::CliError::from(rsproxy_cli::RuleDiagnostics) -> Self
+impl core::error::Error for rsproxy_cli::RuleDiagnostics
+impl core::fmt::Debug for rsproxy_cli::RuleDiagnostics
+pub fn rsproxy_cli::RuleDiagnostics::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for rsproxy_cli::RuleDiagnostics
+pub fn rsproxy_cli::RuleDiagnostics::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub fn rsproxy_cli::parse_cli() -> core::result::Result<rsproxy_cli::ParsedCli, clap_builder::Error>
+pub fn rsproxy_cli::run_cli() -> rsproxy_cli::CliResult<()>
+pub fn rsproxy_cli::run_parsed(rsproxy_cli::ParsedCli) -> rsproxy_cli::CliResult<()>
+pub type rsproxy_cli::CliResult<T> = core::result::Result<T, rsproxy_cli::CliError>

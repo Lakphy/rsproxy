@@ -28,6 +28,11 @@ pub use stats::TraceStats;
 use worker::{Command, TraceWorker};
 
 #[derive(Clone)]
+/// A cloneable handle to the bounded asynchronous trace collector.
+///
+/// Producers never wait for queue capacity: event submission returns `false` when the queue or
+/// queue-memory budget is exhausted. Queries synchronize with the collector and return empty
+/// fallbacks if its worker has stopped.
 pub struct TraceStore {
     handle: Arc<TraceHandle>,
 }
@@ -59,6 +64,7 @@ impl fmt::Debug for TraceStore {
 }
 
 impl TraceStore {
+    /// Starts a store with default budgets and room for at most `max_sessions` completed records.
     pub fn new(max_sessions: usize) -> Self {
         Self::new_with_config(TraceStoreConfig {
             max_sessions,
@@ -66,6 +72,10 @@ impl TraceStore {
         })
     }
 
+    /// Starts a store with legacy spill-path compatibility.
+    ///
+    /// When `spill_path` is present, its parent directory is used with 64 MiB segments and a
+    /// 2 GiB disk budget; the filename itself is not used as a fixed output file.
     pub fn new_with_spill(max_sessions: usize, spill_path: Option<PathBuf>) -> Self {
         let config = spill_path.map(|path| {
             let dir = path
@@ -78,6 +88,7 @@ impl TraceStore {
         Self::new_with_spill_config(max_sessions, config)
     }
 
+    /// Starts a store with default memory and queue budgets plus an explicit spill policy.
     pub fn new_with_spill_config(
         max_sessions: usize,
         spill_config: Option<TraceSpillConfig>,
@@ -89,6 +100,9 @@ impl TraceStore {
         })
     }
 
+    /// Starts a store with explicit session, event-queue, and total-memory limits.
+    ///
+    /// The queue-memory share is selected automatically from `memory_budget_bytes`.
     pub fn new_with_limits(
         max_sessions: usize,
         queue_capacity: usize,
@@ -105,6 +119,10 @@ impl TraceStore {
         })
     }
 
+    /// Starts a collector thread using the complete bounded-resource policy.
+    ///
+    /// A zero queue capacity is clamped to one. Failure to create the collector thread is treated
+    /// as a process invariant violation and panics.
     pub fn new_with_config(config: TraceStoreConfig) -> Self {
         let (queue_memory_budget_bytes, resident_memory_budget_bytes) = config.memory_partitions();
         let TraceStoreConfig {
@@ -132,7 +150,7 @@ impl TraceStore {
                 )
                 .run(receiver, worker_counters, queue_capacity);
             })
-            .expect("failed to start trace collector");
+            .expect("trace collector thread must start during store construction");
         Self {
             handle: Arc::new(TraceHandle {
                 sender,
@@ -147,6 +165,9 @@ impl TraceStore {
         }
     }
 
+    /// Assigns an identifier and submits an already completed session without blocking.
+    ///
+    /// The identifier is consumed even when resource pressure drops the submission.
     pub fn record(&self, mut session: Session) -> u64 {
         let id = self.handle.counters.next_id.fetch_add(1, Ordering::Relaxed);
         session.id = id;
@@ -162,6 +183,9 @@ impl TraceStore {
         id
     }
 
+    /// Allocates an identifier and submits the opening event for an incremental session.
+    ///
+    /// The identifier is consumed even when resource pressure drops the opening event.
     pub fn start(&self, start: SessionStart) -> u64 {
         let id = self.handle.counters.next_id.fetch_add(1, Ordering::Relaxed);
         let event = TraceEvent::Start { id, start };
@@ -176,6 +200,9 @@ impl TraceStore {
         id
     }
 
+    /// Submits the remaining events from a caller-assembled session.
+    ///
+    /// Returns `false` for identifier zero or when the bounded queue rejects the submission.
     pub fn finish(&self, session: Session) -> bool {
         if session.id == 0 {
             return false;
@@ -191,6 +218,7 @@ impl TraceStore {
         )
     }
 
+    /// Attempts to enqueue one incremental event without waiting for capacity.
     pub fn emit(&self, event: TraceEvent) -> bool {
         let queued_bytes = event.estimated_bytes();
         self.submit(
@@ -202,15 +230,20 @@ impl TraceStore {
         )
     }
 
+    /// Requests removal of pending state for `id` without publishing a completed session.
     pub fn abort(&self, id: u64) -> bool {
         self.emit(TraceEvent::Abort { id })
     }
 
+    /// Returns up to `limit` newest resident sessions in newest-first order.
     pub fn list(&self, limit: usize) -> Vec<Session> {
         self.query(|reply| Command::List { limit, reply })
             .unwrap_or_default()
     }
 
+    /// Returns up to `limit` resident sessions whose identifiers are greater than `after`.
+    ///
+    /// Results are ordered from oldest to newest so they can seed a follow stream.
     pub fn list_after(&self, after: u64, limit: usize) -> Vec<Session> {
         self.query(|reply| Command::ListAfter {
             after,
@@ -220,28 +253,39 @@ impl TraceStore {
         .unwrap_or_default()
     }
 
+    /// Returns a cloned resident session by store-local identifier.
+    ///
+    /// Sessions evicted to spill storage are not searched by this method.
     pub fn get(&self, id: u64) -> Option<Session> {
         self.query(|reply| Command::Get { id, reply })
             .unwrap_or(None)
     }
 
+    /// Removes resident, pending, and spill state while keeping the collector running.
     pub fn clear(&self) {
         let _ = self.query(Command::Clear);
     }
 
+    /// Captures collector resource and integrity counters at one synchronization point.
     pub fn stats(&self) -> TraceStats {
         self.query(Command::Stats)
             .unwrap_or_else(|| self.empty_stats())
     }
 
+    /// Returns the active or next spill segment path, if spilling is configured.
     pub fn spill_path(&self) -> Option<PathBuf> {
         self.query(Command::SpillPath).unwrap_or(None)
     }
 
+    /// Returns existing spill data-segment paths in ascending segment order.
     pub fn spill_paths(&self) -> Vec<PathBuf> {
         self.query(Command::SpillPaths).unwrap_or_default()
     }
 
+    /// Reads a verified snapshot of all indexed spill records as uncompressed NDJSON.
+    ///
+    /// Records with corrupt indexes, checksums, or encodings are omitted and reported through
+    /// [`TraceStats::spill_corrupt_records`].
     pub fn spill_ndjson(&self) -> io::Result<Vec<u8>> {
         self.spill_ndjson_inner(|| {})
     }
@@ -260,6 +304,10 @@ impl TraceStore {
         Ok(body)
     }
 
+    /// Subscribes to completed sessions after `after`, with a bounded backlog and live channel.
+    ///
+    /// `capacity` is clamped to one. Returns `None` if the collector is unavailable. Slow
+    /// subscribers may lose live records; such loss is reflected in [`TraceStats::follow_dropped`].
     pub fn follow(&self, after: u64, backlog_limit: usize, capacity: usize) -> Option<TraceFollow> {
         let (sender, receiver) = mpsc::sync_channel(capacity.max(1));
         let liveness = Arc::new(());
@@ -322,8 +370,10 @@ impl TraceStore {
                 started,
                 release: release_rx,
             })
-            .expect("trace collector is available");
-        started_rx.recv().expect("trace collector entered block");
+            .expect("trace collector must remain connected for a test block request");
+        started_rx
+            .recv()
+            .expect("trace collector must acknowledge a test block request");
         CollectorBlock {
             release: Some(release),
         }
@@ -344,7 +394,12 @@ impl Drop for TraceHandle {
         if self.sender.send(Command::Shutdown(reply)).is_ok() {
             let _ = response.recv();
         }
-        if let Some(worker) = self.worker.lock().unwrap().take() {
+        if let Some(worker) = self
+            .worker
+            .lock()
+            .expect("trace collector worker lock poisoned")
+            .take()
+        {
             let _ = worker.join();
         }
     }

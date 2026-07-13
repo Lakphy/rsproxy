@@ -35,7 +35,7 @@ jobs:
       - name: Install cargo-fuzz
         run: cargo install cargo-fuzz --version 0.13.2 --locked
       - name: Replay versioned seeds
-        run: cargo test -p rsproxy-rules --test fuzz_seeds --locked
+        run: "cargo test -p rsproxy-rules --test it fuzz_seeds:: --locked"
       - name: Fuzz parser and resolver
         run: ./scripts/verify.sh fuzz
       - name: Preserve crash artifacts

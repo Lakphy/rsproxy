@@ -50,7 +50,10 @@ pub(super) fn websocket_tunnel_concurrent<W: Write + Send>(
     });
     let request_bytes = c2s?;
     let response_bytes = s2c?;
-    let frames = frames.lock().unwrap().clone();
+    let frames = frames
+        .lock()
+        .expect("WebSocket trace frame lock poisoned")
+        .clone();
     Ok((request_bytes, response_bytes, frames))
 }
 
@@ -84,7 +87,7 @@ fn websocket_copy_frames_shared<R: Read, W: Write>(
             return Err(err);
         }
         record_ws_frame(
-            &mut frames.lock().unwrap(),
+            &mut frames.lock().expect("WebSocket trace frame lock poisoned"),
             direction,
             &frame,
             trace_limit,

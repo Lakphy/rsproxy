@@ -1,4 +1,6 @@
-use criterion::{BenchmarkId, Criterion, Throughput, black_box, criterion_group, criterion_main};
+//! Criterion benchmarks for rule parsing and indexed resolution.
+
+use criterion::{BenchmarkId, Criterion, Throughput, black_box};
 use rsproxy_rules::{RequestMeta, RuleSet};
 use std::fmt::Write as _;
 use std::time::Duration;
@@ -13,13 +15,13 @@ fn source(rule_count: usize) -> String {
                 rules,
                 r"/^http:\/\/bench-{index}\.example\.test\/api\/[0-9]+$/ status(200)"
             )
-            .unwrap();
+            .expect("writing generated rules to a String cannot fail");
         } else {
             writeln!(
                 rules,
                 "bench-{index}.example.test/api status(200) when method(GET)"
             )
-            .unwrap();
+            .expect("writing generated rules to a String cannot fail");
         }
     }
     rules
@@ -48,7 +50,10 @@ fn parse_benchmarks(criterion: &mut Criterion) {
             BenchmarkId::from_parameter(size),
             &rules,
             |bencher, rules| {
-                bencher.iter(|| RuleSet::parse("criterion", black_box(rules)).unwrap());
+                bencher.iter(|| {
+                    RuleSet::parse("criterion", black_box(rules))
+                        .expect("generated benchmark rules must parse")
+                });
             },
         );
     }
@@ -58,7 +63,8 @@ fn parse_benchmarks(criterion: &mut Criterion) {
 fn resolve_benchmarks(criterion: &mut Criterion) {
     let mut group = criterion.benchmark_group("rules_resolve_mixed");
     for size in SIZES {
-        let rules = RuleSet::parse("criterion", &source(size)).unwrap();
+        let rules = RuleSet::parse("criterion", &source(size))
+            .expect("generated benchmark rules must parse");
         let request = request(size);
         assert_eq!(rules.stats().rules, size);
         assert_eq!(rules.resolve(&request).actions.len(), 1);
@@ -70,11 +76,16 @@ fn resolve_benchmarks(criterion: &mut Criterion) {
     group.finish();
 }
 
-criterion_group! {
-    name = benches;
-    config = Criterion::default()
+fn benches() {
+    let mut criterion = Criterion::default()
         .measurement_time(Duration::from_secs(3))
-        .warm_up_time(Duration::from_secs(1));
-    targets = parse_benchmarks, resolve_benchmarks
+        .warm_up_time(Duration::from_secs(1))
+        .configure_from_args();
+    parse_benchmarks(&mut criterion);
+    resolve_benchmarks(&mut criterion);
 }
-criterion_main!(benches);
+
+fn main() {
+    benches();
+    Criterion::default().configure_from_args().final_summary();
+}

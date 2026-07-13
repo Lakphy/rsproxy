@@ -1,3 +1,10 @@
+//! Listener selection and lifecycle for the authenticated control server.
+//!
+//! Each accepted connection is isolated on its own thread; all state shared
+//! with those threads is exposed through cloneable engine and trace handles.
+//! One HTTP/1.0 or HTTP/1.1 request is parsed per connection, authenticated,
+//! routed, and answered before the connection closes.
+
 use crate::{ControlError, ControlResult};
 use rsproxy_engine::EngineHandle;
 use rsproxy_trace::TraceStore;
@@ -28,17 +35,35 @@ pub(crate) use windows_pipe::NamedPipeStream;
 use router::handle;
 
 #[derive(Clone)]
+/// Configuration captured by every control connection handler.
+///
+/// The bearer token is treated as secret and is redacted from the `Debug`
+/// representation.
 pub struct ControlOptions {
+    /// Data-plane listener host reported by status responses.
     pub host: String,
+    /// Data-plane listener port reported by status responses.
     pub port: u16,
+    /// Control endpoint in TCP, `unix:` or `pipe:` form.
     pub api: String,
+    /// Expected bearer token; `None` disables header authentication.
+    ///
+    /// [`crate::prepare_server_api_auth`] supplies a token for TCP and named-pipe
+    /// deployments while leaving permission-protected Unix sockets tokenless.
     pub api_token: Option<String>,
+    /// Storage root used by control resources such as rules and values.
     pub storage: PathBuf,
+    /// Configuration source reported by the status resource, when one was loaded.
     pub config_path: Option<PathBuf>,
+    /// Whether the engine watches its persistent rule-group directory for changes.
     pub rules_watch: bool,
+    /// Minimum interval used to coalesce rule-file change notifications.
     pub rules_watch_debounce: Duration,
+    /// Maximum bytes in the complete control request head or trailer block.
     pub max_header_size: usize,
+    /// Maximum field count in each control request header or trailer block.
     pub max_header_count: usize,
+    /// Maximum accepted control-request body size in bytes.
     pub max_body_size: usize,
 }
 
@@ -62,6 +87,11 @@ impl std::fmt::Debug for ControlOptions {
 }
 
 #[derive(Clone)]
+/// Cloneable state shared by control request handlers.
+///
+/// Construction clones the engine's trace-store handle without copying sessions,
+/// so every request observes the same live collector while remaining behind the
+/// engine's public control boundary.
 pub struct ControlState {
     options: ControlOptions,
     engine: EngineHandle,
@@ -69,6 +99,7 @@ pub struct ControlState {
 }
 
 impl ControlState {
+    /// Composes immutable server options with handles to the same live engine and trace store.
     pub fn new(options: ControlOptions, engine: EngineHandle) -> Self {
         let trace = engine.trace_store();
         Self {
@@ -79,6 +110,10 @@ impl ControlState {
     }
 }
 
+/// An already-bound control endpoint ready to be passed to [`serve`].
+///
+/// The concrete TCP, Unix-socket or named-pipe listener remains opaque so
+/// transport selection cannot leak into callers.
 pub struct ControlListener(ControlListenerKind);
 
 enum ControlListenerKind {
@@ -90,6 +125,7 @@ enum ControlListenerKind {
 }
 
 impl ControlListener {
+    /// Returns the effective endpoint, including an operating-system-assigned TCP port.
     pub fn endpoint(&self) -> ControlResult<String> {
         match &self.0 {
             ControlListenerKind::Tcp(listener) => listener
@@ -104,6 +140,11 @@ impl ControlListener {
     }
 }
 
+/// Binds a TCP address, `unix:` socket path or `pipe:` named-pipe path.
+///
+/// Binding performs no serving and therefore lets the caller publish readiness
+/// only after the operating-system resource exists. Unix binding replaces a
+/// stale path and applies owner-only `0600` permissions.
 pub fn bind(addr: &str) -> ControlResult<ControlListener> {
     if let Some(path) = unix_api_path(addr) {
         return bind_unix(path);
@@ -116,6 +157,11 @@ pub fn bind(addr: &str) -> ControlResult<ControlListener> {
         .map_err(|source| ControlError::io(format!("bind TCP control listener {addr}"), source))
 }
 
+/// Runs the blocking accept loop and spawns one isolated thread per connection.
+///
+/// Individual protocol and request failures are isolated to their connection
+/// thread. TCP and Unix accept errors are logged and the loop continues; a
+/// terminal transport error is returned to the process-lifecycle owner.
 pub fn serve(listener: ControlListener, state: ControlState) -> ControlResult<()> {
     let result = match listener.0 {
         ControlListenerKind::Tcp(listener) => serve_tcp(listener, state),
@@ -307,12 +353,14 @@ fn respond_json<W: Write + ?Sized>(stream: &mut W, status: u16, body: &str) -> s
     )
 }
 
+/// Extracts a non-empty path from `unix:<path>` or `unix://<path>`.
 pub fn unix_api_path(api: &str) -> Option<&str> {
     api.strip_prefix("unix://")
         .or_else(|| api.strip_prefix("unix:"))
         .filter(|path| !path.is_empty())
 }
 
+/// Extracts a non-empty path from `pipe:`/`pipe://` or `npipe:`/`npipe://`.
 pub fn windows_pipe_path(api: &str) -> Option<&str> {
     api.strip_prefix("pipe://")
         .or_else(|| api.strip_prefix("pipe:"))

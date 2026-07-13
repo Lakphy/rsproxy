@@ -3,21 +3,21 @@ use clap::{Args, Subcommand, ValueEnum};
 use super::ClientArgs;
 
 #[derive(Args)]
-pub struct ProxyArgs {
+pub(crate) struct ProxyArgs {
     #[command(flatten)]
-    pub client: ClientArgs,
+    pub(crate) client: ClientArgs,
     #[arg(long, global = true, value_enum)]
-    pub platform: Option<ProxyPlatformArg>,
+    pub(crate) platform: Option<ProxyPlatformArg>,
     #[arg(long, global = true)]
-    pub service: Option<String>,
+    pub(crate) service: Option<String>,
     #[arg(long, global = true)]
-    pub dry_run: bool,
+    pub(crate) dry_run: bool,
     #[command(subcommand)]
-    pub command: Option<ProxyCommand>,
+    pub(crate) command: Option<ProxyCommand>,
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, ValueEnum)]
-pub enum ProxyPlatformArg {
+pub(crate) enum ProxyPlatformArg {
     #[value(alias = "darwin")]
     Macos,
     #[value(alias = "win")]
@@ -26,23 +26,23 @@ pub enum ProxyPlatformArg {
 }
 
 #[derive(Subcommand)]
-pub enum ProxyCommand {
+pub(crate) enum ProxyCommand {
     Status(ProxyStatusArgs),
     On(ProxyMutationArgs),
     Off(ProxyMutationArgs),
 }
 
 #[derive(Args)]
-pub struct ProxyStatusArgs {}
+pub(crate) struct ProxyStatusArgs {}
 
 #[derive(Args)]
-pub struct ProxyMutationArgs {
+pub(crate) struct ProxyMutationArgs {
     #[arg(long)]
-    pub host: Option<String>,
+    pub(crate) host: Option<String>,
     #[arg(long)]
-    pub port: Option<u16>,
+    pub(crate) port: Option<u16>,
     #[arg(long)]
-    pub bypass: Option<String>,
+    pub(crate) bypass: Option<String>,
     #[arg(long)]
-    pub all: bool,
+    pub(crate) all: bool,
 }

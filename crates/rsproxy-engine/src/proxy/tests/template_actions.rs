@@ -13,7 +13,7 @@ fn request_actions_render_method_id_port_and_request_cookie() {
         7,
         "123e4567-e89b-42d3-a456-426614174000",
     );
-    let rules = rsproxy_rules::RuleSet::parse(
+    let rules = RuleSet::parse(
         "default",
         "example.test req.method(${reqH.x-method}) req.header(x-template: ${id}|${port}|${reqCookies.sid})",
     )

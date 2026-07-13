@@ -1,7 +1,6 @@
 use serde_json::Value;
 use std::fs;
 use std::net::TcpListener;
-#[cfg(unix)]
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::{Command, Output, Stdio};
@@ -16,16 +15,25 @@ pub(super) struct DaemonHarness {
 
 impl DaemonHarness {
     pub(super) fn new() -> Self {
-        let proxy_port = unused_port();
-        let mut api_port = unused_port();
-        while api_port == proxy_port {
-            api_port = unused_port();
-        }
+        let (proxy_port, api_port) = probe_ports();
         Self {
             storage: unique_temp_dir("daemon-lifecycle"),
             proxy_port,
             api_port,
         }
+    }
+
+    /// Starts the daemon, probing fresh ports and retrying when another
+    /// process claimed a probed port before the daemon could bind it.
+    pub(super) fn start(&mut self) -> Output {
+        for _ in 1..START_ATTEMPTS {
+            let output = self.run("start");
+            if output.status.success() || !lost_probed_port(&self.storage, &output) {
+                return output;
+            }
+            (self.proxy_port, self.api_port) = probe_ports();
+        }
+        self.run("start")
     }
 
     pub(super) fn run(&self, command: &str) -> Output {
@@ -124,6 +132,42 @@ pub(super) fn unused_port() -> u16 {
         .local_addr()
         .unwrap()
         .port()
+}
+
+const START_ATTEMPTS: usize = 5;
+
+fn probe_ports() -> (u16, u16) {
+    let proxy_port = unused_port();
+    let mut api_port = unused_port();
+    while api_port == proxy_port {
+        api_port = unused_port();
+    }
+    (proxy_port, api_port)
+}
+
+/// Runs a daemon start command on a freshly probed proxy port, retrying with
+/// a new port when the probe was lost to another process. The probe listener
+/// is released before the daemon starts, so the reservation is inherently
+/// racy under parallel tests.
+pub(super) fn start_daemon_on_probed_port(
+    storage: &Path,
+    start: impl Fn(u16) -> Output,
+) -> (u16, Output) {
+    for _ in 1..START_ATTEMPTS {
+        let port = unused_port();
+        let output = start(port);
+        if output.status.success() || !lost_probed_port(storage, &output) {
+            return (port, output);
+        }
+    }
+    let port = unused_port();
+    (port, start(port))
+}
+
+fn lost_probed_port(storage: &Path, output: &Output) -> bool {
+    stderr(output).contains("exited during start")
+        && fs::read_to_string(storage.join("run/rsproxy.log"))
+            .is_ok_and(|log| log.contains("Address already in use"))
 }
 
 pub(super) fn unique_temp_dir(label: &str) -> PathBuf {

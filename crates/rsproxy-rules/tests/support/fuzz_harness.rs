@@ -3,7 +3,7 @@ use rsproxy_rules::{RequestMeta, ResponseMeta, RuleSet, UrlParts, redact_secrets
 const MAX_INPUT: usize = 64 * 1024;
 const INPUT_SEPARATOR: &str = "\n---request-url---\n";
 
-pub fn exercise(data: &[u8]) {
+pub(super) fn exercise(data: &[u8]) {
     if data.len() > MAX_INPUT {
         return;
     }

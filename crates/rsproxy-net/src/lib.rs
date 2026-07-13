@@ -1,3 +1,14 @@
+//! Transport primitives shared by the rsproxy engine.
+//!
+//! This crate owns bounded HTTP/1 message parsing, HTTP/2 client and server
+//! adaptation, DNS resolution, connection-pool admission, and request deadline
+//! accounting. Callers supply policy and execute rule actions; this crate does
+//! not load application configuration, choose proxy routes, issue certificates,
+//! or retain trace sessions.
+//!
+//! Timeout values are durations rather than background timers. Unless an item
+//! says otherwise, the caller starts enforcement when it begins the named I/O
+//! stage, and a [`RequestDeadline`] caps all stage-local budgets for one request.
 mod async_io;
 mod dns;
 mod downstream_h2;
@@ -18,7 +29,18 @@ pub use downstream_h2::{
 };
 pub use error::{NetError, NetResult, NetStage, ProtocolErrorKind};
 #[cfg(feature = "test-support")]
-pub use http::read_request_body_all;
+type BodyAndTrailers = (Vec<u8>, Vec<(String, String)>);
+
+/// Drains a request body reader and returns its bytes and validated trailers.
+#[cfg(feature = "test-support")]
+pub fn read_request_body_all<R: std::io::Read + ?Sized>(
+    stream: &mut R,
+    reader: RequestBodyReader,
+    max_header_size: usize,
+    max_header_count: usize,
+) -> std::io::Result<BodyAndTrailers> {
+    http::read_request_body_all(stream, reader, max_header_size, max_header_count)
+}
 pub use http::{
     BoundedRequestBody, RawRequest, RawResponseHead, RequestBodyFraming, RequestBodyRead,
     RequestBodyReader, RequestHead, header, read_request, read_request_body_bounded,

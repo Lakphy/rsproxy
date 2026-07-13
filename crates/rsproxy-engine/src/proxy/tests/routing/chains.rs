@@ -3,7 +3,7 @@ use super::*;
 #[test]
 fn upstream_route_parses_http_proxy_chain() {
     let request = meta("http://origin.test:18080/path");
-    let rules = rsproxy_rules::RuleSet::parse(
+    let rules = RuleSet::parse(
         "default",
         "origin.test upstream(proxy://127.0.0.1:18001, proxy://127.0.0.1:18002)",
     )
@@ -43,7 +43,7 @@ fn upstream_route_parses_http_proxy_chain() {
 #[test]
 fn upstream_route_parses_http_to_socks_proxy_chain() {
     let request = meta("http://origin.test:18080/path");
-    let rules = rsproxy_rules::RuleSet::parse(
+    let rules = RuleSet::parse(
         "default",
         "origin.test upstream(proxy://127.0.0.1:18001, socks5://127.0.0.1:18002)",
     )
@@ -84,7 +84,7 @@ fn upstream_route_parses_http_to_socks_proxy_chain() {
 #[test]
 fn upstream_route_parses_socks_to_http_proxy_chain_with_auth_redaction() {
     let request = meta("http://origin.test/path");
-    let rules = rsproxy_rules::RuleSet::parse(
+    let rules = RuleSet::parse(
         "default",
         "origin.test upstream(socks5://alice:secret@127.0.0.1:18001, proxy://127.0.0.1:18002)",
     )
@@ -103,7 +103,7 @@ fn upstream_route_parses_socks_to_http_proxy_chain_with_auth_redaction() {
 #[test]
 fn upstream_route_parses_http_to_https_proxy_chain() {
     let request = meta("http://origin.test:18080/path");
-    let rules = rsproxy_rules::RuleSet::parse(
+    let rules = RuleSet::parse(
         "default",
         "origin.test upstream(proxy://127.0.0.1:18001, https-proxy://secure-proxy.test:18443)",
     )
@@ -143,7 +143,7 @@ fn upstream_route_parses_http_to_https_proxy_chain() {
 #[test]
 fn upstream_route_parses_https_to_socks_proxy_chain() {
     let request = meta("http://origin.test/path");
-    let rules = rsproxy_rules::RuleSet::parse(
+    let rules = RuleSet::parse(
         "default",
         "origin.test upstream(https-proxy://secure-proxy.test:18443, socks5://127.0.0.1:18002)",
     )
@@ -166,7 +166,7 @@ fn upstream_route_parses_https_to_socks_proxy_chain() {
 #[test]
 fn upstream_route_parses_nested_https_proxy_chain() {
     let request = meta("http://origin.test/path");
-    let rules = rsproxy_rules::RuleSet::parse(
+    let rules = RuleSet::parse(
         "default",
         "origin.test upstream(https-proxy://p1.test:18443, https-proxy://p2.test:19443)",
     )

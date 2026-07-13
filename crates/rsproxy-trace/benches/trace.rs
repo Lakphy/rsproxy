@@ -1,4 +1,6 @@
-use criterion::{Criterion, Throughput, black_box, criterion_group, criterion_main};
+//! Criterion benchmarks for trace ingestion and bounded storage.
+
+use criterion::{Criterion, Throughput, black_box};
 use rsproxy_trace::{TraceEvent, TraceStore, TraceStoreConfig};
 use std::time::Duration;
 
@@ -23,11 +25,15 @@ fn enqueue_benchmark(criterion: &mut Criterion) {
     group.finish();
 }
 
-criterion_group! {
-    name = benches;
-    config = Criterion::default()
+fn benches() {
+    let mut criterion = Criterion::default()
         .measurement_time(Duration::from_secs(3))
-        .warm_up_time(Duration::from_secs(1));
-    targets = enqueue_benchmark
+        .warm_up_time(Duration::from_secs(1))
+        .configure_from_args();
+    enqueue_benchmark(&mut criterion);
 }
-criterion_main!(benches);
+
+fn main() {
+    benches();
+    Criterion::default().configure_from_args().final_summary();
+}

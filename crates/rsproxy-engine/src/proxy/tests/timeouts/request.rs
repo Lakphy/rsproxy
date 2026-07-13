@@ -4,11 +4,11 @@ use super::super::*;
 fn connect_proxy_setup_uses_request_total_deadline() {
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
     let addr = listener.local_addr().unwrap();
-    let worker = std::thread::spawn(move || {
+    let worker = thread::spawn(move || {
         let (mut stream, _) = listener.accept().unwrap();
         let mut request = [0u8; 512];
         let _ = stream.read(&mut request);
-        std::thread::sleep(Duration::from_millis(100));
+        thread::sleep(Duration::from_millis(100));
     });
     let route = UpstreamRoute::HttpProxy {
         proxy_host: addr.ip().to_string(),
@@ -49,9 +49,9 @@ fn dns_timeout_classification_does_not_include_lookup_failures() {
 fn manual_ttfb_deadline_excludes_response_body_wait() {
     let silent_listener = TcpListener::bind("127.0.0.1:0").unwrap();
     let silent_addr = silent_listener.local_addr().unwrap();
-    let silent_worker = std::thread::spawn(move || {
+    let silent_worker = thread::spawn(move || {
         let (_stream, _) = silent_listener.accept().unwrap();
-        std::thread::sleep(Duration::from_millis(100));
+        thread::sleep(Duration::from_millis(100));
     });
     let mut silent = UpstreamStream::Tcp(TcpStream::connect(silent_addr).unwrap());
     let mut timings = NetworkTimings::default();
@@ -73,13 +73,13 @@ fn manual_ttfb_deadline_excludes_response_body_wait() {
 
     let body_listener = TcpListener::bind("127.0.0.1:0").unwrap();
     let body_addr = body_listener.local_addr().unwrap();
-    let body_worker = std::thread::spawn(move || {
+    let body_worker = thread::spawn(move || {
         let (mut stream, _) = body_listener.accept().unwrap();
         stream
             .write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\n")
             .unwrap();
         stream.flush().unwrap();
-        std::thread::sleep(Duration::from_millis(80));
+        thread::sleep(Duration::from_millis(80));
         stream.write_all(b"ok").unwrap();
     });
     let mut body_stream = UpstreamStream::Tcp(TcpStream::connect(body_addr).unwrap());
@@ -105,13 +105,13 @@ fn manual_ttfb_deadline_excludes_response_body_wait() {
 fn manual_response_body_uses_request_total_deadline() {
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
     let addr = listener.local_addr().unwrap();
-    let worker = std::thread::spawn(move || {
+    let worker = thread::spawn(move || {
         let (mut stream, _) = listener.accept().unwrap();
         stream
             .write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\n")
             .unwrap();
         stream.flush().unwrap();
-        std::thread::sleep(Duration::from_millis(100));
+        thread::sleep(Duration::from_millis(100));
         let _ = stream.write_all(b"ok");
     });
     let mut stream = UpstreamStream::Tcp(TcpStream::connect(addr).unwrap());
@@ -149,8 +149,7 @@ fn request_delay_timeout_returns_504_and_records_trace_flags() {
     state.config.request_total_timeout = Duration::from_millis(40);
     state.rules = RuleStore::from_compiled(
         &state.config.storage,
-        rsproxy_rules::RuleSet::parse("default", "example.test delay(req, 100ms) status(209)")
-            .unwrap(),
+        RuleSet::parse("default", "example.test delay(req, 100ms) status(209)").unwrap(),
     );
     let request = RawRequest {
         method: "GET".to_string(),

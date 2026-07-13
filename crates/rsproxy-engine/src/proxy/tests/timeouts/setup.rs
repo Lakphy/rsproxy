@@ -61,7 +61,7 @@ fn upstream_tls_handshake_timeout_is_staged_and_recorded() {
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
     let addr = listener.local_addr().unwrap();
     let (release_tx, release_rx) = std::sync::mpsc::channel();
-    std::thread::spawn(move || {
+    thread::spawn(move || {
         let (_stream, _) = listener.accept().unwrap();
         let _ = release_rx.recv_timeout(Duration::from_secs(1));
     });
@@ -75,7 +75,7 @@ fn upstream_tls_handshake_timeout_is_staged_and_recorded() {
     )
     .unwrap();
     let mut tls_records = Vec::new();
-    let started = std::time::Instant::now();
+    let started = Instant::now();
 
     let error = match tls_wrap_upstream_stream(
         UpstreamStream::Tcp(tcp),

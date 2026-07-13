@@ -1,0 +1,738 @@
+pub mod rsproxy_rules
+pub enum rsproxy_rules::Action
+pub rsproxy_rules::Action::Attachment(core::option::Option<rsproxy_rules::Value>)
+pub rsproxy_rules::Action::Bypass
+pub rsproxy_rules::Action::Cache(rsproxy_rules::CacheOp)
+pub rsproxy_rules::Action::Delay
+pub rsproxy_rules::Action::Delay::millis: u64
+pub rsproxy_rules::Action::Delay::phase: rsproxy_rules::Phase
+pub rsproxy_rules::Action::Delete(alloc::vec::Vec<rsproxy_rules::DeleteOp>)
+pub rsproxy_rules::Action::Direct
+pub rsproxy_rules::Action::Hide
+pub rsproxy_rules::Action::Host(rsproxy_rules::HostPool)
+pub rsproxy_rules::Action::Inject(rsproxy_rules::InjectOp)
+pub rsproxy_rules::Action::Mock(rsproxy_rules::Value)
+pub rsproxy_rules::Action::MockRaw(rsproxy_rules::Value)
+pub rsproxy_rules::Action::Redirect
+pub rsproxy_rules::Action::Redirect::code: u16
+pub rsproxy_rules::Action::Redirect::url: rsproxy_rules::Value
+pub rsproxy_rules::Action::ReqAuth(rsproxy_rules::Value)
+pub rsproxy_rules::Action::ReqBody(rsproxy_rules::BodyOp)
+pub rsproxy_rules::Action::ReqCharset(rsproxy_rules::Value)
+pub rsproxy_rules::Action::ReqCookie(rsproxy_rules::CookieOp)
+pub rsproxy_rules::Action::ReqForwarded(rsproxy_rules::Value)
+pub rsproxy_rules::Action::ReqHeader(rsproxy_rules::HeaderOp)
+pub rsproxy_rules::Action::ReqMethod(rsproxy_rules::Value)
+pub rsproxy_rules::Action::ReqReferer(rsproxy_rules::Value)
+pub rsproxy_rules::Action::ReqType(rsproxy_rules::Value)
+pub rsproxy_rules::Action::ReqUa(rsproxy_rules::Value)
+pub rsproxy_rules::Action::ResBody(rsproxy_rules::BodyOp)
+pub rsproxy_rules::Action::ResCharset(rsproxy_rules::Value)
+pub rsproxy_rules::Action::ResCookie(rsproxy_rules::CookieOp)
+pub rsproxy_rules::Action::ResCors(rsproxy_rules::CorsOp)
+pub rsproxy_rules::Action::ResHeader(rsproxy_rules::HeaderOp)
+pub rsproxy_rules::Action::ResMerge(rsproxy_rules::Value)
+pub rsproxy_rules::Action::ResStatus(u16)
+pub rsproxy_rules::Action::ResTrailer(rsproxy_rules::HeaderOp)
+pub rsproxy_rules::Action::ResType(rsproxy_rules::Value)
+pub rsproxy_rules::Action::Skip(alloc::vec::Vec<alloc::string::String>)
+pub rsproxy_rules::Action::Status(u16)
+pub rsproxy_rules::Action::Tag(rsproxy_rules::Value)
+pub rsproxy_rules::Action::Throttle
+pub rsproxy_rules::Action::Throttle::bytes_per_sec: u64
+pub rsproxy_rules::Action::Throttle::phase: rsproxy_rules::Phase
+pub rsproxy_rules::Action::Tls(rsproxy_rules::TlsOp)
+pub rsproxy_rules::Action::Upstream(rsproxy_rules::Value)
+pub rsproxy_rules::Action::UrlQuery(alloc::vec::Vec<rsproxy_rules::QueryOp>)
+pub rsproxy_rules::Action::UrlRewrite
+pub rsproxy_rules::Action::UrlRewrite::from: rsproxy_rules::UrlRewritePattern
+pub rsproxy_rules::Action::UrlRewrite::to: rsproxy_rules::Value
+impl rsproxy_rules::Action
+pub const rsproxy_rules::Action::FAMILIES: &'static [&'static str]
+pub fn rsproxy_rules::Action::family(&self) -> &'static str
+impl core::clone::Clone for rsproxy_rules::Action
+pub fn rsproxy_rules::Action::clone(&self) -> rsproxy_rules::Action
+impl core::cmp::Eq for rsproxy_rules::Action
+impl core::cmp::PartialEq for rsproxy_rules::Action
+pub fn rsproxy_rules::Action::eq(&self, &rsproxy_rules::Action) -> bool
+impl core::fmt::Debug for rsproxy_rules::Action
+pub fn rsproxy_rules::Action::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for rsproxy_rules::Action
+pub enum rsproxy_rules::BodyOp
+pub rsproxy_rules::BodyOp::Append(rsproxy_rules::Value)
+pub rsproxy_rules::BodyOp::Prepend(rsproxy_rules::Value)
+pub rsproxy_rules::BodyOp::Replace
+pub rsproxy_rules::BodyOp::Replace::pattern: rsproxy_rules::RegexReplacePattern
+pub rsproxy_rules::BodyOp::Replace::replacement: alloc::string::String
+pub rsproxy_rules::BodyOp::Set(rsproxy_rules::Value)
+impl core::clone::Clone for rsproxy_rules::BodyOp
+pub fn rsproxy_rules::BodyOp::clone(&self) -> rsproxy_rules::BodyOp
+impl core::cmp::Eq for rsproxy_rules::BodyOp
+impl core::cmp::PartialEq for rsproxy_rules::BodyOp
+pub fn rsproxy_rules::BodyOp::eq(&self, &rsproxy_rules::BodyOp) -> bool
+impl core::fmt::Debug for rsproxy_rules::BodyOp
+pub fn rsproxy_rules::BodyOp::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for rsproxy_rules::BodyOp
+pub enum rsproxy_rules::CacheOp
+pub rsproxy_rules::CacheOp::Directives(alloc::vec::Vec<rsproxy_rules::CacheDirective>)
+pub rsproxy_rules::CacheOp::Off
+impl core::clone::Clone for rsproxy_rules::CacheOp
+pub fn rsproxy_rules::CacheOp::clone(&self) -> rsproxy_rules::CacheOp
+impl core::cmp::Eq for rsproxy_rules::CacheOp
+impl core::cmp::PartialEq for rsproxy_rules::CacheOp
+pub fn rsproxy_rules::CacheOp::eq(&self, &rsproxy_rules::CacheOp) -> bool
+impl core::fmt::Debug for rsproxy_rules::CacheOp
+pub fn rsproxy_rules::CacheOp::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for rsproxy_rules::CacheOp
+pub enum rsproxy_rules::Condition
+pub rsproxy_rules::Condition::Any(alloc::vec::Vec<rsproxy_rules::Condition>)
+pub rsproxy_rules::Condition::BodyContains(alloc::string::String)
+pub rsproxy_rules::Condition::BodyRegex(rsproxy_rules::RegexMatcher)
+pub rsproxy_rules::Condition::ChancePermille(u16)
+pub rsproxy_rules::Condition::ClientIp(alloc::vec::Vec<alloc::string::String>)
+pub rsproxy_rules::Condition::EnvEquals
+pub rsproxy_rules::Condition::EnvEquals::name: alloc::string::String
+pub rsproxy_rules::Condition::EnvEquals::value: alloc::string::String
+pub rsproxy_rules::Condition::EnvPresent(alloc::string::String)
+pub rsproxy_rules::Condition::HeaderContains
+pub rsproxy_rules::Condition::HeaderContains::name: alloc::string::String
+pub rsproxy_rules::Condition::HeaderContains::value: alloc::string::String
+pub rsproxy_rules::Condition::HeaderPresent(alloc::string::String)
+pub rsproxy_rules::Condition::Host(alloc::string::String)
+pub rsproxy_rules::Condition::Method(alloc::vec::Vec<alloc::string::String>)
+pub rsproxy_rules::Condition::Not(alloc::boxed::Box<rsproxy_rules::Condition>)
+pub rsproxy_rules::Condition::ResHeaderContains
+pub rsproxy_rules::Condition::ResHeaderContains::name: alloc::string::String
+pub rsproxy_rules::Condition::ResHeaderContains::value: alloc::string::String
+pub rsproxy_rules::Condition::ResHeaderPresent(alloc::string::String)
+pub rsproxy_rules::Condition::ServerIp(alloc::vec::Vec<alloc::string::String>)
+pub rsproxy_rules::Condition::Status(alloc::vec::Vec<u16>)
+pub rsproxy_rules::Condition::Url(rsproxy_rules::UrlCondition)
+impl core::clone::Clone for rsproxy_rules::Condition
+pub fn rsproxy_rules::Condition::clone(&self) -> rsproxy_rules::Condition
+impl core::cmp::Eq for rsproxy_rules::Condition
+impl core::cmp::PartialEq for rsproxy_rules::Condition
+pub fn rsproxy_rules::Condition::eq(&self, &rsproxy_rules::Condition) -> bool
+impl core::fmt::Debug for rsproxy_rules::Condition
+pub fn rsproxy_rules::Condition::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for rsproxy_rules::Condition
+pub enum rsproxy_rules::CookieOp
+pub rsproxy_rules::CookieOp::Remove
+pub rsproxy_rules::CookieOp::Remove::name: alloc::string::String
+pub rsproxy_rules::CookieOp::Set
+pub rsproxy_rules::CookieOp::Set::attrs: alloc::vec::Vec<rsproxy_rules::CookieAttr>
+pub rsproxy_rules::CookieOp::Set::name: alloc::string::String
+pub rsproxy_rules::CookieOp::Set::value: rsproxy_rules::Value
+impl core::clone::Clone for rsproxy_rules::CookieOp
+pub fn rsproxy_rules::CookieOp::clone(&self) -> rsproxy_rules::CookieOp
+impl core::cmp::Eq for rsproxy_rules::CookieOp
+impl core::cmp::PartialEq for rsproxy_rules::CookieOp
+pub fn rsproxy_rules::CookieOp::eq(&self, &rsproxy_rules::CookieOp) -> bool
+impl core::fmt::Debug for rsproxy_rules::CookieOp
+pub fn rsproxy_rules::CookieOp::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for rsproxy_rules::CookieOp
+pub enum rsproxy_rules::DeleteBodyPathSegment
+pub rsproxy_rules::DeleteBodyPathSegment::Index(usize)
+pub rsproxy_rules::DeleteBodyPathSegment::Key(alloc::string::String)
+impl core::clone::Clone for rsproxy_rules::DeleteBodyPathSegment
+pub fn rsproxy_rules::DeleteBodyPathSegment::clone(&self) -> rsproxy_rules::DeleteBodyPathSegment
+impl core::cmp::Eq for rsproxy_rules::DeleteBodyPathSegment
+impl core::cmp::PartialEq for rsproxy_rules::DeleteBodyPathSegment
+pub fn rsproxy_rules::DeleteBodyPathSegment::eq(&self, &rsproxy_rules::DeleteBodyPathSegment) -> bool
+impl core::fmt::Debug for rsproxy_rules::DeleteBodyPathSegment
+pub fn rsproxy_rules::DeleteBodyPathSegment::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for rsproxy_rules::DeleteBodyPathSegment
+pub enum rsproxy_rules::DeleteOp
+pub rsproxy_rules::DeleteOp::PathSegment(rsproxy_rules::DeletePathSegment)
+pub rsproxy_rules::DeleteOp::Pathname
+pub rsproxy_rules::DeleteOp::ReqBody
+pub rsproxy_rules::DeleteOp::ReqBodyPath(rsproxy_rules::DeleteBodyPath)
+pub rsproxy_rules::DeleteOp::ReqCharset
+pub rsproxy_rules::DeleteOp::ReqCookie(alloc::string::String)
+pub rsproxy_rules::DeleteOp::ReqCookies
+pub rsproxy_rules::DeleteOp::ReqHeader(alloc::string::String)
+pub rsproxy_rules::DeleteOp::ReqType
+pub rsproxy_rules::DeleteOp::ResBody
+pub rsproxy_rules::DeleteOp::ResBodyPath(rsproxy_rules::DeleteBodyPath)
+pub rsproxy_rules::DeleteOp::ResCharset
+pub rsproxy_rules::DeleteOp::ResCookie(alloc::string::String)
+pub rsproxy_rules::DeleteOp::ResCookies
+pub rsproxy_rules::DeleteOp::ResHeader(alloc::string::String)
+pub rsproxy_rules::DeleteOp::ResType
+pub rsproxy_rules::DeleteOp::Trailer(alloc::string::String)
+pub rsproxy_rules::DeleteOp::Trailers
+pub rsproxy_rules::DeleteOp::UrlParam(alloc::string::String)
+pub rsproxy_rules::DeleteOp::UrlParams
+impl core::clone::Clone for rsproxy_rules::DeleteOp
+pub fn rsproxy_rules::DeleteOp::clone(&self) -> rsproxy_rules::DeleteOp
+impl core::cmp::Eq for rsproxy_rules::DeleteOp
+impl core::cmp::PartialEq for rsproxy_rules::DeleteOp
+pub fn rsproxy_rules::DeleteOp::eq(&self, &rsproxy_rules::DeleteOp) -> bool
+impl core::fmt::Debug for rsproxy_rules::DeleteOp
+pub fn rsproxy_rules::DeleteOp::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for rsproxy_rules::DeleteOp
+pub enum rsproxy_rules::DeletePathSegment
+pub rsproxy_rules::DeletePathSegment::Index(i32)
+pub rsproxy_rules::DeletePathSegment::Last
+impl core::clone::Clone for rsproxy_rules::DeletePathSegment
+pub fn rsproxy_rules::DeletePathSegment::clone(&self) -> rsproxy_rules::DeletePathSegment
+impl core::cmp::Eq for rsproxy_rules::DeletePathSegment
+impl core::cmp::PartialEq for rsproxy_rules::DeletePathSegment
+pub fn rsproxy_rules::DeletePathSegment::eq(&self, &rsproxy_rules::DeletePathSegment) -> bool
+impl core::fmt::Debug for rsproxy_rules::DeletePathSegment
+pub fn rsproxy_rules::DeletePathSegment::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for rsproxy_rules::DeletePathSegment
+impl core::marker::StructuralPartialEq for rsproxy_rules::DeletePathSegment
+pub enum rsproxy_rules::HeaderOp
+pub rsproxy_rules::HeaderOp::Remove
+pub rsproxy_rules::HeaderOp::Remove::name: alloc::string::String
+pub rsproxy_rules::HeaderOp::Replace
+pub rsproxy_rules::HeaderOp::Replace::name: alloc::string::String
+pub rsproxy_rules::HeaderOp::Replace::pattern: rsproxy_rules::RegexReplacePattern
+pub rsproxy_rules::HeaderOp::Replace::replacement: alloc::string::String
+pub rsproxy_rules::HeaderOp::Set
+pub rsproxy_rules::HeaderOp::Set::name: alloc::string::String
+pub rsproxy_rules::HeaderOp::Set::value: rsproxy_rules::Value
+impl core::clone::Clone for rsproxy_rules::HeaderOp
+pub fn rsproxy_rules::HeaderOp::clone(&self) -> rsproxy_rules::HeaderOp
+impl core::cmp::Eq for rsproxy_rules::HeaderOp
+impl core::cmp::PartialEq for rsproxy_rules::HeaderOp
+pub fn rsproxy_rules::HeaderOp::eq(&self, &rsproxy_rules::HeaderOp) -> bool
+impl core::fmt::Debug for rsproxy_rules::HeaderOp
+pub fn rsproxy_rules::HeaderOp::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for rsproxy_rules::HeaderOp
+pub enum rsproxy_rules::InjectMode
+pub rsproxy_rules::InjectMode::Append
+pub rsproxy_rules::InjectMode::Prepend
+pub rsproxy_rules::InjectMode::Replace
+impl core::clone::Clone for rsproxy_rules::InjectMode
+pub fn rsproxy_rules::InjectMode::clone(&self) -> rsproxy_rules::InjectMode
+impl core::cmp::Eq for rsproxy_rules::InjectMode
+impl core::cmp::PartialEq for rsproxy_rules::InjectMode
+pub fn rsproxy_rules::InjectMode::eq(&self, &rsproxy_rules::InjectMode) -> bool
+impl core::fmt::Debug for rsproxy_rules::InjectMode
+pub fn rsproxy_rules::InjectMode::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for rsproxy_rules::InjectMode
+impl core::marker::StructuralPartialEq for rsproxy_rules::InjectMode
+pub enum rsproxy_rules::InjectTarget
+pub rsproxy_rules::InjectTarget::Css
+pub rsproxy_rules::InjectTarget::Html
+pub rsproxy_rules::InjectTarget::Js
+impl core::clone::Clone for rsproxy_rules::InjectTarget
+pub fn rsproxy_rules::InjectTarget::clone(&self) -> rsproxy_rules::InjectTarget
+impl core::cmp::Eq for rsproxy_rules::InjectTarget
+impl core::cmp::PartialEq for rsproxy_rules::InjectTarget
+pub fn rsproxy_rules::InjectTarget::eq(&self, &rsproxy_rules::InjectTarget) -> bool
+impl core::fmt::Debug for rsproxy_rules::InjectTarget
+pub fn rsproxy_rules::InjectTarget::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for rsproxy_rules::InjectTarget
+impl core::marker::StructuralPartialEq for rsproxy_rules::InjectTarget
+pub enum rsproxy_rules::Matcher
+pub rsproxy_rules::Matcher::ExactUrl(alloc::string::String)
+pub rsproxy_rules::Matcher::Glob(rsproxy_rules::GlobMatcher)
+pub rsproxy_rules::Matcher::Not(alloc::boxed::Box<rsproxy_rules::Matcher>)
+pub rsproxy_rules::Matcher::Port(u16)
+pub rsproxy_rules::Matcher::Regex(rsproxy_rules::RegexMatcher)
+impl core::clone::Clone for rsproxy_rules::Matcher
+pub fn rsproxy_rules::Matcher::clone(&self) -> rsproxy_rules::Matcher
+impl core::cmp::Eq for rsproxy_rules::Matcher
+impl core::cmp::PartialEq for rsproxy_rules::Matcher
+pub fn rsproxy_rules::Matcher::eq(&self, &rsproxy_rules::Matcher) -> bool
+impl core::fmt::Debug for rsproxy_rules::Matcher
+pub fn rsproxy_rules::Matcher::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for rsproxy_rules::Matcher
+pub enum rsproxy_rules::Phase
+pub rsproxy_rules::Phase::Req
+pub rsproxy_rules::Phase::Res
+impl core::clone::Clone for rsproxy_rules::Phase
+pub fn rsproxy_rules::Phase::clone(&self) -> rsproxy_rules::Phase
+impl core::cmp::Eq for rsproxy_rules::Phase
+impl core::cmp::PartialEq for rsproxy_rules::Phase
+pub fn rsproxy_rules::Phase::eq(&self, &rsproxy_rules::Phase) -> bool
+impl core::fmt::Debug for rsproxy_rules::Phase
+pub fn rsproxy_rules::Phase::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for rsproxy_rules::Phase
+impl core::marker::StructuralPartialEq for rsproxy_rules::Phase
+pub enum rsproxy_rules::QueryOp
+pub rsproxy_rules::QueryOp::Remove
+pub rsproxy_rules::QueryOp::Remove::name: alloc::string::String
+pub rsproxy_rules::QueryOp::Set
+pub rsproxy_rules::QueryOp::Set::name: alloc::string::String
+pub rsproxy_rules::QueryOp::Set::value: rsproxy_rules::Value
+impl core::clone::Clone for rsproxy_rules::QueryOp
+pub fn rsproxy_rules::QueryOp::clone(&self) -> rsproxy_rules::QueryOp
+impl core::cmp::Eq for rsproxy_rules::QueryOp
+impl core::cmp::PartialEq for rsproxy_rules::QueryOp
+pub fn rsproxy_rules::QueryOp::eq(&self, &rsproxy_rules::QueryOp) -> bool
+impl core::fmt::Debug for rsproxy_rules::QueryOp
+pub fn rsproxy_rules::QueryOp::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for rsproxy_rules::QueryOp
+pub enum rsproxy_rules::RegexEngine
+pub rsproxy_rules::RegexEngine::Fancy
+pub rsproxy_rules::RegexEngine::Linear
+impl core::clone::Clone for rsproxy_rules::RegexEngine
+pub fn rsproxy_rules::RegexEngine::clone(&self) -> rsproxy_rules::RegexEngine
+impl core::cmp::Eq for rsproxy_rules::RegexEngine
+impl core::cmp::PartialEq for rsproxy_rules::RegexEngine
+pub fn rsproxy_rules::RegexEngine::eq(&self, &rsproxy_rules::RegexEngine) -> bool
+impl core::fmt::Debug for rsproxy_rules::RegexEngine
+pub fn rsproxy_rules::RegexEngine::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for rsproxy_rules::RegexEngine
+impl core::marker::StructuralPartialEq for rsproxy_rules::RegexEngine
+pub enum rsproxy_rules::RuleErrorCode
+pub rsproxy_rules::RuleErrorCode::Action
+pub rsproxy_rules::RuleErrorCode::Condition
+pub rsproxy_rules::RuleErrorCode::Matcher
+pub rsproxy_rules::RuleErrorCode::Property
+pub rsproxy_rules::RuleErrorCode::Syntax
+impl rsproxy_rules::RuleErrorCode
+pub fn rsproxy_rules::RuleErrorCode::as_str(self) -> &'static str
+impl core::clone::Clone for rsproxy_rules::RuleErrorCode
+pub fn rsproxy_rules::RuleErrorCode::clone(&self) -> rsproxy_rules::RuleErrorCode
+impl core::cmp::Eq for rsproxy_rules::RuleErrorCode
+impl core::cmp::PartialEq for rsproxy_rules::RuleErrorCode
+pub fn rsproxy_rules::RuleErrorCode::eq(&self, &rsproxy_rules::RuleErrorCode) -> bool
+impl core::fmt::Debug for rsproxy_rules::RuleErrorCode
+pub fn rsproxy_rules::RuleErrorCode::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for rsproxy_rules::RuleErrorCode
+impl core::marker::StructuralPartialEq for rsproxy_rules::RuleErrorCode
+#[non_exhaustive] pub enum rsproxy_rules::RuleModelError
+pub rsproxy_rules::RuleModelError::ConstraintViolation
+pub rsproxy_rules::RuleModelError::ConstraintViolation::context: &'static str
+pub rsproxy_rules::RuleModelError::ConstraintViolation::message: alloc::string::String
+pub rsproxy_rules::RuleModelError::EmptyInput
+pub rsproxy_rules::RuleModelError::EmptyInput::context: &'static str
+pub rsproxy_rules::RuleModelError::EmptyInput::message: alloc::string::String
+pub rsproxy_rules::RuleModelError::InvalidExactUrlMatcher
+pub rsproxy_rules::RuleModelError::InvalidExactUrlMatcher::source: alloc::boxed::Box<rsproxy_rules::RuleModelError>
+pub rsproxy_rules::RuleModelError::InvalidFloat
+pub rsproxy_rules::RuleModelError::InvalidFloat::context: &'static str
+pub rsproxy_rules::RuleModelError::InvalidFloat::input: alloc::string::String
+pub rsproxy_rules::RuleModelError::InvalidFloat::message: alloc::string::String
+pub rsproxy_rules::RuleModelError::InvalidFloat::source: core::num::float_parse::ParseFloatError
+pub rsproxy_rules::RuleModelError::InvalidInput
+pub rsproxy_rules::RuleModelError::InvalidInput::context: &'static str
+pub rsproxy_rules::RuleModelError::InvalidInput::message: alloc::string::String
+pub rsproxy_rules::RuleModelError::InvalidInteger
+pub rsproxy_rules::RuleModelError::InvalidInteger::context: &'static str
+pub rsproxy_rules::RuleModelError::InvalidInteger::input: alloc::string::String
+pub rsproxy_rules::RuleModelError::InvalidInteger::message: alloc::string::String
+pub rsproxy_rules::RuleModelError::InvalidInteger::source: core::num::error::ParseIntError
+pub rsproxy_rules::RuleModelError::InvalidRegex
+pub rsproxy_rules::RuleModelError::InvalidRegex::context: &'static str
+pub rsproxy_rules::RuleModelError::InvalidRegex::source: alloc::boxed::Box<regex::error::Error>
+pub rsproxy_rules::RuleModelError::InvalidRegexMatcher
+pub rsproxy_rules::RuleModelError::InvalidRegexMatcher::fancy: alloc::boxed::Box<fancy_regex::error::Error>
+pub rsproxy_rules::RuleModelError::InvalidRegexMatcher::linear: alloc::boxed::Box<regex::error::Error>
+pub rsproxy_rules::RuleModelError::InvalidSyntax
+pub rsproxy_rules::RuleModelError::InvalidSyntax::context: &'static str
+pub rsproxy_rules::RuleModelError::InvalidSyntax::message: alloc::string::String
+pub rsproxy_rules::RuleModelError::InvalidTemplate
+pub rsproxy_rules::RuleModelError::InvalidTemplate::context: &'static str
+pub rsproxy_rules::RuleModelError::InvalidTemplate::message: alloc::string::String
+pub rsproxy_rules::RuleModelError::LimitExceeded
+pub rsproxy_rules::RuleModelError::LimitExceeded::context: &'static str
+pub rsproxy_rules::RuleModelError::LimitExceeded::message: alloc::string::String
+pub rsproxy_rules::RuleModelError::MissingArgument
+pub rsproxy_rules::RuleModelError::MissingArgument::context: &'static str
+pub rsproxy_rules::RuleModelError::MissingArgument::message: alloc::string::String
+pub rsproxy_rules::RuleModelError::UnsupportedInput
+pub rsproxy_rules::RuleModelError::UnsupportedInput::context: &'static str
+pub rsproxy_rules::RuleModelError::UnsupportedInput::message: alloc::string::String
+impl core::error::Error for rsproxy_rules::RuleModelError
+pub fn rsproxy_rules::RuleModelError::source(&self) -> core::option::Option<&(dyn core::error::Error + 'static)>
+impl core::fmt::Debug for rsproxy_rules::RuleModelError
+pub fn rsproxy_rules::RuleModelError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for rsproxy_rules::RuleModelError
+pub fn rsproxy_rules::RuleModelError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub enum rsproxy_rules::TlsCipherSuite
+pub rsproxy_rules::TlsCipherSuite::Tls12EcdheEcdsaAes128GcmSha256
+pub rsproxy_rules::TlsCipherSuite::Tls12EcdheEcdsaAes256GcmSha384
+pub rsproxy_rules::TlsCipherSuite::Tls12EcdheEcdsaChacha20Poly1305Sha256
+pub rsproxy_rules::TlsCipherSuite::Tls12EcdheRsaAes128GcmSha256
+pub rsproxy_rules::TlsCipherSuite::Tls12EcdheRsaAes256GcmSha384
+pub rsproxy_rules::TlsCipherSuite::Tls12EcdheRsaChacha20Poly1305Sha256
+pub rsproxy_rules::TlsCipherSuite::Tls13Aes128GcmSha256
+pub rsproxy_rules::TlsCipherSuite::Tls13Aes256GcmSha384
+pub rsproxy_rules::TlsCipherSuite::Tls13Chacha20Poly1305Sha256
+impl rsproxy_rules::TlsCipherSuite
+pub fn rsproxy_rules::TlsCipherSuite::as_str(self) -> &'static str
+pub fn rsproxy_rules::TlsCipherSuite::is_tls13(self) -> bool
+impl core::clone::Clone for rsproxy_rules::TlsCipherSuite
+pub fn rsproxy_rules::TlsCipherSuite::clone(&self) -> rsproxy_rules::TlsCipherSuite
+impl core::cmp::Eq for rsproxy_rules::TlsCipherSuite
+impl core::cmp::PartialEq for rsproxy_rules::TlsCipherSuite
+pub fn rsproxy_rules::TlsCipherSuite::eq(&self, &rsproxy_rules::TlsCipherSuite) -> bool
+impl core::fmt::Debug for rsproxy_rules::TlsCipherSuite
+pub fn rsproxy_rules::TlsCipherSuite::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for rsproxy_rules::TlsCipherSuite
+impl core::marker::StructuralPartialEq for rsproxy_rules::TlsCipherSuite
+pub enum rsproxy_rules::TlsMinVersion
+pub rsproxy_rules::TlsMinVersion::Tls12
+pub rsproxy_rules::TlsMinVersion::Tls13
+impl rsproxy_rules::TlsMinVersion
+pub fn rsproxy_rules::TlsMinVersion::as_str(self) -> &'static str
+impl core::clone::Clone for rsproxy_rules::TlsMinVersion
+pub fn rsproxy_rules::TlsMinVersion::clone(&self) -> rsproxy_rules::TlsMinVersion
+impl core::cmp::Eq for rsproxy_rules::TlsMinVersion
+impl core::cmp::PartialEq for rsproxy_rules::TlsMinVersion
+pub fn rsproxy_rules::TlsMinVersion::eq(&self, &rsproxy_rules::TlsMinVersion) -> bool
+impl core::fmt::Debug for rsproxy_rules::TlsMinVersion
+pub fn rsproxy_rules::TlsMinVersion::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for rsproxy_rules::TlsMinVersion
+impl core::marker::StructuralPartialEq for rsproxy_rules::TlsMinVersion
+pub enum rsproxy_rules::UrlCondition
+pub rsproxy_rules::UrlCondition::Glob(alloc::string::String)
+pub rsproxy_rules::UrlCondition::Regex(rsproxy_rules::RegexMatcher)
+impl core::clone::Clone for rsproxy_rules::UrlCondition
+pub fn rsproxy_rules::UrlCondition::clone(&self) -> rsproxy_rules::UrlCondition
+impl core::cmp::Eq for rsproxy_rules::UrlCondition
+impl core::cmp::PartialEq for rsproxy_rules::UrlCondition
+pub fn rsproxy_rules::UrlCondition::eq(&self, &rsproxy_rules::UrlCondition) -> bool
+impl core::fmt::Debug for rsproxy_rules::UrlCondition
+pub fn rsproxy_rules::UrlCondition::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for rsproxy_rules::UrlCondition
+pub enum rsproxy_rules::UrlRewritePattern
+pub rsproxy_rules::UrlRewritePattern::Plain(rsproxy_rules::Value)
+pub rsproxy_rules::UrlRewritePattern::Regex(rsproxy_rules::RegexReplacePattern)
+impl core::clone::Clone for rsproxy_rules::UrlRewritePattern
+pub fn rsproxy_rules::UrlRewritePattern::clone(&self) -> rsproxy_rules::UrlRewritePattern
+impl core::cmp::Eq for rsproxy_rules::UrlRewritePattern
+impl core::cmp::PartialEq for rsproxy_rules::UrlRewritePattern
+pub fn rsproxy_rules::UrlRewritePattern::eq(&self, &rsproxy_rules::UrlRewritePattern) -> bool
+impl core::fmt::Debug for rsproxy_rules::UrlRewritePattern
+pub fn rsproxy_rules::UrlRewritePattern::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for rsproxy_rules::UrlRewritePattern
+pub enum rsproxy_rules::Value
+pub rsproxy_rules::Value::File(alloc::string::String)
+pub rsproxy_rules::Value::Inline(alloc::string::String)
+pub rsproxy_rules::Value::Reference(alloc::string::String)
+impl rsproxy_rules::Value
+pub fn rsproxy_rules::Value::as_inline(&self) -> core::option::Option<&str>
+pub fn rsproxy_rules::Value::inline(impl core::convert::Into<alloc::string::String>) -> Self
+pub fn rsproxy_rules::Value::source(&self) -> &str
+impl core::clone::Clone for rsproxy_rules::Value
+pub fn rsproxy_rules::Value::clone(&self) -> rsproxy_rules::Value
+impl core::cmp::Eq for rsproxy_rules::Value
+impl core::cmp::PartialEq for rsproxy_rules::Value
+pub fn rsproxy_rules::Value::eq(&self, &rsproxy_rules::Value) -> bool
+impl core::fmt::Debug for rsproxy_rules::Value
+pub fn rsproxy_rules::Value::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for rsproxy_rules::Value
+pub struct rsproxy_rules::CacheDirective
+pub rsproxy_rules::CacheDirective::name: alloc::string::String
+pub rsproxy_rules::CacheDirective::value: core::option::Option<rsproxy_rules::Value>
+impl core::clone::Clone for rsproxy_rules::CacheDirective
+pub fn rsproxy_rules::CacheDirective::clone(&self) -> rsproxy_rules::CacheDirective
+impl core::cmp::Eq for rsproxy_rules::CacheDirective
+impl core::cmp::PartialEq for rsproxy_rules::CacheDirective
+pub fn rsproxy_rules::CacheDirective::eq(&self, &rsproxy_rules::CacheDirective) -> bool
+impl core::fmt::Debug for rsproxy_rules::CacheDirective
+pub fn rsproxy_rules::CacheDirective::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for rsproxy_rules::CacheDirective
+pub struct rsproxy_rules::Captures
+impl rsproxy_rules::Captures
+pub fn rsproxy_rules::Captures::get_index(&self, usize) -> core::option::Option<&str>
+pub fn rsproxy_rules::Captures::insert_index(&mut self, alloc::string::String)
+pub fn rsproxy_rules::Captures::render(&self, &str, &rsproxy_rules::RequestMeta) -> alloc::string::String
+pub fn rsproxy_rules::Captures::render_with_response(&self, &str, &rsproxy_rules::RequestMeta, core::option::Option<&rsproxy_rules::ResponseMeta>) -> alloc::string::String
+impl core::clone::Clone for rsproxy_rules::Captures
+pub fn rsproxy_rules::Captures::clone(&self) -> rsproxy_rules::Captures
+impl core::cmp::Eq for rsproxy_rules::Captures
+impl core::cmp::PartialEq for rsproxy_rules::Captures
+pub fn rsproxy_rules::Captures::eq(&self, &rsproxy_rules::Captures) -> bool
+impl core::default::Default for rsproxy_rules::Captures
+pub fn rsproxy_rules::Captures::default() -> rsproxy_rules::Captures
+impl core::fmt::Debug for rsproxy_rules::Captures
+pub fn rsproxy_rules::Captures::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for rsproxy_rules::Captures
+pub struct rsproxy_rules::CookieAttr
+pub rsproxy_rules::CookieAttr::name: alloc::string::String
+pub rsproxy_rules::CookieAttr::value: core::option::Option<rsproxy_rules::Value>
+impl core::clone::Clone for rsproxy_rules::CookieAttr
+pub fn rsproxy_rules::CookieAttr::clone(&self) -> rsproxy_rules::CookieAttr
+impl core::cmp::Eq for rsproxy_rules::CookieAttr
+impl core::cmp::PartialEq for rsproxy_rules::CookieAttr
+pub fn rsproxy_rules::CookieAttr::eq(&self, &rsproxy_rules::CookieAttr) -> bool
+impl core::fmt::Debug for rsproxy_rules::CookieAttr
+pub fn rsproxy_rules::CookieAttr::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for rsproxy_rules::CookieAttr
+pub struct rsproxy_rules::CorsOp
+pub rsproxy_rules::CorsOp::credentials: core::option::Option<bool>
+pub rsproxy_rules::CorsOp::expose: core::option::Option<rsproxy_rules::Value>
+pub rsproxy_rules::CorsOp::headers: core::option::Option<rsproxy_rules::Value>
+pub rsproxy_rules::CorsOp::max_age: core::option::Option<rsproxy_rules::Value>
+pub rsproxy_rules::CorsOp::methods: core::option::Option<rsproxy_rules::Value>
+pub rsproxy_rules::CorsOp::origin: rsproxy_rules::Value
+impl core::clone::Clone for rsproxy_rules::CorsOp
+pub fn rsproxy_rules::CorsOp::clone(&self) -> rsproxy_rules::CorsOp
+impl core::cmp::Eq for rsproxy_rules::CorsOp
+impl core::cmp::PartialEq for rsproxy_rules::CorsOp
+pub fn rsproxy_rules::CorsOp::eq(&self, &rsproxy_rules::CorsOp) -> bool
+impl core::fmt::Debug for rsproxy_rules::CorsOp
+pub fn rsproxy_rules::CorsOp::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for rsproxy_rules::CorsOp
+pub struct rsproxy_rules::DeleteBodyPath
+impl rsproxy_rules::DeleteBodyPath
+pub fn rsproxy_rules::DeleteBodyPath::new(alloc::vec::Vec<rsproxy_rules::DeleteBodyPathSegment>) -> core::result::Result<Self, rsproxy_rules::RuleModelError>
+pub fn rsproxy_rules::DeleteBodyPath::segments(&self) -> &[rsproxy_rules::DeleteBodyPathSegment]
+impl core::clone::Clone for rsproxy_rules::DeleteBodyPath
+pub fn rsproxy_rules::DeleteBodyPath::clone(&self) -> rsproxy_rules::DeleteBodyPath
+impl core::cmp::Eq for rsproxy_rules::DeleteBodyPath
+impl core::cmp::PartialEq for rsproxy_rules::DeleteBodyPath
+pub fn rsproxy_rules::DeleteBodyPath::eq(&self, &rsproxy_rules::DeleteBodyPath) -> bool
+impl core::fmt::Debug for rsproxy_rules::DeleteBodyPath
+pub fn rsproxy_rules::DeleteBodyPath::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for rsproxy_rules::DeleteBodyPath
+pub struct rsproxy_rules::GlobMatcher
+pub rsproxy_rules::GlobMatcher::host: alloc::string::String
+pub rsproxy_rules::GlobMatcher::path: core::option::Option<alloc::string::String>
+pub rsproxy_rules::GlobMatcher::port: core::option::Option<alloc::string::String>
+pub rsproxy_rules::GlobMatcher::query: core::option::Option<alloc::string::String>
+pub rsproxy_rules::GlobMatcher::scheme: core::option::Option<alloc::string::String>
+impl core::clone::Clone for rsproxy_rules::GlobMatcher
+pub fn rsproxy_rules::GlobMatcher::clone(&self) -> rsproxy_rules::GlobMatcher
+impl core::cmp::Eq for rsproxy_rules::GlobMatcher
+impl core::cmp::PartialEq for rsproxy_rules::GlobMatcher
+pub fn rsproxy_rules::GlobMatcher::eq(&self, &rsproxy_rules::GlobMatcher) -> bool
+impl core::fmt::Debug for rsproxy_rules::GlobMatcher
+pub fn rsproxy_rules::GlobMatcher::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for rsproxy_rules::GlobMatcher
+pub struct rsproxy_rules::HostPool
+impl rsproxy_rules::HostPool
+pub fn rsproxy_rules::HostPool::addresses(&self) -> &[rsproxy_rules::Value]
+pub fn rsproxy_rules::HostPool::new(alloc::vec::Vec<rsproxy_rules::Value>) -> core::result::Result<Self, rsproxy_rules::RuleModelError>
+pub fn rsproxy_rules::HostPool::selected_address(&self) -> &rsproxy_rules::Value
+impl core::clone::Clone for rsproxy_rules::HostPool
+pub fn rsproxy_rules::HostPool::clone(&self) -> Self
+impl core::cmp::Eq for rsproxy_rules::HostPool
+impl core::cmp::PartialEq for rsproxy_rules::HostPool
+pub fn rsproxy_rules::HostPool::eq(&self, &Self) -> bool
+impl core::fmt::Debug for rsproxy_rules::HostPool
+pub fn rsproxy_rules::HostPool::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub struct rsproxy_rules::InjectOp
+pub rsproxy_rules::InjectOp::mode: rsproxy_rules::InjectMode
+pub rsproxy_rules::InjectOp::target: rsproxy_rules::InjectTarget
+pub rsproxy_rules::InjectOp::value: rsproxy_rules::Value
+impl core::clone::Clone for rsproxy_rules::InjectOp
+pub fn rsproxy_rules::InjectOp::clone(&self) -> rsproxy_rules::InjectOp
+impl core::cmp::Eq for rsproxy_rules::InjectOp
+impl core::cmp::PartialEq for rsproxy_rules::InjectOp
+pub fn rsproxy_rules::InjectOp::eq(&self, &rsproxy_rules::InjectOp) -> bool
+impl core::fmt::Debug for rsproxy_rules::InjectOp
+pub fn rsproxy_rules::InjectOp::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for rsproxy_rules::InjectOp
+pub struct rsproxy_rules::MatchedRule
+pub rsproxy_rules::MatchedRule::group: alloc::string::String
+pub rsproxy_rules::MatchedRule::line: usize
+pub rsproxy_rules::MatchedRule::raw: alloc::string::String
+impl core::clone::Clone for rsproxy_rules::MatchedRule
+pub fn rsproxy_rules::MatchedRule::clone(&self) -> rsproxy_rules::MatchedRule
+impl core::cmp::Eq for rsproxy_rules::MatchedRule
+impl core::cmp::PartialEq for rsproxy_rules::MatchedRule
+pub fn rsproxy_rules::MatchedRule::eq(&self, &rsproxy_rules::MatchedRule) -> bool
+impl core::fmt::Debug for rsproxy_rules::MatchedRule
+pub fn rsproxy_rules::MatchedRule::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for rsproxy_rules::MatchedRule
+pub struct rsproxy_rules::RegexMatcher
+pub rsproxy_rules::RegexMatcher::case_insensitive: bool
+pub rsproxy_rules::RegexMatcher::engine: rsproxy_rules::RegexEngine
+pub rsproxy_rules::RegexMatcher::pattern: alloc::string::String
+impl core::clone::Clone for rsproxy_rules::RegexMatcher
+pub fn rsproxy_rules::RegexMatcher::clone(&self) -> rsproxy_rules::RegexMatcher
+impl core::cmp::Eq for rsproxy_rules::RegexMatcher
+impl core::cmp::PartialEq for rsproxy_rules::RegexMatcher
+pub fn rsproxy_rules::RegexMatcher::eq(&self, &Self) -> bool
+impl core::fmt::Debug for rsproxy_rules::RegexMatcher
+pub fn rsproxy_rules::RegexMatcher::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub struct rsproxy_rules::RegexReplacePattern
+impl rsproxy_rules::RegexReplacePattern
+pub fn rsproxy_rules::RegexReplacePattern::is_case_insensitive(&self) -> bool
+pub fn rsproxy_rules::RegexReplacePattern::new(alloc::string::String, bool) -> core::result::Result<Self, regex::error::Error>
+pub fn rsproxy_rules::RegexReplacePattern::pattern(&self) -> &str
+pub fn rsproxy_rules::RegexReplacePattern::replace_all(&self, &str, &str) -> alloc::string::String
+impl core::clone::Clone for rsproxy_rules::RegexReplacePattern
+pub fn rsproxy_rules::RegexReplacePattern::clone(&self) -> rsproxy_rules::RegexReplacePattern
+impl core::cmp::Eq for rsproxy_rules::RegexReplacePattern
+impl core::cmp::PartialEq for rsproxy_rules::RegexReplacePattern
+pub fn rsproxy_rules::RegexReplacePattern::eq(&self, &Self) -> bool
+impl core::fmt::Debug for rsproxy_rules::RegexReplacePattern
+pub fn rsproxy_rules::RegexReplacePattern::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub struct rsproxy_rules::RequestMeta
+pub rsproxy_rules::RequestMeta::body: alloc::vec::Vec<u8>
+pub rsproxy_rules::RequestMeta::client_ip: core::option::Option<alloc::string::String>
+pub rsproxy_rules::RequestMeta::headers: alloc::vec::Vec<(alloc::string::String, alloc::string::String)>
+pub rsproxy_rules::RequestMeta::method: alloc::string::String
+pub rsproxy_rules::RequestMeta::server_ip: core::option::Option<alloc::string::String>
+pub rsproxy_rules::RequestMeta::template: rsproxy_rules::TemplateMetadata
+pub rsproxy_rules::RequestMeta::url: alloc::string::String
+impl core::clone::Clone for rsproxy_rules::RequestMeta
+pub fn rsproxy_rules::RequestMeta::clone(&self) -> rsproxy_rules::RequestMeta
+impl core::cmp::Eq for rsproxy_rules::RequestMeta
+impl core::cmp::PartialEq for rsproxy_rules::RequestMeta
+pub fn rsproxy_rules::RequestMeta::eq(&self, &rsproxy_rules::RequestMeta) -> bool
+impl core::fmt::Debug for rsproxy_rules::RequestMeta
+pub fn rsproxy_rules::RequestMeta::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for rsproxy_rules::RequestMeta
+pub struct rsproxy_rules::ResolveResult
+pub rsproxy_rules::ResolveResult::actions: alloc::vec::Vec<rsproxy_rules::ResolvedAction>
+pub rsproxy_rules::ResolveResult::matched_rules: alloc::vec::Vec<rsproxy_rules::MatchedRule>
+impl core::clone::Clone for rsproxy_rules::ResolveResult
+pub fn rsproxy_rules::ResolveResult::clone(&self) -> rsproxy_rules::ResolveResult
+impl core::cmp::Eq for rsproxy_rules::ResolveResult
+impl core::cmp::PartialEq for rsproxy_rules::ResolveResult
+pub fn rsproxy_rules::ResolveResult::eq(&self, &rsproxy_rules::ResolveResult) -> bool
+impl core::fmt::Debug for rsproxy_rules::ResolveResult
+pub fn rsproxy_rules::ResolveResult::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for rsproxy_rules::ResolveResult
+pub struct rsproxy_rules::ResolvedAction
+pub rsproxy_rules::ResolvedAction::action: rsproxy_rules::Action
+pub rsproxy_rules::ResolvedAction::captures: rsproxy_rules::Captures
+pub rsproxy_rules::ResolvedAction::rule: rsproxy_rules::MatchedRule
+impl rsproxy_rules::ResolvedAction
+pub fn rsproxy_rules::ResolvedAction::new(rsproxy_rules::Action, rsproxy_rules::MatchedRule, rsproxy_rules::Captures) -> Self
+pub fn rsproxy_rules::ResolvedAction::render(&self, &str, &rsproxy_rules::RequestMeta) -> alloc::string::String
+pub fn rsproxy_rules::ResolvedAction::response_meta(&self) -> core::option::Option<&rsproxy_rules::ResponseMeta>
+impl core::clone::Clone for rsproxy_rules::ResolvedAction
+pub fn rsproxy_rules::ResolvedAction::clone(&self) -> rsproxy_rules::ResolvedAction
+impl core::cmp::Eq for rsproxy_rules::ResolvedAction
+impl core::cmp::PartialEq for rsproxy_rules::ResolvedAction
+pub fn rsproxy_rules::ResolvedAction::eq(&self, &rsproxy_rules::ResolvedAction) -> bool
+impl core::fmt::Debug for rsproxy_rules::ResolvedAction
+pub fn rsproxy_rules::ResolvedAction::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for rsproxy_rules::ResolvedAction
+pub struct rsproxy_rules::ResponseMeta
+pub rsproxy_rules::ResponseMeta::headers: alloc::vec::Vec<(alloc::string::String, alloc::string::String)>
+pub rsproxy_rules::ResponseMeta::status: u16
+impl core::clone::Clone for rsproxy_rules::ResponseMeta
+pub fn rsproxy_rules::ResponseMeta::clone(&self) -> rsproxy_rules::ResponseMeta
+impl core::cmp::Eq for rsproxy_rules::ResponseMeta
+impl core::cmp::PartialEq for rsproxy_rules::ResponseMeta
+pub fn rsproxy_rules::ResponseMeta::eq(&self, &rsproxy_rules::ResponseMeta) -> bool
+impl core::fmt::Debug for rsproxy_rules::ResponseMeta
+pub fn rsproxy_rules::ResponseMeta::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for rsproxy_rules::ResponseMeta
+pub struct rsproxy_rules::Rule
+pub rsproxy_rules::Rule::actions: alloc::vec::Vec<rsproxy_rules::Action>
+pub rsproxy_rules::Rule::conditions: alloc::vec::Vec<rsproxy_rules::Condition>
+pub rsproxy_rules::Rule::disabled: bool
+pub rsproxy_rules::Rule::group: alloc::string::String
+pub rsproxy_rules::Rule::important: bool
+pub rsproxy_rules::Rule::line: usize
+pub rsproxy_rules::Rule::matcher: rsproxy_rules::Matcher
+pub rsproxy_rules::Rule::raw: alloc::string::String
+pub rsproxy_rules::Rule::tags: alloc::vec::Vec<alloc::string::String>
+impl core::clone::Clone for rsproxy_rules::Rule
+pub fn rsproxy_rules::Rule::clone(&self) -> rsproxy_rules::Rule
+impl core::cmp::Eq for rsproxy_rules::Rule
+impl core::cmp::PartialEq for rsproxy_rules::Rule
+pub fn rsproxy_rules::Rule::eq(&self, &rsproxy_rules::Rule) -> bool
+impl core::fmt::Debug for rsproxy_rules::Rule
+pub fn rsproxy_rules::Rule::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for rsproxy_rules::Rule
+pub struct rsproxy_rules::RuleError
+pub rsproxy_rules::RuleError::code: rsproxy_rules::RuleErrorCode
+pub rsproxy_rules::RuleError::group: alloc::string::String
+pub rsproxy_rules::RuleError::line: usize
+pub rsproxy_rules::RuleError::message: alloc::string::String
+impl core::clone::Clone for rsproxy_rules::RuleError
+pub fn rsproxy_rules::RuleError::clone(&self) -> rsproxy_rules::RuleError
+impl core::cmp::Eq for rsproxy_rules::RuleError
+impl core::cmp::PartialEq for rsproxy_rules::RuleError
+pub fn rsproxy_rules::RuleError::eq(&self, &rsproxy_rules::RuleError) -> bool
+impl core::error::Error for rsproxy_rules::RuleError
+impl core::fmt::Debug for rsproxy_rules::RuleError
+pub fn rsproxy_rules::RuleError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for rsproxy_rules::RuleError
+pub fn rsproxy_rules::RuleError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for rsproxy_rules::RuleError
+pub struct rsproxy_rules::RuleSet
+pub rsproxy_rules::RuleSet::rules: alloc::vec::Vec<rsproxy_rules::Rule>
+pub rsproxy_rules::RuleSet::version: u64
+impl rsproxy_rules::RuleSet
+pub fn rsproxy_rules::RuleSet::empty() -> Self
+pub fn rsproxy_rules::RuleSet::explain(&self, &rsproxy_rules::RequestMeta) -> alloc::string::String
+pub fn rsproxy_rules::RuleSet::explain_response(&self, &rsproxy_rules::RequestMeta, &rsproxy_rules::ResponseMeta) -> alloc::string::String
+pub fn rsproxy_rules::RuleSet::parse(&str, &str) -> core::result::Result<Self, alloc::vec::Vec<rsproxy_rules::RuleError>>
+pub fn rsproxy_rules::RuleSet::parse_groups<I, G, T>(I) -> core::result::Result<Self, alloc::vec::Vec<rsproxy_rules::RuleError>> where I: core::iter::traits::collect::IntoIterator<Item = (G, T)>, G: core::convert::AsRef<str>, T: core::convert::AsRef<str>
+pub fn rsproxy_rules::RuleSet::request_body_required(&self, &rsproxy_rules::RequestMeta) -> bool
+pub fn rsproxy_rules::RuleSet::resolve(&self, &rsproxy_rules::RequestMeta) -> rsproxy_rules::ResolveResult
+pub fn rsproxy_rules::RuleSet::resolve_response(&self, &rsproxy_rules::RequestMeta, &rsproxy_rules::ResponseMeta) -> rsproxy_rules::ResolveResult
+pub fn rsproxy_rules::RuleSet::resolve_response_without_request_body(&self, &rsproxy_rules::RequestMeta, &rsproxy_rules::ResponseMeta) -> rsproxy_rules::ResolveResult
+pub fn rsproxy_rules::RuleSet::resolve_without_request_body(&self, &rsproxy_rules::RequestMeta) -> rsproxy_rules::ResolveResult
+pub fn rsproxy_rules::RuleSet::stats(&self) -> rsproxy_rules::RuleSetStats
+impl core::clone::Clone for rsproxy_rules::RuleSet
+pub fn rsproxy_rules::RuleSet::clone(&self) -> rsproxy_rules::RuleSet
+impl core::cmp::Eq for rsproxy_rules::RuleSet
+impl core::cmp::PartialEq for rsproxy_rules::RuleSet
+pub fn rsproxy_rules::RuleSet::eq(&self, &rsproxy_rules::RuleSet) -> bool
+impl core::fmt::Debug for rsproxy_rules::RuleSet
+pub fn rsproxy_rules::RuleSet::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for rsproxy_rules::RuleSet
+pub struct rsproxy_rules::RuleSetStats
+pub rsproxy_rules::RuleSetStats::disabled: usize
+pub rsproxy_rules::RuleSetStats::domain_exact_entries: usize
+pub rsproxy_rules::RuleSetStats::domain_suffix_entries: usize
+pub rsproxy_rules::RuleSetStats::global_rules: usize
+pub rsproxy_rules::RuleSetStats::indexed_rules: usize
+pub rsproxy_rules::RuleSetStats::prefilter_literals: usize
+pub rsproxy_rules::RuleSetStats::prefilter_rules: usize
+pub rsproxy_rules::RuleSetStats::rules: usize
+impl core::clone::Clone for rsproxy_rules::RuleSetStats
+pub fn rsproxy_rules::RuleSetStats::clone(&self) -> rsproxy_rules::RuleSetStats
+impl core::cmp::Eq for rsproxy_rules::RuleSetStats
+impl core::cmp::PartialEq for rsproxy_rules::RuleSetStats
+pub fn rsproxy_rules::RuleSetStats::eq(&self, &rsproxy_rules::RuleSetStats) -> bool
+impl core::fmt::Debug for rsproxy_rules::RuleSetStats
+pub fn rsproxy_rules::RuleSetStats::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for rsproxy_rules::RuleSetStats
+pub struct rsproxy_rules::TemplateMetadata
+impl rsproxy_rules::TemplateMetadata
+pub fn rsproxy_rules::TemplateMetadata::fixed(impl core::convert::Into<alloc::string::String>, u64, u64, impl core::convert::Into<alloc::string::String>) -> Self
+pub fn rsproxy_rules::TemplateMetadata::generate() -> Self
+pub fn rsproxy_rules::TemplateMetadata::id(&self) -> &str
+pub fn rsproxy_rules::TemplateMetadata::now_ms(&self) -> u64
+pub fn rsproxy_rules::TemplateMetadata::random(&self) -> u64
+pub fn rsproxy_rules::TemplateMetadata::random_uuid(&self) -> &str
+impl core::clone::Clone for rsproxy_rules::TemplateMetadata
+pub fn rsproxy_rules::TemplateMetadata::clone(&self) -> rsproxy_rules::TemplateMetadata
+impl core::cmp::Eq for rsproxy_rules::TemplateMetadata
+impl core::cmp::PartialEq for rsproxy_rules::TemplateMetadata
+pub fn rsproxy_rules::TemplateMetadata::eq(&self, &Self) -> bool
+impl core::default::Default for rsproxy_rules::TemplateMetadata
+pub fn rsproxy_rules::TemplateMetadata::default() -> Self
+impl core::fmt::Debug for rsproxy_rules::TemplateMetadata
+pub fn rsproxy_rules::TemplateMetadata::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub struct rsproxy_rules::TlsOp
+pub rsproxy_rules::TlsOp::ciphers: alloc::vec::Vec<rsproxy_rules::TlsCipherSuite>
+pub rsproxy_rules::TlsOp::client_cert: core::option::Option<alloc::string::String>
+pub rsproxy_rules::TlsOp::client_key: core::option::Option<alloc::string::String>
+pub rsproxy_rules::TlsOp::min_version: core::option::Option<rsproxy_rules::TlsMinVersion>
+impl core::clone::Clone for rsproxy_rules::TlsOp
+pub fn rsproxy_rules::TlsOp::clone(&self) -> rsproxy_rules::TlsOp
+impl core::cmp::Eq for rsproxy_rules::TlsOp
+impl core::cmp::PartialEq for rsproxy_rules::TlsOp
+pub fn rsproxy_rules::TlsOp::eq(&self, &rsproxy_rules::TlsOp) -> bool
+impl core::fmt::Debug for rsproxy_rules::TlsOp
+pub fn rsproxy_rules::TlsOp::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for rsproxy_rules::TlsOp
+pub struct rsproxy_rules::UrlParts
+pub rsproxy_rules::UrlParts::host: alloc::string::String
+pub rsproxy_rules::UrlParts::path: alloc::string::String
+pub rsproxy_rules::UrlParts::port: core::option::Option<u16>
+pub rsproxy_rules::UrlParts::query: core::option::Option<alloc::string::String>
+pub rsproxy_rules::UrlParts::scheme: alloc::string::String
+impl rsproxy_rules::UrlParts
+pub fn rsproxy_rules::UrlParts::effective_port(&self) -> core::option::Option<u16>
+pub fn rsproxy_rules::UrlParts::origin_form(&self) -> alloc::string::String
+pub fn rsproxy_rules::UrlParts::parse(&str) -> core::result::Result<Self, rsproxy_rules::RuleModelError>
+impl core::clone::Clone for rsproxy_rules::UrlParts
+pub fn rsproxy_rules::UrlParts::clone(&self) -> rsproxy_rules::UrlParts
+impl core::cmp::Eq for rsproxy_rules::UrlParts
+impl core::cmp::PartialEq for rsproxy_rules::UrlParts
+pub fn rsproxy_rules::UrlParts::eq(&self, &rsproxy_rules::UrlParts) -> bool
+impl core::fmt::Debug for rsproxy_rules::UrlParts
+pub fn rsproxy_rules::UrlParts::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for rsproxy_rules::UrlParts
+pub fn rsproxy_rules::redact_secrets(&str) -> alloc::string::String
+pub fn rsproxy_rules::valid_value_key(&str) -> bool

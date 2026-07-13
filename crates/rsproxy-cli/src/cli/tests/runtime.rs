@@ -62,47 +62,48 @@ fn trace_resource_options_parse_sizes() {
         "0123456789abcdef0123456789abcdef".to_string(),
     ])
     .unwrap();
-    assert_eq!(config.trace_body_limit, 8 * 1024);
-    assert_eq!(config.trace_queue_capacity, 17);
-    assert_eq!(config.trace_memory_budget, 24 * 1024 * 1024);
-    assert_eq!(config.body_buffer_limit, 4 * 1024 * 1024);
-    assert_eq!(config.trace_spill_segment_size, 16 * 1024);
-    assert_eq!(config.trace_disk_budget, 32 * 1024);
+    let engine = config.engine();
+    assert_eq!(engine.trace_body_limit, 8 * 1024);
+    assert_eq!(engine.trace_queue_capacity, 17);
+    assert_eq!(engine.trace_memory_budget, 24 * 1024 * 1024);
+    assert_eq!(engine.body_buffer_limit, 4 * 1024 * 1024);
+    assert_eq!(engine.trace_spill_segment_size, 16 * 1024);
+    assert_eq!(engine.trace_disk_budget, 32 * 1024);
     assert_eq!(
-        config.trace_spill_compression,
+        engine.trace_spill_compression,
         rsproxy_trace::TraceSpillCompression::Zstd { level: 3 }
     );
-    assert_eq!(config.mitm_cert_cache_capacity, 7);
-    assert!(!config.no_mitm);
-    assert!(config.strict_mitm);
-    assert_eq!(config.mitm_failure_cache_capacity, 9);
-    assert_eq!(config.mitm_failure_ttl, Duration::from_secs(45));
-    assert_eq!(config.connect_probe_timeout, Duration::from_millis(225));
-    assert_eq!(config.max_header_count, 19);
-    assert_eq!(config.h1_pool_max_active_per_key, 3);
-    assert_eq!(config.h1_pool_wait_timeout, Duration::from_millis(250));
-    assert_eq!(config.h2_pool_max_active_streams_per_key, 5);
-    assert_eq!(config.h2_pool_wait_timeout, Duration::from_millis(300));
-    assert_eq!(config.dns_timeout, Duration::from_millis(125));
-    assert_eq!(config.dns_cache_ttl, Duration::from_secs(17));
+    assert_eq!(engine.mitm_cert_cache_capacity, 7);
+    assert!(!engine.no_mitm);
+    assert!(engine.strict_mitm);
+    assert_eq!(engine.mitm_failure_cache_capacity, 9);
+    assert_eq!(engine.mitm_failure_ttl, Duration::from_secs(45));
+    assert_eq!(engine.connect_probe_timeout, Duration::from_millis(225));
+    assert_eq!(engine.max_header_count, 19);
+    assert_eq!(engine.h1_pool_max_active_per_key, 3);
+    assert_eq!(engine.h1_pool_wait_timeout, Duration::from_millis(250));
+    assert_eq!(engine.h2_pool_max_active_streams_per_key, 5);
+    assert_eq!(engine.h2_pool_wait_timeout, Duration::from_millis(300));
+    assert_eq!(engine.dns_timeout, Duration::from_millis(125));
+    assert_eq!(engine.dns_cache_ttl, Duration::from_secs(17));
     assert_eq!(
-        config.dns_servers,
+        engine.dns_servers,
         vec![
             "127.0.0.1:5353".parse().unwrap(),
             "1.1.1.1:53".parse().unwrap()
         ]
     );
-    assert_eq!(config.tcp_connect_timeout, Duration::from_millis(325));
+    assert_eq!(engine.tcp_connect_timeout, Duration::from_millis(325));
     assert_eq!(
-        config.client_tls_handshake_timeout,
+        engine.client_tls_handshake_timeout,
         Duration::from_millis(340)
     );
     assert_eq!(
-        config.upstream_tls_handshake_timeout,
+        engine.upstream_tls_handshake_timeout,
         Duration::from_millis(350)
     );
-    assert_eq!(config.upstream_ttfb_timeout, Duration::from_millis(375));
-    assert_eq!(config.request_total_timeout, Duration::from_millis(425));
+    assert_eq!(engine.upstream_ttfb_timeout, Duration::from_millis(375));
+    assert_eq!(engine.request_total_timeout, Duration::from_millis(425));
     assert_eq!(
         config.api_token.as_deref(),
         Some("0123456789abcdef0123456789abcdef")
@@ -229,7 +230,7 @@ fn proxy_auth_requires_nonempty_user_and_password() {
     ])
     .unwrap();
     assert_eq!(
-        config.proxy_auth.as_deref(),
+        config.engine().proxy_auth.as_deref(),
         Some("alice:secret:with-colon")
     );
 
@@ -250,8 +251,8 @@ fn trace_filter_headers_only_disables_body_capture() {
         "headers-only".to_string(),
     ])
     .unwrap();
-    assert_eq!(config.trace_body_limit, 0);
-    assert!(config.trace_exclude_media_body);
+    assert_eq!(config.engine().trace_body_limit, 0);
+    assert!(config.engine().trace_exclude_media_body);
 
     let config = runtime_config_without_default(&[
         "--trace-body-limit".to_string(),
@@ -260,8 +261,8 @@ fn trace_filter_headers_only_disables_body_capture() {
         "full".to_string(),
     ])
     .unwrap();
-    assert_eq!(config.trace_body_limit, 8 * 1024);
-    assert!(!config.trace_exclude_media_body);
+    assert_eq!(config.engine().trace_body_limit, 8 * 1024);
+    assert!(!config.engine().trace_exclude_media_body);
 
     let config = runtime_config_without_default(&[
         "--trace-filter".to_string(),
@@ -270,8 +271,8 @@ fn trace_filter_headers_only_disables_body_capture() {
         "8kb".to_string(),
     ])
     .unwrap();
-    assert_eq!(config.trace_body_limit, 8 * 1024);
-    assert!(config.trace_exclude_media_body);
+    assert_eq!(config.engine().trace_body_limit, 8 * 1024);
+    assert!(config.engine().trace_exclude_media_body);
 
     let err = runtime_config_without_default(&["--trace-filter".to_string(), "images".to_string()])
         .expect_err("unsupported trace filter should fail");
@@ -294,7 +295,7 @@ fn debug_output_redacts_api_tokens() {
 
     let mut config = AppConfig::default();
     config.api_token = Some(secret.to_string());
-    config.proxy_auth = Some(format!("user:{secret}"));
+    config.engine_mut().proxy_auth = Some(format!("user:{secret}"));
     let config_debug = format!("{config:?}");
     assert!(!config_debug.contains(secret));
     assert!(config_debug.contains("[REDACTED]"));

@@ -11,12 +11,16 @@ mod macos;
 mod windows;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// Requested mutation of the host certificate trust store.
 pub enum TrustAction {
+    /// Add the rsproxy root certificate as trusted.
     Install,
+    /// Remove trust and, where supported, the matching certificate.
     Uninstall,
 }
 
 impl TrustAction {
+    /// Returns the stable past-tense label used in command results.
     pub fn completed_name(self) -> &'static str {
         match self {
             Self::Install => "installed",
@@ -26,30 +30,49 @@ impl TrustAction {
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
+/// Platform-specific trust-store selection and execution policy.
 pub struct TrustOptions {
+    /// Explicit macOS keychain; unsupported platforms reject or ignore it as documented by their backend.
     pub keychain: Option<PathBuf>,
+    /// When true, validate inputs and return planned commands without executing them.
     pub dry_run: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+/// Sanitized external command included in a trust-operation report.
 pub struct TrustCommand {
+    /// Executable name without shell interpolation.
     pub program: String,
+    /// Exact argument vector passed or planned for the executable.
     pub args: Vec<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+/// Auditable result of a trust-store install or uninstall operation.
 pub struct TrustOutcome {
+    /// Stable operating-system name selected at compile time.
     pub platform: &'static str,
+    /// Platform trust-store backend, such as a keychain or certificate database.
     pub backend: &'static str,
+    /// Requested install or uninstall mutation.
     pub action: TrustAction,
+    /// Root certificate path used by the backend.
     pub certificate: PathBuf,
+    /// Uppercase, colon-delimited SHA-256 fingerprint of that certificate.
     pub fingerprint_sha256: String,
+    /// macOS keychain targeted by the operation, when applicable.
     pub keychain: Option<PathBuf>,
+    /// Windows SHA-1 thumbprint used for certificate-store lookup, when applicable.
     pub thumbprint_sha1: Option<String>,
+    /// Whether commands were planned but deliberately not executed.
     pub dry_run: bool,
+    /// External commands executed or proposed, in operation order.
     pub commands: Vec<TrustCommand>,
+    /// Whether macOS trust settings were removed; absent on other backends or dry runs.
     pub trust_settings_removed: Option<bool>,
+    /// Whether a matching certificate object was removed; absent when not observable.
     pub removed_certificate: Option<bool>,
+    /// Whether installation was confirmed; absent when the backend cannot confirm or on dry runs.
     pub installed: Option<bool>,
 }
 
@@ -60,6 +83,10 @@ struct RootCaInfo {
     fingerprint_sha256: String,
 }
 
+/// Installs the persisted rsproxy root into the native trust store.
+///
+/// The root certificate must already exist and parse correctly. This may invoke privileged host
+/// commands; the function never attempts to elevate privileges itself.
 pub fn install_root_ca(
     ca_directory: &Path,
     options: &TrustOptions,
@@ -67,6 +94,9 @@ pub fn install_root_ca(
     install_root_ca_impl(ca_directory, options)
 }
 
+/// Removes the persisted rsproxy root from the native trust store by certificate identity.
+///
+/// This may invoke privileged host commands; the function never attempts to elevate privileges.
 pub fn uninstall_root_ca(
     ca_directory: &Path,
     options: &TrustOptions,
@@ -164,11 +194,15 @@ fn uninstall_root_ca_impl(
 }
 
 #[cfg(target_os = "macos")]
+/// Checks whether a macOS keychain contains a certificate with `fingerprint`.
+///
+/// The comparison ignores fingerprint colons and ASCII case.
 pub fn keychain_contains_fingerprint(keychain: &Path, fingerprint: &str) -> PlatformResult<bool> {
     macos::keychain_contains_fingerprint(keychain, fingerprint)
 }
 
 #[cfg(not(target_os = "macos"))]
+/// Reports that direct keychain fingerprint lookup is unavailable outside macOS builds.
 pub fn keychain_contains_fingerprint(_keychain: &Path, _fingerprint: &str) -> PlatformResult<bool> {
     Err(PlatformError::Unsupported(
         "CA keychain status is only implemented for macOS security keychains in this build"

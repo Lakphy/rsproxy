@@ -6,7 +6,7 @@ fn state_with_storage(name: &str) -> (SharedState, PathBuf) {
         std::process::id(),
         rsproxy_trace::now_millis()
     ));
-    std::fs::create_dir_all(storage.join("values")).unwrap();
+    fs::create_dir_all(storage.join("values")).unwrap();
     let mut state = test_state();
     state.config.storage = storage.clone();
     (state, storage)
@@ -15,9 +15,9 @@ fn state_with_storage(name: &str) -> (SharedState, PathBuf) {
 fn write_storage(storage: &Path, relative: &str, bytes: &[u8]) {
     let path = storage.join(relative);
     if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent).unwrap();
+        fs::create_dir_all(parent).unwrap();
     }
-    std::fs::write(path, bytes).unwrap();
+    fs::write(path, bytes).unwrap();
 }
 
 #[test]
@@ -50,7 +50,7 @@ fn references_and_files_render_across_request_response_url_and_routing_actions()
     }
 
     let request_meta = meta("http://example.test/users/items/42?old=1");
-    let rules = rsproxy_rules::RuleSet::parse(
+    let rules = RuleSet::parse(
         "default",
         concat!(
             r#"/\/users\/(?P<kind>\w+)\/(\d+)/ "#,
@@ -181,7 +181,7 @@ fn references_and_files_render_across_request_response_url_and_routing_actions()
         http::header(&trailers, "x-ref"),
         Some("example.test-items-42")
     );
-    let _ = std::fs::remove_dir_all(storage);
+    let _ = fs::remove_dir_all(storage);
 }
 
 #[test]
@@ -190,7 +190,7 @@ fn binary_values_are_preserved_for_body_actions_and_rejected_for_text_actions() 
     let binary = [0xff, 0x00, 0x80, b'X'];
     write_storage(&storage, "values/binary", &binary);
     let request_meta = meta("http://example.test/");
-    let rules = rsproxy_rules::RuleSet::parse(
+    let rules = RuleSet::parse(
         "default",
         "example.test req.header(x-binary: @binary) req.body.set(@binary)",
     )
@@ -216,7 +216,7 @@ fn binary_values_are_preserved_for_body_actions_and_rejected_for_text_actions() 
     let mut body = Vec::new();
     apply_body_op(&mut body, op, body_action, &request_meta, &state).unwrap();
     assert_eq!(body, binary);
-    let _ = std::fs::remove_dir_all(storage);
+    let _ = fs::remove_dir_all(storage);
 }
 
 #[test]
@@ -238,7 +238,7 @@ fn referenced_regex_url_replacement_preserves_regex_captures() {
     let (state, storage) = state_with_storage("regex-replacement");
     write_storage(&storage, "values/replacement", b"/new/$1");
     let request_meta = meta("http://example.test/old/42");
-    let rules = rsproxy_rules::RuleSet::parse(
+    let rules = RuleSet::parse(
         "default",
         r"example.test url.rewrite(/\/old\/(\d+)/, @replacement)",
     )
@@ -249,7 +249,7 @@ fn referenced_regex_url_replacement_preserves_regex_captures() {
         apply_url_actions(&request_meta.url, &request_meta, &actions, &state).unwrap(),
         "http://example.test/new/42"
     );
-    let _ = std::fs::remove_dir_all(storage);
+    let _ = fs::remove_dir_all(storage);
 }
 
 #[test]
@@ -257,7 +257,7 @@ fn mock_sources_render_text_and_preserve_binary_files() {
     let (state, storage) = state_with_storage("mock");
     write_storage(&storage, "values/mock-text", b"hello ${kind} $2 at ${path}");
     let request_meta = meta("http://example.test/users/items/42");
-    let rules = rsproxy_rules::RuleSet::parse(
+    let rules = RuleSet::parse(
         "default",
         r"/\/users\/(?P<kind>\w+)\/(\d+)/ mock(@mock-text)",
     )
@@ -270,8 +270,7 @@ fn mock_sources_render_text_and_preserve_binary_files() {
 
     let binary = [0xff, 0x00, 0x80];
     write_storage(&storage, "files/image.bin", &binary);
-    let rules =
-        rsproxy_rules::RuleSet::parse("default", "example.test mock(<files/image.bin>)").unwrap();
+    let rules = RuleSet::parse("default", "example.test mock(<files/image.bin>)").unwrap();
     let actions = rules.resolve(&request_meta).actions;
     let response = first_mock(&actions, &request_meta, &state)
         .unwrap()
@@ -281,5 +280,5 @@ fn mock_sources_render_text_and_preserve_binary_files() {
         http::header(&response.headers, "content-type"),
         Some("application/octet-stream")
     );
-    let _ = std::fs::remove_dir_all(storage);
+    let _ = fs::remove_dir_all(storage);
 }

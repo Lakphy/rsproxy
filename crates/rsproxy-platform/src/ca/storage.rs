@@ -4,15 +4,22 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+/// Deterministic filesystem layout for one rsproxy certificate authority.
 pub struct CaPaths {
+    /// Root directory containing all CA-owned files.
     pub directory: PathBuf,
+    /// PEM root certificate path.
     pub certificate: PathBuf,
+    /// PEM root private-key path, written with owner-only permissions on Unix.
     pub private_key: PathBuf,
+    /// Safety notice written alongside generated root material.
     pub readme: PathBuf,
+    /// Directory containing cached per-host leaf certificate material.
     pub leaf_directory: PathBuf,
 }
 
 impl CaPaths {
+    /// Derives the stable rsproxy filenames beneath `directory` without touching the filesystem.
     pub fn new(directory: impl Into<PathBuf>) -> Self {
         let directory = directory.into();
         Self {
@@ -26,39 +33,63 @@ impl CaPaths {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+/// Result of ensuring root CA material exists on disk.
 pub enum CaInitialization {
+    /// Both root files already existed and `force` was not requested.
     AlreadyInitialized {
+        /// Existing CA filesystem layout.
         paths: CaPaths,
     },
+    /// New root certificate and private key were generated and persisted.
     Created {
+        /// Newly written CA filesystem layout.
         paths: CaPaths,
+        /// Uppercase, colon-delimited SHA-256 certificate fingerprint.
         fingerprint_sha256: String,
     },
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+/// Filesystem health and cache summary for persistent root CA material.
 pub struct CaStatus {
+    /// Expected CA filesystem layout.
     pub paths: CaPaths,
+    /// Whether both the root certificate and private key are regular files.
     pub initialized: bool,
+    /// Whether the root certificate is a regular file.
     pub certificate_exists: bool,
+    /// Whether the root private key is a regular file.
     pub private_key_exists: bool,
+    /// Number of cached leaf certificate files, excluding key and chain files.
     pub leaf_cached: usize,
+    /// Root SHA-256 fingerprint, `invalid-pem`, or `-` when no certificate exists.
     pub fingerprint_sha256: String,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+/// Deterministic paths for one cached host certificate bundle.
 pub struct LeafPaths {
+    /// PEM leaf certificate path.
     pub certificate: PathBuf,
+    /// PEM leaf private-key path, written with owner-only permissions on Unix.
     pub private_key: PathBuf,
+    /// PEM certificate-chain path presented with the leaf.
     pub chain: PathBuf,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+/// Metadata returned after locating or writing a complete cached leaf bundle.
 pub struct StoredLeafCertificate {
+    /// Paths to the certificate, private key, and chain files.
     pub paths: LeafPaths,
+    /// Uppercase, colon-delimited SHA-256 leaf certificate fingerprint.
     pub fingerprint_sha256: String,
 }
 
+/// Creates persistent root material, or reports an existing complete installation.
+///
+/// Partial state is rejected unless `force` is true. With `force`, existing root files are
+/// replaced but the leaf cache is not cleared. On Unix the private key is set to mode `0600`.
 pub fn initialize_root_ca(
     ca_directory: &Path,
     common_name: &str,
@@ -105,6 +136,7 @@ pub fn initialize_root_ca(
     })
 }
 
+/// Inspects expected root files and counts cached leaf certificates without changing disk state.
 pub fn root_ca_status(ca_directory: &Path) -> PlatformResult<CaStatus> {
     let paths = CaPaths::new(ca_directory);
     let certificate_exists = paths.certificate.is_file();
@@ -129,6 +161,7 @@ pub fn root_ca_status(ca_directory: &Path) -> PlatformResult<CaStatus> {
     })
 }
 
+/// Reads both PEM root files from the deterministic CA layout.
 pub fn read_root_ca(ca_directory: &Path) -> PlatformResult<RootCaPem> {
     let paths = CaPaths::new(ca_directory);
     Ok(RootCaPem {
@@ -147,6 +180,7 @@ pub fn read_root_ca(ca_directory: &Path) -> PlatformResult<RootCaPem> {
     })
 }
 
+/// Reads only the PEM root certificate, leaving the private key untouched.
 pub fn read_root_certificate(ca_directory: &Path) -> PlatformResult<String> {
     let path = CaPaths::new(ca_directory).certificate;
     fs::read_to_string(&path).map_err(|source| PlatformError::Io {
@@ -155,6 +189,7 @@ pub fn read_root_certificate(ca_directory: &Path) -> PlatformResult<String> {
     })
 }
 
+/// Derives safe cache paths for `host` without reading or writing the filesystem.
 pub fn leaf_paths(ca_directory: &Path, host: &str) -> LeafPaths {
     let directory = CaPaths::new(ca_directory).leaf_directory;
     let cache_name = leaf_cache_name(host);
@@ -165,6 +200,9 @@ pub fn leaf_paths(ca_directory: &Path, host: &str) -> LeafPaths {
     }
 }
 
+/// Returns a cached leaf only when its certificate, key, and chain files all exist.
+///
+/// Incomplete bundles are treated as cache misses rather than errors.
 pub fn cached_leaf_certificate(
     ca_directory: &Path,
     host: &str,
@@ -185,6 +223,9 @@ pub fn cached_leaf_certificate(
     }))
 }
 
+/// Writes a complete leaf certificate bundle and returns its paths and fingerprint.
+///
+/// The cache directory is created when necessary. On Unix the private key is set to mode `0600`.
 pub fn store_leaf_certificate(
     ca_directory: &Path,
     host: &str,
@@ -219,6 +260,9 @@ pub fn store_leaf_certificate(
     })
 }
 
+/// Maps a host to a lowercase, path-safe cache component.
+///
+/// ASCII alphanumerics, `.`, `-`, and `_` are preserved; every other character becomes `_`.
 pub fn leaf_cache_name(host: &str) -> String {
     host.chars()
         .map(|character| {

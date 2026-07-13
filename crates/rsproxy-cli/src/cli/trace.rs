@@ -80,7 +80,7 @@ pub(super) fn trace_cmd(args: TraceArgs, json: bool) -> CliResult<()> {
 pub(super) fn values_cmd(args: ValuesArgs, json: bool) -> CliResult<()> {
     let config = runtime_config(&RuntimeArgs::from_client(args.client))?;
     let api = config.api.clone();
-    let storage = config.storage.clone();
+    let storage = config.engine().storage.clone();
     match args.command {
         ValuesCommand::List(_) => match api_request(
             "GET",

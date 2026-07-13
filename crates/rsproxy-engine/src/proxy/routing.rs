@@ -180,7 +180,5 @@ pub(super) fn planned_upstream_addr(
 
 pub(super) fn literal_ip_from_url(url: &str) -> Option<String> {
     let host = UrlParts::parse(url).ok()?.host;
-    host.parse::<std::net::IpAddr>()
-        .ok()
-        .map(|ip| ip.to_string())
+    host.parse::<IpAddr>().ok().map(|ip| ip.to_string())
 }

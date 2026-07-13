@@ -1,3 +1,8 @@
+/// Replaces user/password text in SOCKS proxy authorities with the marker `auth`.
+///
+/// The function is deliberately narrow: it leaves non-SOCKS URLs and malformed
+/// authorities unchanged, making it safe for rule explain and diagnostic text
+/// without pretending to be a general secret scanner.
 pub fn redact_secrets(input: &str) -> String {
     let mut out = input.to_string();
     for scheme in ["socks5://", "socks://"] {

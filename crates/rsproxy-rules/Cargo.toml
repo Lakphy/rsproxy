@@ -1,5 +1,6 @@
 [package]
 name = "rsproxy-rules"
+description = "Parsing, matching, and action evaluation for the rsproxy rule DSL."
 version.workspace = true
 edition.workspace = true
 license.workspace = true

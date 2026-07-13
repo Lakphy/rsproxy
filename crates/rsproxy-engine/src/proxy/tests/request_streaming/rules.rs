@@ -17,7 +17,7 @@ fn body_rules_apply_below_limit_and_skip_only_body_behavior_above_it() {
     state.config.body_buffer_limit = 4;
     state.rules = RuleStore::from_compiled(
         &state.config.storage,
-        rsproxy_rules::RuleSet::parse(
+        RuleSet::parse(
             "default",
             "127.0.0.1 req.header(x-kept: yes) req.body.append(\"!\")\n127.0.0.1 res.header(x-body-match: yes) when body(~abc)\n127.0.0.1 res.header(x-status: yes) when status(200)",
         )

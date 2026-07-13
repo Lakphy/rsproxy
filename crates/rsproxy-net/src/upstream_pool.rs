@@ -4,13 +4,18 @@ use std::sync::{Condvar, Mutex};
 use std::time::{Duration, Instant};
 
 #[derive(Default)]
+/// In-memory active-operation counts partitioned by pool key.
 pub struct KeyedActivity {
     per_key: HashMap<String, usize>,
 }
 
+/// Mutable accounting required by the generic pool admission loop.
 pub trait ActivityStore {
+    /// Returns the active reservation count for `key`.
     fn active_for(&self, key: &str) -> usize;
+    /// Adds one active reservation for `key`.
     fn reserve(&mut self, key: &str);
+    /// Releases one reservation and removes a zero-valued key.
     fn release(&mut self, key: &str);
 }
 
@@ -35,11 +40,18 @@ impl ActivityStore for KeyedActivity {
 }
 
 #[derive(Clone, Copy)]
+/// Labels used to produce stable pool-wait diagnostics.
 pub struct PoolWaitSpec {
+    /// Stage prefix included in wait errors, such as `h2`.
     pub stage: &'static str,
+    /// Human-readable name of the configured concurrency limit.
     pub limit_label: &'static str,
 }
 
+/// Waits for and reserves one keyed pool slot.
+///
+/// The timeout is measured from the caller-provided `started` instant, so time
+/// already spent before entering this function remains part of the wait budget.
 pub fn acquire_slot<T: ActivityStore>(
     inner: &Mutex<T>,
     available: &Condvar,

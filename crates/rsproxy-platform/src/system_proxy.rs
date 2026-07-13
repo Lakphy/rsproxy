@@ -9,30 +9,46 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// Native proxy-settings backend to plan or execute.
 pub enum ProxyPlatform {
+    /// macOS network services managed through `networksetup`.
     Macos,
+    /// Current-user Windows Internet Settings registry values.
     Windows,
+    /// Linux desktop settings managed through `gsettings` and environment guidance.
     Linux,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+/// HTTP proxy endpoint written to native operating-system settings.
 pub struct ProxyTarget {
+    /// Hostname or IP address stored without a URL scheme.
     pub host: String,
+    /// TCP listener port.
     pub port: u16,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
+/// Optional target and platform-specific scope for a system-proxy operation.
 pub struct ProxyOptions {
+    /// Proxy endpoint required by every mutating operation and included in change reports.
     pub target: Option<ProxyTarget>,
+    /// Hosts or domains that should bypass the configured proxy.
     pub bypass: Option<Vec<String>>,
+    /// Single macOS network service to mutate, when selected explicitly.
     pub service: Option<String>,
+    /// Whether macOS mutations should cover every enabled network service.
     pub all_services: bool,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// Read-only or mutating system-proxy operation.
 pub enum ProxyAction {
+    /// Inspect native settings without changing them.
     Status,
+    /// Configure and enable HTTP and HTTPS proxy routing.
     Enable,
+    /// Disable proxy routing while retaining a target in the change report.
     Disable,
 }
 
@@ -47,14 +63,20 @@ impl ProxyAction {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+/// Result of inspecting or mutating native system-proxy state.
 pub enum ProxyOutcome {
+    /// Platform-specific settings observed without mutation.
     Status(ProxyStatus),
+    /// Logical changes applied to the selected service or platform.
     Changed(Vec<ProxyChange>),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+/// Reviewable sequence of external commands and logical changes for an operation.
 pub struct ProxyPlan {
+    /// Backend for which the plan is valid.
     pub platform: ProxyPlatform,
+    /// Ordered commands and resulting state changes.
     pub steps: Vec<ProxyPlanStep>,
 }
 
@@ -65,75 +87,134 @@ impl ProxyPlan {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+/// One ordered element in a system-proxy dry-run plan.
 pub enum ProxyPlanStep {
+    /// External platform command that would be executed.
     Command(ProxyCommand),
+    /// Logical state change that the command sequence is expected to produce.
     Change(ProxyChange),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+/// Sanitized external command used by a native proxy backend.
 pub enum ProxyCommand {
-    MacosNetworkSetup { args: Vec<String> },
-    WindowsRegistry { args: Vec<String> },
-    LinuxGsettings { args: Vec<String> },
-    LinuxEnvironment { args: Vec<String> },
+    /// Invocation of the macOS `networksetup` utility.
+    MacosNetworkSetup {
+        /// Exact arguments passed after the executable name.
+        args: Vec<String>,
+    },
+    /// Invocation of the Windows `reg` utility for current-user Internet Settings.
+    WindowsRegistry {
+        /// Exact arguments passed after the executable name.
+        args: Vec<String>,
+    },
+    /// Invocation of Linux desktop `gsettings`.
+    LinuxGsettings {
+        /// Exact arguments passed after the executable name.
+        args: Vec<String>,
+    },
+    /// Shell-independent description of Linux proxy environment assignments.
+    LinuxEnvironment {
+        /// Environment assignment tokens proposed for user-managed process startup.
+        args: Vec<String>,
+    },
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+/// Normalized logical proxy mutation independent of the platform command syntax.
 pub struct ProxyChange {
+    /// Backend that received the mutation.
     pub platform: ProxyPlatform,
+    /// Whether proxy routing is enabled after the change.
     pub enabled: bool,
+    /// Endpoint associated with the mutation.
     pub target: ProxyTarget,
+    /// Bypass list written with the change, when one was supplied.
     pub bypass: Option<Vec<String>>,
+    /// macOS network service affected by the change, if applicable.
     pub service: Option<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+/// Native settings returned by a read-only status operation.
 pub enum ProxyStatus {
+    /// Per-network-service state reported by macOS.
     Macos {
+        /// Selected services and their HTTP, HTTPS, and bypass settings.
         services: Vec<MacosServiceStatus>,
     },
+    /// Current-user Internet Settings reported by Windows.
     Windows {
+        /// Whether the native proxy-enable flag is set.
         enabled: bool,
+        /// Raw proxy-server value, when configured.
         server: Option<String>,
+        /// Raw bypass-list value, when configured.
         bypass: Option<String>,
     },
+    /// Relevant GNOME settings reported by a Linux desktop.
     Linux {
+        /// Schema/key/value triples in deterministic query order.
         settings: Vec<LinuxSettingStatus>,
     },
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+/// One Linux desktop setting returned by `gsettings get`.
 pub struct LinuxSettingStatus {
+    /// GSettings schema queried.
     pub schema: String,
+    /// Key queried within the schema.
     pub key: String,
+    /// Raw textual value emitted by `gsettings`.
     pub value: String,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+/// HTTP, HTTPS, and bypass state for one macOS network service.
 pub struct MacosServiceStatus {
+    /// Human-readable network service name accepted by `networksetup`.
     pub service: String,
+    /// Web proxy state reported for HTTP.
     pub http: MacosEndpointStatus,
+    /// Secure web proxy state reported for HTTPS.
     pub https: MacosEndpointStatus,
+    /// Bypass domains or the sanitized error returned by the bypass query.
     pub bypass: MacosBypassStatus,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+/// Parsed endpoint state from one macOS proxy query.
 pub struct MacosEndpointStatus {
+    /// Parsed `Enabled` state, defaulting to false when the field is absent.
     pub enabled: bool,
+    /// Configured proxy server, when reported.
     pub server: Option<String>,
+    /// Parsed proxy port, when numeric and reported.
     pub port: Option<u16>,
+    /// Parsed authentication-required state.
     pub authenticated: bool,
+    /// Raw `Enabled` value retained for diagnostics.
     pub reported_enabled: Option<String>,
+    /// Raw `Port` value retained for diagnostics whether or not parsing succeeds.
     pub reported_port: Option<String>,
+    /// Raw `Authenticated Proxy Enabled` value retained for diagnostics.
     pub reported_authenticated: Option<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+/// Result of querying bypass domains for a macOS network service.
 pub enum MacosBypassStatus {
+    /// Bypass domains in the order reported by `networksetup`.
     Domains(Vec<String>),
+    /// Sanitized query failure; endpoint status remains usable.
     QueryError(String),
 }
 
+/// Builds a deterministic dry-run plan without invoking platform commands that mutate settings.
+///
+/// Read-only discovery may still be required to select macOS network services. Invalid option
+/// combinations and missing mutation targets are returned as [`crate::PlatformError`].
 pub fn plan_system_proxy(
     platform: ProxyPlatform,
     action: ProxyAction,
@@ -146,6 +227,10 @@ pub fn plan_system_proxy(
     }
 }
 
+/// Inspects or mutates native proxy settings for the selected backend.
+///
+/// Mutations can require existing user or administrator permissions. Commands have bounded
+/// execution time and this function does not attempt privilege escalation.
 pub fn execute_system_proxy(
     platform: ProxyPlatform,
     action: ProxyAction,

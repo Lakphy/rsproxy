@@ -8,7 +8,9 @@ use sha2::{Digest, Sha256};
 /// PEM-encoded root certificate material owned by the platform layer.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct RootCaPem {
+    /// PEM-encoded X.509 certificate suitable for trust-store installation.
     pub certificate_pem: String,
+    /// PEM-encoded private key that must remain confined to user-controlled storage.
     pub private_key_pem: String,
 }
 
@@ -33,6 +35,9 @@ pub fn generate_root_ca(common_name: &str) -> PlatformResult<RootCaPem> {
     })
 }
 
+/// Computes the uppercase, colon-delimited SHA-256 fingerprint of the first PEM certificate.
+///
+/// Returns `None` when a certificate section is absent or its base64 body is invalid.
 pub fn certificate_fingerprint_sha256(certificate_pem: &str) -> Option<String> {
     let der = pem_section(certificate_pem, "CERTIFICATE")?;
     Some(hex_fingerprint(&Sha256::digest(der), ":"))

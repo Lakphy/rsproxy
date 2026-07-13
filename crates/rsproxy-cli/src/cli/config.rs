@@ -72,112 +72,123 @@ fn apply_cli_overrides(
         config.api.clone_from(api);
     }
     if let Some(storage) = &args.client.storage {
-        config.storage.clone_from(storage);
+        config.engine_mut().storage.clone_from(storage);
     }
     if args.client.api.is_none() && !file_api_explicit {
-        config.api = crate::app::default_api_for_storage(&config.storage);
+        config.api = crate::app::default_api_for_storage(&config.engine().storage);
     }
     if args.watch {
-        config.rules_watch = true;
+        config.engine_mut().rules_watch = true;
     }
     if let Some(value) = args.watch_debounce_ms {
-        config.rules_watch_debounce = positive_millis(value, "--watch-debounce-ms")?;
+        config.engine_mut().rules_watch_debounce = positive_millis(value, "--watch-debounce-ms")?;
     }
     if let Some(token) = &args.client.api_token {
         config.api_token = Some(validate_api_token(token)?);
     }
     if let Some(auth) = &args.proxy_auth {
-        config.proxy_auth = Some(parse_proxy_auth(auth)?);
+        config.engine_mut().proxy_auth = Some(parse_proxy_auth(auth)?);
     }
     if let Some(limit) = &args.max_header_size {
-        config.max_header_size = parse_size(limit)?;
+        config.engine_mut().max_header_size = parse_size(limit)?;
     }
     if let Some(limit) = args.max_header_count {
-        config.max_header_count = positive_usize(limit, "--max-header-count")?;
+        config.engine_mut().max_header_count = positive_usize(limit, "--max-header-count")?;
     }
     if let Some(limit) = &args.body_buffer_limit {
-        config.body_buffer_limit = positive_size(parse_size(limit)?, "--body-buffer-limit")?;
+        config.engine_mut().body_buffer_limit =
+            positive_size(parse_size(limit)?, "--body-buffer-limit")?;
     }
     if let Some(limit) = &args.trace_body_limit {
-        config.trace_body_limit = parse_size(limit)?;
+        config.engine_mut().trace_body_limit = parse_size(limit)?;
     }
     if let Some(filter) = &args.trace_filter {
         apply_trace_filter(config, filter)?;
     }
     if let Some(capacity) = args.trace_queue_capacity {
-        config.trace_queue_capacity = positive_usize(capacity, "--trace-queue-capacity")?;
+        config.engine_mut().trace_queue_capacity =
+            positive_usize(capacity, "--trace-queue-capacity")?;
     }
     if let Some(budget) = &args.trace_mem_budget {
-        config.trace_memory_budget = positive_size(parse_size(budget)?, "--trace-mem-budget")?;
+        config.engine_mut().trace_memory_budget =
+            positive_size(parse_size(budget)?, "--trace-mem-budget")?;
     }
     if let Some(size) = &args.trace_segment_size {
-        config.trace_spill_segment_size = positive_size(parse_size(size)?, "--trace-segment-size")?;
+        config.engine_mut().trace_spill_segment_size =
+            positive_size(parse_size(size)?, "--trace-segment-size")?;
     }
     if let Some(budget) = &args.trace_disk_budget {
-        config.trace_disk_budget = parse_size(budget)?;
+        config.engine_mut().trace_disk_budget = parse_size(budget)?;
     }
     if let Some(compression) = &args.trace_spill_compression {
-        config.trace_spill_compression = parse_trace_spill_compression(compression)?;
+        config.engine_mut().trace_spill_compression = parse_trace_spill_compression(compression)?;
     }
     if args.no_mitm {
-        config.no_mitm = true;
+        config.engine_mut().no_mitm = true;
     }
     if args.strict_mitm {
-        config.strict_mitm = true;
+        config.engine_mut().strict_mitm = true;
     }
     if let Some(capacity) = args.mitm_cert_cache_capacity {
-        config.mitm_cert_cache_capacity = capacity;
+        config.engine_mut().mitm_cert_cache_capacity = capacity;
     }
     if let Some(capacity) = args.mitm_failure_cache_capacity {
-        config.mitm_failure_cache_capacity = capacity;
+        config.engine_mut().mitm_failure_cache_capacity = capacity;
     }
     if let Some(ttl) = args.mitm_failure_ttl_seconds {
-        config.mitm_failure_ttl = positive_seconds(ttl, "--mitm-failure-ttl-seconds")?;
+        config.engine_mut().mitm_failure_ttl = positive_seconds(ttl, "--mitm-failure-ttl-seconds")?;
     }
     if let Some(timeout) = args.connect_probe_timeout_ms {
-        config.connect_probe_timeout = positive_millis(timeout, "--connect-probe-timeout-ms")?;
+        config.engine_mut().connect_probe_timeout =
+            positive_millis(timeout, "--connect-probe-timeout-ms")?;
     }
     if let Some(limit) = args.h1_pool_max_active_per_key {
-        config.h1_pool_max_active_per_key = positive_usize(limit, "--h1-pool-max-active-per-key")?;
+        config.engine_mut().h1_pool_max_active_per_key =
+            positive_usize(limit, "--h1-pool-max-active-per-key")?;
     }
     if let Some(timeout) = args.h1_pool_wait_timeout_ms {
-        config.h1_pool_wait_timeout = positive_millis(timeout, "--h1-pool-wait-timeout-ms")?;
+        config.engine_mut().h1_pool_wait_timeout =
+            positive_millis(timeout, "--h1-pool-wait-timeout-ms")?;
     }
     if let Some(limit) = args.h2_pool_max_active_streams_per_key {
-        config.h2_pool_max_active_streams_per_key =
+        config.engine_mut().h2_pool_max_active_streams_per_key =
             positive_usize(limit, "--h2-pool-max-active-streams-per-key")?;
     }
     if let Some(timeout) = args.h2_pool_wait_timeout_ms {
-        config.h2_pool_wait_timeout = positive_millis(timeout, "--h2-pool-wait-timeout-ms")?;
+        config.engine_mut().h2_pool_wait_timeout =
+            positive_millis(timeout, "--h2-pool-wait-timeout-ms")?;
     }
     if let Some(timeout) = args.tcp_connect_timeout_ms {
-        config.tcp_connect_timeout = positive_millis(timeout, "--tcp-connect-timeout-ms")?;
+        config.engine_mut().tcp_connect_timeout =
+            positive_millis(timeout, "--tcp-connect-timeout-ms")?;
     }
     if let Some(timeout) = args.dns_timeout_ms {
-        config.dns_timeout = positive_millis(timeout, "--dns-timeout-ms")?;
+        config.engine_mut().dns_timeout = positive_millis(timeout, "--dns-timeout-ms")?;
     }
     if let Some(ttl) = args.dns_cache {
-        config.dns_cache_ttl = Duration::from_secs(ttl);
+        config.engine_mut().dns_cache_ttl = Duration::from_secs(ttl);
     }
     if !args.dns_server.is_empty() {
-        config.dns_servers = dns::parse_dns_servers(&args.dns_server)?;
+        config.engine_mut().dns_servers = dns::parse_dns_servers(&args.dns_server)?;
     }
     if let Some(timeout) = args.client_tls_handshake_timeout_ms {
-        config.client_tls_handshake_timeout =
+        config.engine_mut().client_tls_handshake_timeout =
             positive_millis(timeout, "--client-tls-handshake-timeout-ms")?;
     }
     if let Some(timeout) = args.upstream_tls_handshake_timeout_ms {
-        config.upstream_tls_handshake_timeout =
+        config.engine_mut().upstream_tls_handshake_timeout =
             positive_millis(timeout, "--upstream-tls-handshake-timeout-ms")?;
     }
     if let Some(timeout) = args.upstream_ttfb_timeout_ms {
-        config.upstream_ttfb_timeout = positive_millis(timeout, "--upstream-ttfb-timeout-ms")?;
+        config.engine_mut().upstream_ttfb_timeout =
+            positive_millis(timeout, "--upstream-ttfb-timeout-ms")?;
     }
     if let Some(timeout) = args.request_timeout_ms {
-        config.request_total_timeout = positive_millis(timeout, "--request-timeout-ms")?;
+        config.engine_mut().request_total_timeout =
+            positive_millis(timeout, "--request-timeout-ms")?;
     }
     if args.no_trace_body {
-        config.trace_body_limit = 0;
+        config.engine_mut().trace_body_limit = 0;
     }
     Ok(())
 }
@@ -205,7 +216,7 @@ fn positive_size(value: usize, field: &str) -> Result<usize, ConfigError> {
 }
 
 fn validate_mitm_mode(config: &AppConfig) -> Result<(), ConfigError> {
-    if config.no_mitm && config.strict_mitm {
+    if config.engine().no_mitm && config.engine().strict_mitm {
         Err(ConfigError::Invalid(
             "--no-mitm and --strict-mitm cannot be used together".to_string(),
         ))
@@ -238,13 +249,13 @@ fn apply_trace_filter(config: &mut AppConfig, input: &str) -> Result<(), ConfigE
         match raw.trim().to_ascii_lowercase().as_str() {
             "" => {}
             "headers-only" | "headers_only" | "headers" | "no-body" | "no_body" => {
-                config.trace_body_limit = 0;
+                config.engine_mut().trace_body_limit = 0;
             }
             "media" | "media-body-off" | "media_body_off" | "no-media-body" | "no_media_body"
             | "exclude-media" | "exclude_media" => {
-                config.trace_exclude_media_body = true;
+                config.engine_mut().trace_exclude_media_body = true;
             }
-            "full" | "all" => config.trace_exclude_media_body = false,
+            "full" | "all" => config.engine_mut().trace_exclude_media_body = false,
             _ => {
                 return Err(ConfigError::Invalid(
                     "--trace-filter supports headers-only, media, or full in this build"

@@ -1,0 +1,373 @@
+pub mod rsproxy_platform
+pub mod rsproxy_platform::ca
+pub enum rsproxy_platform::ca::CaInitialization
+pub rsproxy_platform::ca::CaInitialization::AlreadyInitialized
+pub rsproxy_platform::ca::CaInitialization::AlreadyInitialized::paths: rsproxy_platform::ca::CaPaths
+pub rsproxy_platform::ca::CaInitialization::Created
+pub rsproxy_platform::ca::CaInitialization::Created::fingerprint_sha256: alloc::string::String
+pub rsproxy_platform::ca::CaInitialization::Created::paths: rsproxy_platform::ca::CaPaths
+impl core::clone::Clone for rsproxy_platform::ca::CaInitialization
+pub fn rsproxy_platform::ca::CaInitialization::clone(&self) -> rsproxy_platform::ca::CaInitialization
+impl core::cmp::Eq for rsproxy_platform::ca::CaInitialization
+impl core::cmp::PartialEq for rsproxy_platform::ca::CaInitialization
+pub fn rsproxy_platform::ca::CaInitialization::eq(&self, &rsproxy_platform::ca::CaInitialization) -> bool
+impl core::fmt::Debug for rsproxy_platform::ca::CaInitialization
+pub fn rsproxy_platform::ca::CaInitialization::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for rsproxy_platform::ca::CaInitialization
+pub enum rsproxy_platform::ca::TrustAction
+pub rsproxy_platform::ca::TrustAction::Install
+pub rsproxy_platform::ca::TrustAction::Uninstall
+impl rsproxy_platform::ca::TrustAction
+pub fn rsproxy_platform::ca::TrustAction::completed_name(self) -> &'static str
+impl core::clone::Clone for rsproxy_platform::ca::TrustAction
+pub fn rsproxy_platform::ca::TrustAction::clone(&self) -> rsproxy_platform::ca::TrustAction
+impl core::cmp::Eq for rsproxy_platform::ca::TrustAction
+impl core::cmp::PartialEq for rsproxy_platform::ca::TrustAction
+pub fn rsproxy_platform::ca::TrustAction::eq(&self, &rsproxy_platform::ca::TrustAction) -> bool
+impl core::fmt::Debug for rsproxy_platform::ca::TrustAction
+pub fn rsproxy_platform::ca::TrustAction::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for rsproxy_platform::ca::TrustAction
+impl core::marker::StructuralPartialEq for rsproxy_platform::ca::TrustAction
+pub struct rsproxy_platform::ca::CaPaths
+pub rsproxy_platform::ca::CaPaths::certificate: std::path::PathBuf
+pub rsproxy_platform::ca::CaPaths::directory: std::path::PathBuf
+pub rsproxy_platform::ca::CaPaths::leaf_directory: std::path::PathBuf
+pub rsproxy_platform::ca::CaPaths::private_key: std::path::PathBuf
+pub rsproxy_platform::ca::CaPaths::readme: std::path::PathBuf
+impl rsproxy_platform::ca::CaPaths
+pub fn rsproxy_platform::ca::CaPaths::new(impl core::convert::Into<std::path::PathBuf>) -> Self
+impl core::clone::Clone for rsproxy_platform::ca::CaPaths
+pub fn rsproxy_platform::ca::CaPaths::clone(&self) -> rsproxy_platform::ca::CaPaths
+impl core::cmp::Eq for rsproxy_platform::ca::CaPaths
+impl core::cmp::PartialEq for rsproxy_platform::ca::CaPaths
+pub fn rsproxy_platform::ca::CaPaths::eq(&self, &rsproxy_platform::ca::CaPaths) -> bool
+impl core::fmt::Debug for rsproxy_platform::ca::CaPaths
+pub fn rsproxy_platform::ca::CaPaths::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for rsproxy_platform::ca::CaPaths
+pub struct rsproxy_platform::ca::CaStatus
+pub rsproxy_platform::ca::CaStatus::certificate_exists: bool
+pub rsproxy_platform::ca::CaStatus::fingerprint_sha256: alloc::string::String
+pub rsproxy_platform::ca::CaStatus::initialized: bool
+pub rsproxy_platform::ca::CaStatus::leaf_cached: usize
+pub rsproxy_platform::ca::CaStatus::paths: rsproxy_platform::ca::CaPaths
+pub rsproxy_platform::ca::CaStatus::private_key_exists: bool
+impl core::clone::Clone for rsproxy_platform::ca::CaStatus
+pub fn rsproxy_platform::ca::CaStatus::clone(&self) -> rsproxy_platform::ca::CaStatus
+impl core::cmp::Eq for rsproxy_platform::ca::CaStatus
+impl core::cmp::PartialEq for rsproxy_platform::ca::CaStatus
+pub fn rsproxy_platform::ca::CaStatus::eq(&self, &rsproxy_platform::ca::CaStatus) -> bool
+impl core::fmt::Debug for rsproxy_platform::ca::CaStatus
+pub fn rsproxy_platform::ca::CaStatus::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for rsproxy_platform::ca::CaStatus
+pub struct rsproxy_platform::ca::LeafPaths
+pub rsproxy_platform::ca::LeafPaths::certificate: std::path::PathBuf
+pub rsproxy_platform::ca::LeafPaths::chain: std::path::PathBuf
+pub rsproxy_platform::ca::LeafPaths::private_key: std::path::PathBuf
+impl core::clone::Clone for rsproxy_platform::ca::LeafPaths
+pub fn rsproxy_platform::ca::LeafPaths::clone(&self) -> rsproxy_platform::ca::LeafPaths
+impl core::cmp::Eq for rsproxy_platform::ca::LeafPaths
+impl core::cmp::PartialEq for rsproxy_platform::ca::LeafPaths
+pub fn rsproxy_platform::ca::LeafPaths::eq(&self, &rsproxy_platform::ca::LeafPaths) -> bool
+impl core::fmt::Debug for rsproxy_platform::ca::LeafPaths
+pub fn rsproxy_platform::ca::LeafPaths::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for rsproxy_platform::ca::LeafPaths
+pub struct rsproxy_platform::ca::RootCaPem
+pub rsproxy_platform::ca::RootCaPem::certificate_pem: alloc::string::String
+pub rsproxy_platform::ca::RootCaPem::private_key_pem: alloc::string::String
+impl core::clone::Clone for rsproxy_platform::ca::RootCaPem
+pub fn rsproxy_platform::ca::RootCaPem::clone(&self) -> rsproxy_platform::ca::RootCaPem
+impl core::cmp::Eq for rsproxy_platform::ca::RootCaPem
+impl core::cmp::PartialEq for rsproxy_platform::ca::RootCaPem
+pub fn rsproxy_platform::ca::RootCaPem::eq(&self, &rsproxy_platform::ca::RootCaPem) -> bool
+impl core::fmt::Debug for rsproxy_platform::ca::RootCaPem
+pub fn rsproxy_platform::ca::RootCaPem::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for rsproxy_platform::ca::RootCaPem
+pub struct rsproxy_platform::ca::StoredLeafCertificate
+pub rsproxy_platform::ca::StoredLeafCertificate::fingerprint_sha256: alloc::string::String
+pub rsproxy_platform::ca::StoredLeafCertificate::paths: rsproxy_platform::ca::LeafPaths
+impl core::clone::Clone for rsproxy_platform::ca::StoredLeafCertificate
+pub fn rsproxy_platform::ca::StoredLeafCertificate::clone(&self) -> rsproxy_platform::ca::StoredLeafCertificate
+impl core::cmp::Eq for rsproxy_platform::ca::StoredLeafCertificate
+impl core::cmp::PartialEq for rsproxy_platform::ca::StoredLeafCertificate
+pub fn rsproxy_platform::ca::StoredLeafCertificate::eq(&self, &rsproxy_platform::ca::StoredLeafCertificate) -> bool
+impl core::fmt::Debug for rsproxy_platform::ca::StoredLeafCertificate
+pub fn rsproxy_platform::ca::StoredLeafCertificate::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for rsproxy_platform::ca::StoredLeafCertificate
+pub struct rsproxy_platform::ca::TrustCommand
+pub rsproxy_platform::ca::TrustCommand::args: alloc::vec::Vec<alloc::string::String>
+pub rsproxy_platform::ca::TrustCommand::program: alloc::string::String
+impl core::clone::Clone for rsproxy_platform::ca::TrustCommand
+pub fn rsproxy_platform::ca::TrustCommand::clone(&self) -> rsproxy_platform::ca::TrustCommand
+impl core::cmp::Eq for rsproxy_platform::ca::TrustCommand
+impl core::cmp::PartialEq for rsproxy_platform::ca::TrustCommand
+pub fn rsproxy_platform::ca::TrustCommand::eq(&self, &rsproxy_platform::ca::TrustCommand) -> bool
+impl core::fmt::Debug for rsproxy_platform::ca::TrustCommand
+pub fn rsproxy_platform::ca::TrustCommand::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for rsproxy_platform::ca::TrustCommand
+pub struct rsproxy_platform::ca::TrustOptions
+pub rsproxy_platform::ca::TrustOptions::dry_run: bool
+pub rsproxy_platform::ca::TrustOptions::keychain: core::option::Option<std::path::PathBuf>
+impl core::clone::Clone for rsproxy_platform::ca::TrustOptions
+pub fn rsproxy_platform::ca::TrustOptions::clone(&self) -> rsproxy_platform::ca::TrustOptions
+impl core::cmp::Eq for rsproxy_platform::ca::TrustOptions
+impl core::cmp::PartialEq for rsproxy_platform::ca::TrustOptions
+pub fn rsproxy_platform::ca::TrustOptions::eq(&self, &rsproxy_platform::ca::TrustOptions) -> bool
+impl core::default::Default for rsproxy_platform::ca::TrustOptions
+pub fn rsproxy_platform::ca::TrustOptions::default() -> rsproxy_platform::ca::TrustOptions
+impl core::fmt::Debug for rsproxy_platform::ca::TrustOptions
+pub fn rsproxy_platform::ca::TrustOptions::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for rsproxy_platform::ca::TrustOptions
+pub struct rsproxy_platform::ca::TrustOutcome
+pub rsproxy_platform::ca::TrustOutcome::action: rsproxy_platform::ca::TrustAction
+pub rsproxy_platform::ca::TrustOutcome::backend: &'static str
+pub rsproxy_platform::ca::TrustOutcome::certificate: std::path::PathBuf
+pub rsproxy_platform::ca::TrustOutcome::commands: alloc::vec::Vec<rsproxy_platform::ca::TrustCommand>
+pub rsproxy_platform::ca::TrustOutcome::dry_run: bool
+pub rsproxy_platform::ca::TrustOutcome::fingerprint_sha256: alloc::string::String
+pub rsproxy_platform::ca::TrustOutcome::installed: core::option::Option<bool>
+pub rsproxy_platform::ca::TrustOutcome::keychain: core::option::Option<std::path::PathBuf>
+pub rsproxy_platform::ca::TrustOutcome::platform: &'static str
+pub rsproxy_platform::ca::TrustOutcome::removed_certificate: core::option::Option<bool>
+pub rsproxy_platform::ca::TrustOutcome::thumbprint_sha1: core::option::Option<alloc::string::String>
+pub rsproxy_platform::ca::TrustOutcome::trust_settings_removed: core::option::Option<bool>
+impl core::clone::Clone for rsproxy_platform::ca::TrustOutcome
+pub fn rsproxy_platform::ca::TrustOutcome::clone(&self) -> rsproxy_platform::ca::TrustOutcome
+impl core::cmp::Eq for rsproxy_platform::ca::TrustOutcome
+impl core::cmp::PartialEq for rsproxy_platform::ca::TrustOutcome
+pub fn rsproxy_platform::ca::TrustOutcome::eq(&self, &rsproxy_platform::ca::TrustOutcome) -> bool
+impl core::fmt::Debug for rsproxy_platform::ca::TrustOutcome
+pub fn rsproxy_platform::ca::TrustOutcome::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for rsproxy_platform::ca::TrustOutcome
+pub fn rsproxy_platform::ca::cached_leaf_certificate(&std::path::Path, &str) -> rsproxy_platform::PlatformResult<core::option::Option<rsproxy_platform::ca::StoredLeafCertificate>>
+pub fn rsproxy_platform::ca::certificate_fingerprint_sha256(&str) -> core::option::Option<alloc::string::String>
+pub fn rsproxy_platform::ca::generate_root_ca(&str) -> rsproxy_platform::PlatformResult<rsproxy_platform::ca::RootCaPem>
+pub fn rsproxy_platform::ca::initialize_root_ca(&std::path::Path, &str, bool) -> rsproxy_platform::PlatformResult<rsproxy_platform::ca::CaInitialization>
+pub fn rsproxy_platform::ca::install_root_ca(&std::path::Path, &rsproxy_platform::ca::TrustOptions) -> rsproxy_platform::PlatformResult<rsproxy_platform::ca::TrustOutcome>
+pub fn rsproxy_platform::ca::keychain_contains_fingerprint(&std::path::Path, &str) -> rsproxy_platform::PlatformResult<bool>
+pub fn rsproxy_platform::ca::leaf_cache_name(&str) -> alloc::string::String
+pub fn rsproxy_platform::ca::leaf_paths(&std::path::Path, &str) -> rsproxy_platform::ca::LeafPaths
+pub fn rsproxy_platform::ca::read_root_ca(&std::path::Path) -> rsproxy_platform::PlatformResult<rsproxy_platform::ca::RootCaPem>
+pub fn rsproxy_platform::ca::read_root_certificate(&std::path::Path) -> rsproxy_platform::PlatformResult<alloc::string::String>
+pub fn rsproxy_platform::ca::root_ca_status(&std::path::Path) -> rsproxy_platform::PlatformResult<rsproxy_platform::ca::CaStatus>
+pub fn rsproxy_platform::ca::store_leaf_certificate(&std::path::Path, &str, &str, &str, &str) -> rsproxy_platform::PlatformResult<rsproxy_platform::ca::StoredLeafCertificate>
+pub fn rsproxy_platform::ca::uninstall_root_ca(&std::path::Path, &rsproxy_platform::ca::TrustOptions) -> rsproxy_platform::PlatformResult<rsproxy_platform::ca::TrustOutcome>
+pub mod rsproxy_platform::process
+pub fn rsproxy_platform::process::detach_daemon(&mut std::process::Command)
+pub fn rsproxy_platform::process::force_terminate_process(u32) -> rsproxy_platform::PlatformResult<()>
+pub fn rsproxy_platform::process::parse_pid(&str) -> rsproxy_platform::PlatformResult<u32>
+pub fn rsproxy_platform::process::process_alive(u32) -> bool
+pub fn rsproxy_platform::process::resident_kib(u32) -> core::option::Option<u64>
+pub fn rsproxy_platform::process::terminate_process(u32) -> rsproxy_platform::PlatformResult<()>
+pub fn rsproxy_platform::process::unix_control_socket_path(&std::path::Path) -> std::path::PathBuf
+pub mod rsproxy_platform::system_proxy
+pub enum rsproxy_platform::system_proxy::MacosBypassStatus
+pub rsproxy_platform::system_proxy::MacosBypassStatus::Domains(alloc::vec::Vec<alloc::string::String>)
+pub rsproxy_platform::system_proxy::MacosBypassStatus::QueryError(alloc::string::String)
+impl core::clone::Clone for rsproxy_platform::system_proxy::MacosBypassStatus
+pub fn rsproxy_platform::system_proxy::MacosBypassStatus::clone(&self) -> rsproxy_platform::system_proxy::MacosBypassStatus
+impl core::cmp::Eq for rsproxy_platform::system_proxy::MacosBypassStatus
+impl core::cmp::PartialEq for rsproxy_platform::system_proxy::MacosBypassStatus
+pub fn rsproxy_platform::system_proxy::MacosBypassStatus::eq(&self, &rsproxy_platform::system_proxy::MacosBypassStatus) -> bool
+impl core::fmt::Debug for rsproxy_platform::system_proxy::MacosBypassStatus
+pub fn rsproxy_platform::system_proxy::MacosBypassStatus::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for rsproxy_platform::system_proxy::MacosBypassStatus
+pub enum rsproxy_platform::system_proxy::ProxyAction
+pub rsproxy_platform::system_proxy::ProxyAction::Disable
+pub rsproxy_platform::system_proxy::ProxyAction::Enable
+pub rsproxy_platform::system_proxy::ProxyAction::Status
+impl core::clone::Clone for rsproxy_platform::system_proxy::ProxyAction
+pub fn rsproxy_platform::system_proxy::ProxyAction::clone(&self) -> rsproxy_platform::system_proxy::ProxyAction
+impl core::cmp::Eq for rsproxy_platform::system_proxy::ProxyAction
+impl core::cmp::PartialEq for rsproxy_platform::system_proxy::ProxyAction
+pub fn rsproxy_platform::system_proxy::ProxyAction::eq(&self, &rsproxy_platform::system_proxy::ProxyAction) -> bool
+impl core::fmt::Debug for rsproxy_platform::system_proxy::ProxyAction
+pub fn rsproxy_platform::system_proxy::ProxyAction::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for rsproxy_platform::system_proxy::ProxyAction
+impl core::marker::StructuralPartialEq for rsproxy_platform::system_proxy::ProxyAction
+pub enum rsproxy_platform::system_proxy::ProxyCommand
+pub rsproxy_platform::system_proxy::ProxyCommand::LinuxEnvironment
+pub rsproxy_platform::system_proxy::ProxyCommand::LinuxEnvironment::args: alloc::vec::Vec<alloc::string::String>
+pub rsproxy_platform::system_proxy::ProxyCommand::LinuxGsettings
+pub rsproxy_platform::system_proxy::ProxyCommand::LinuxGsettings::args: alloc::vec::Vec<alloc::string::String>
+pub rsproxy_platform::system_proxy::ProxyCommand::MacosNetworkSetup
+pub rsproxy_platform::system_proxy::ProxyCommand::MacosNetworkSetup::args: alloc::vec::Vec<alloc::string::String>
+pub rsproxy_platform::system_proxy::ProxyCommand::WindowsRegistry
+pub rsproxy_platform::system_proxy::ProxyCommand::WindowsRegistry::args: alloc::vec::Vec<alloc::string::String>
+impl core::clone::Clone for rsproxy_platform::system_proxy::ProxyCommand
+pub fn rsproxy_platform::system_proxy::ProxyCommand::clone(&self) -> rsproxy_platform::system_proxy::ProxyCommand
+impl core::cmp::Eq for rsproxy_platform::system_proxy::ProxyCommand
+impl core::cmp::PartialEq for rsproxy_platform::system_proxy::ProxyCommand
+pub fn rsproxy_platform::system_proxy::ProxyCommand::eq(&self, &rsproxy_platform::system_proxy::ProxyCommand) -> bool
+impl core::fmt::Debug for rsproxy_platform::system_proxy::ProxyCommand
+pub fn rsproxy_platform::system_proxy::ProxyCommand::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for rsproxy_platform::system_proxy::ProxyCommand
+pub enum rsproxy_platform::system_proxy::ProxyOutcome
+pub rsproxy_platform::system_proxy::ProxyOutcome::Changed(alloc::vec::Vec<rsproxy_platform::system_proxy::ProxyChange>)
+pub rsproxy_platform::system_proxy::ProxyOutcome::Status(rsproxy_platform::system_proxy::ProxyStatus)
+impl core::clone::Clone for rsproxy_platform::system_proxy::ProxyOutcome
+pub fn rsproxy_platform::system_proxy::ProxyOutcome::clone(&self) -> rsproxy_platform::system_proxy::ProxyOutcome
+impl core::cmp::Eq for rsproxy_platform::system_proxy::ProxyOutcome
+impl core::cmp::PartialEq for rsproxy_platform::system_proxy::ProxyOutcome
+pub fn rsproxy_platform::system_proxy::ProxyOutcome::eq(&self, &rsproxy_platform::system_proxy::ProxyOutcome) -> bool
+impl core::fmt::Debug for rsproxy_platform::system_proxy::ProxyOutcome
+pub fn rsproxy_platform::system_proxy::ProxyOutcome::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for rsproxy_platform::system_proxy::ProxyOutcome
+pub enum rsproxy_platform::system_proxy::ProxyPlanStep
+pub rsproxy_platform::system_proxy::ProxyPlanStep::Change(rsproxy_platform::system_proxy::ProxyChange)
+pub rsproxy_platform::system_proxy::ProxyPlanStep::Command(rsproxy_platform::system_proxy::ProxyCommand)
+impl core::clone::Clone for rsproxy_platform::system_proxy::ProxyPlanStep
+pub fn rsproxy_platform::system_proxy::ProxyPlanStep::clone(&self) -> rsproxy_platform::system_proxy::ProxyPlanStep
+impl core::cmp::Eq for rsproxy_platform::system_proxy::ProxyPlanStep
+impl core::cmp::PartialEq for rsproxy_platform::system_proxy::ProxyPlanStep
+pub fn rsproxy_platform::system_proxy::ProxyPlanStep::eq(&self, &rsproxy_platform::system_proxy::ProxyPlanStep) -> bool
+impl core::fmt::Debug for rsproxy_platform::system_proxy::ProxyPlanStep
+pub fn rsproxy_platform::system_proxy::ProxyPlanStep::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for rsproxy_platform::system_proxy::ProxyPlanStep
+pub enum rsproxy_platform::system_proxy::ProxyPlatform
+pub rsproxy_platform::system_proxy::ProxyPlatform::Linux
+pub rsproxy_platform::system_proxy::ProxyPlatform::Macos
+pub rsproxy_platform::system_proxy::ProxyPlatform::Windows
+impl core::clone::Clone for rsproxy_platform::system_proxy::ProxyPlatform
+pub fn rsproxy_platform::system_proxy::ProxyPlatform::clone(&self) -> rsproxy_platform::system_proxy::ProxyPlatform
+impl core::cmp::Eq for rsproxy_platform::system_proxy::ProxyPlatform
+impl core::cmp::PartialEq for rsproxy_platform::system_proxy::ProxyPlatform
+pub fn rsproxy_platform::system_proxy::ProxyPlatform::eq(&self, &rsproxy_platform::system_proxy::ProxyPlatform) -> bool
+impl core::fmt::Debug for rsproxy_platform::system_proxy::ProxyPlatform
+pub fn rsproxy_platform::system_proxy::ProxyPlatform::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for rsproxy_platform::system_proxy::ProxyPlatform
+impl core::marker::StructuralPartialEq for rsproxy_platform::system_proxy::ProxyPlatform
+pub enum rsproxy_platform::system_proxy::ProxyStatus
+pub rsproxy_platform::system_proxy::ProxyStatus::Linux
+pub rsproxy_platform::system_proxy::ProxyStatus::Linux::settings: alloc::vec::Vec<rsproxy_platform::system_proxy::LinuxSettingStatus>
+pub rsproxy_platform::system_proxy::ProxyStatus::Macos
+pub rsproxy_platform::system_proxy::ProxyStatus::Macos::services: alloc::vec::Vec<rsproxy_platform::system_proxy::MacosServiceStatus>
+pub rsproxy_platform::system_proxy::ProxyStatus::Windows
+pub rsproxy_platform::system_proxy::ProxyStatus::Windows::bypass: core::option::Option<alloc::string::String>
+pub rsproxy_platform::system_proxy::ProxyStatus::Windows::enabled: bool
+pub rsproxy_platform::system_proxy::ProxyStatus::Windows::server: core::option::Option<alloc::string::String>
+impl core::clone::Clone for rsproxy_platform::system_proxy::ProxyStatus
+pub fn rsproxy_platform::system_proxy::ProxyStatus::clone(&self) -> rsproxy_platform::system_proxy::ProxyStatus
+impl core::cmp::Eq for rsproxy_platform::system_proxy::ProxyStatus
+impl core::cmp::PartialEq for rsproxy_platform::system_proxy::ProxyStatus
+pub fn rsproxy_platform::system_proxy::ProxyStatus::eq(&self, &rsproxy_platform::system_proxy::ProxyStatus) -> bool
+impl core::fmt::Debug for rsproxy_platform::system_proxy::ProxyStatus
+pub fn rsproxy_platform::system_proxy::ProxyStatus::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for rsproxy_platform::system_proxy::ProxyStatus
+pub struct rsproxy_platform::system_proxy::LinuxSettingStatus
+pub rsproxy_platform::system_proxy::LinuxSettingStatus::key: alloc::string::String
+pub rsproxy_platform::system_proxy::LinuxSettingStatus::schema: alloc::string::String
+pub rsproxy_platform::system_proxy::LinuxSettingStatus::value: alloc::string::String
+impl core::clone::Clone for rsproxy_platform::system_proxy::LinuxSettingStatus
+pub fn rsproxy_platform::system_proxy::LinuxSettingStatus::clone(&self) -> rsproxy_platform::system_proxy::LinuxSettingStatus
+impl core::cmp::Eq for rsproxy_platform::system_proxy::LinuxSettingStatus
+impl core::cmp::PartialEq for rsproxy_platform::system_proxy::LinuxSettingStatus
+pub fn rsproxy_platform::system_proxy::LinuxSettingStatus::eq(&self, &rsproxy_platform::system_proxy::LinuxSettingStatus) -> bool
+impl core::fmt::Debug for rsproxy_platform::system_proxy::LinuxSettingStatus
+pub fn rsproxy_platform::system_proxy::LinuxSettingStatus::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for rsproxy_platform::system_proxy::LinuxSettingStatus
+pub struct rsproxy_platform::system_proxy::MacosEndpointStatus
+pub rsproxy_platform::system_proxy::MacosEndpointStatus::authenticated: bool
+pub rsproxy_platform::system_proxy::MacosEndpointStatus::enabled: bool
+pub rsproxy_platform::system_proxy::MacosEndpointStatus::port: core::option::Option<u16>
+pub rsproxy_platform::system_proxy::MacosEndpointStatus::reported_authenticated: core::option::Option<alloc::string::String>
+pub rsproxy_platform::system_proxy::MacosEndpointStatus::reported_enabled: core::option::Option<alloc::string::String>
+pub rsproxy_platform::system_proxy::MacosEndpointStatus::reported_port: core::option::Option<alloc::string::String>
+pub rsproxy_platform::system_proxy::MacosEndpointStatus::server: core::option::Option<alloc::string::String>
+impl core::clone::Clone for rsproxy_platform::system_proxy::MacosEndpointStatus
+pub fn rsproxy_platform::system_proxy::MacosEndpointStatus::clone(&self) -> rsproxy_platform::system_proxy::MacosEndpointStatus
+impl core::cmp::Eq for rsproxy_platform::system_proxy::MacosEndpointStatus
+impl core::cmp::PartialEq for rsproxy_platform::system_proxy::MacosEndpointStatus
+pub fn rsproxy_platform::system_proxy::MacosEndpointStatus::eq(&self, &rsproxy_platform::system_proxy::MacosEndpointStatus) -> bool
+impl core::fmt::Debug for rsproxy_platform::system_proxy::MacosEndpointStatus
+pub fn rsproxy_platform::system_proxy::MacosEndpointStatus::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for rsproxy_platform::system_proxy::MacosEndpointStatus
+pub struct rsproxy_platform::system_proxy::MacosServiceStatus
+pub rsproxy_platform::system_proxy::MacosServiceStatus::bypass: rsproxy_platform::system_proxy::MacosBypassStatus
+pub rsproxy_platform::system_proxy::MacosServiceStatus::http: rsproxy_platform::system_proxy::MacosEndpointStatus
+pub rsproxy_platform::system_proxy::MacosServiceStatus::https: rsproxy_platform::system_proxy::MacosEndpointStatus
+pub rsproxy_platform::system_proxy::MacosServiceStatus::service: alloc::string::String
+impl core::clone::Clone for rsproxy_platform::system_proxy::MacosServiceStatus
+pub fn rsproxy_platform::system_proxy::MacosServiceStatus::clone(&self) -> rsproxy_platform::system_proxy::MacosServiceStatus
+impl core::cmp::Eq for rsproxy_platform::system_proxy::MacosServiceStatus
+impl core::cmp::PartialEq for rsproxy_platform::system_proxy::MacosServiceStatus
+pub fn rsproxy_platform::system_proxy::MacosServiceStatus::eq(&self, &rsproxy_platform::system_proxy::MacosServiceStatus) -> bool
+impl core::fmt::Debug for rsproxy_platform::system_proxy::MacosServiceStatus
+pub fn rsproxy_platform::system_proxy::MacosServiceStatus::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for rsproxy_platform::system_proxy::MacosServiceStatus
+pub struct rsproxy_platform::system_proxy::ProxyChange
+pub rsproxy_platform::system_proxy::ProxyChange::bypass: core::option::Option<alloc::vec::Vec<alloc::string::String>>
+pub rsproxy_platform::system_proxy::ProxyChange::enabled: bool
+pub rsproxy_platform::system_proxy::ProxyChange::platform: rsproxy_platform::system_proxy::ProxyPlatform
+pub rsproxy_platform::system_proxy::ProxyChange::service: core::option::Option<alloc::string::String>
+pub rsproxy_platform::system_proxy::ProxyChange::target: rsproxy_platform::system_proxy::ProxyTarget
+impl core::clone::Clone for rsproxy_platform::system_proxy::ProxyChange
+pub fn rsproxy_platform::system_proxy::ProxyChange::clone(&self) -> rsproxy_platform::system_proxy::ProxyChange
+impl core::cmp::Eq for rsproxy_platform::system_proxy::ProxyChange
+impl core::cmp::PartialEq for rsproxy_platform::system_proxy::ProxyChange
+pub fn rsproxy_platform::system_proxy::ProxyChange::eq(&self, &rsproxy_platform::system_proxy::ProxyChange) -> bool
+impl core::fmt::Debug for rsproxy_platform::system_proxy::ProxyChange
+pub fn rsproxy_platform::system_proxy::ProxyChange::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for rsproxy_platform::system_proxy::ProxyChange
+pub struct rsproxy_platform::system_proxy::ProxyOptions
+pub rsproxy_platform::system_proxy::ProxyOptions::all_services: bool
+pub rsproxy_platform::system_proxy::ProxyOptions::bypass: core::option::Option<alloc::vec::Vec<alloc::string::String>>
+pub rsproxy_platform::system_proxy::ProxyOptions::service: core::option::Option<alloc::string::String>
+pub rsproxy_platform::system_proxy::ProxyOptions::target: core::option::Option<rsproxy_platform::system_proxy::ProxyTarget>
+impl core::clone::Clone for rsproxy_platform::system_proxy::ProxyOptions
+pub fn rsproxy_platform::system_proxy::ProxyOptions::clone(&self) -> rsproxy_platform::system_proxy::ProxyOptions
+impl core::cmp::Eq for rsproxy_platform::system_proxy::ProxyOptions
+impl core::cmp::PartialEq for rsproxy_platform::system_proxy::ProxyOptions
+pub fn rsproxy_platform::system_proxy::ProxyOptions::eq(&self, &rsproxy_platform::system_proxy::ProxyOptions) -> bool
+impl core::default::Default for rsproxy_platform::system_proxy::ProxyOptions
+pub fn rsproxy_platform::system_proxy::ProxyOptions::default() -> rsproxy_platform::system_proxy::ProxyOptions
+impl core::fmt::Debug for rsproxy_platform::system_proxy::ProxyOptions
+pub fn rsproxy_platform::system_proxy::ProxyOptions::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for rsproxy_platform::system_proxy::ProxyOptions
+pub struct rsproxy_platform::system_proxy::ProxyPlan
+pub rsproxy_platform::system_proxy::ProxyPlan::platform: rsproxy_platform::system_proxy::ProxyPlatform
+pub rsproxy_platform::system_proxy::ProxyPlan::steps: alloc::vec::Vec<rsproxy_platform::system_proxy::ProxyPlanStep>
+impl core::clone::Clone for rsproxy_platform::system_proxy::ProxyPlan
+pub fn rsproxy_platform::system_proxy::ProxyPlan::clone(&self) -> rsproxy_platform::system_proxy::ProxyPlan
+impl core::cmp::Eq for rsproxy_platform::system_proxy::ProxyPlan
+impl core::cmp::PartialEq for rsproxy_platform::system_proxy::ProxyPlan
+pub fn rsproxy_platform::system_proxy::ProxyPlan::eq(&self, &rsproxy_platform::system_proxy::ProxyPlan) -> bool
+impl core::fmt::Debug for rsproxy_platform::system_proxy::ProxyPlan
+pub fn rsproxy_platform::system_proxy::ProxyPlan::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for rsproxy_platform::system_proxy::ProxyPlan
+pub struct rsproxy_platform::system_proxy::ProxyTarget
+pub rsproxy_platform::system_proxy::ProxyTarget::host: alloc::string::String
+pub rsproxy_platform::system_proxy::ProxyTarget::port: u16
+impl core::clone::Clone for rsproxy_platform::system_proxy::ProxyTarget
+pub fn rsproxy_platform::system_proxy::ProxyTarget::clone(&self) -> rsproxy_platform::system_proxy::ProxyTarget
+impl core::cmp::Eq for rsproxy_platform::system_proxy::ProxyTarget
+impl core::cmp::PartialEq for rsproxy_platform::system_proxy::ProxyTarget
+pub fn rsproxy_platform::system_proxy::ProxyTarget::eq(&self, &rsproxy_platform::system_proxy::ProxyTarget) -> bool
+impl core::fmt::Debug for rsproxy_platform::system_proxy::ProxyTarget
+pub fn rsproxy_platform::system_proxy::ProxyTarget::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for rsproxy_platform::system_proxy::ProxyTarget
+pub fn rsproxy_platform::system_proxy::execute_system_proxy(rsproxy_platform::system_proxy::ProxyPlatform, rsproxy_platform::system_proxy::ProxyAction, &rsproxy_platform::system_proxy::ProxyOptions) -> rsproxy_platform::PlatformResult<rsproxy_platform::system_proxy::ProxyOutcome>
+pub fn rsproxy_platform::system_proxy::plan_system_proxy(rsproxy_platform::system_proxy::ProxyPlatform, rsproxy_platform::system_proxy::ProxyAction, &rsproxy_platform::system_proxy::ProxyOptions) -> rsproxy_platform::PlatformResult<rsproxy_platform::system_proxy::ProxyPlan>
+#[non_exhaustive] pub enum rsproxy_platform::PlatformError
+pub rsproxy_platform::PlatformError::Certificate(rcgen::error::Error)
+pub rsproxy_platform::PlatformError::CommandFailed
+pub rsproxy_platform::PlatformError::CommandFailed::command: alloc::string::String
+pub rsproxy_platform::PlatformError::CommandFailed::output: alloc::string::String
+pub rsproxy_platform::PlatformError::CommandFailed::status: core::option::Option<i32>
+pub rsproxy_platform::PlatformError::InvalidState(alloc::string::String)
+pub rsproxy_platform::PlatformError::Io
+pub rsproxy_platform::PlatformError::Io::context: alloc::string::String
+pub rsproxy_platform::PlatformError::Io::source: core::io::error::Error
+pub rsproxy_platform::PlatformError::Timeout
+pub rsproxy_platform::PlatformError::Timeout::operation: alloc::string::String
+pub rsproxy_platform::PlatformError::Timeout::output: alloc::string::String
+pub rsproxy_platform::PlatformError::Timeout::timeout_ms: u64
+pub rsproxy_platform::PlatformError::Unsupported(alloc::string::String)
+impl core::convert::From<rcgen::error::Error> for rsproxy_platform::PlatformError
+pub fn rsproxy_platform::PlatformError::from(rcgen::error::Error) -> Self
+impl core::error::Error for rsproxy_platform::PlatformError
+pub fn rsproxy_platform::PlatformError::source(&self) -> core::option::Option<&(dyn core::error::Error + 'static)>
+impl core::fmt::Debug for rsproxy_platform::PlatformError
+pub fn rsproxy_platform::PlatformError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for rsproxy_platform::PlatformError
+pub fn rsproxy_platform::PlatformError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub type rsproxy_platform::PlatformResult<T> = core::result::Result<T, rsproxy_platform::PlatformError>

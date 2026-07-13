@@ -19,7 +19,7 @@ pub(super) use request::{parse_header_arg, response_meta, rules_test_api_path};
 pub(super) fn rules_cmd(args: RulesArgs, json: bool) -> CliResult<()> {
     let config = runtime_config(&RuntimeArgs::from_client(args.client))?;
     let api = config.api.clone();
-    let storage = config.storage.clone();
+    let storage = config.engine().storage.clone();
     match args.command {
         RulesCommand::Check(args) => {
             let text = if let Some(file) = args.file {

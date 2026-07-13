@@ -41,6 +41,7 @@ pub(super) fn read_trailers<R: Read + ?Sized>(
     }
 }
 
+/// Validates trailer count, aggregate size, names, and forbidden framing fields.
 pub fn validate_request_trailers(
     trailers: &[(String, String)],
     max_header_size: usize,

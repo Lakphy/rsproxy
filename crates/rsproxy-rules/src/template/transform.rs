@@ -155,7 +155,9 @@ fn replace_cached(
         if let Some(index) = cache.iter().position(|entry| {
             entry.pattern == pattern && entry.case_insensitive == case_insensitive
         }) {
-            let entry = cache.remove(index).unwrap();
+            let entry = cache
+                .remove(index)
+                .expect("located template regex cache entry must still exist");
             let output = entry.regex.replace_all(input, replacement).into_owned();
             cache.push_back(entry);
             return Ok(output);

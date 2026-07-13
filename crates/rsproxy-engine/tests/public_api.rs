@@ -1,3 +1,9 @@
+//! Black-box checks for the supported `rsproxy-engine` facade.
+//!
+//! These tests deliberately import only public names and verify that runtime
+//! composition, typed errors, CA injection, replay, and listener entry points
+//! remain usable without reaching into engine implementation modules.
+
 use rcgen::{
     BasicConstraints, CertificateParams, DistinguishedName, DnType, IsCa, KeyPair, KeyUsagePurpose,
 };

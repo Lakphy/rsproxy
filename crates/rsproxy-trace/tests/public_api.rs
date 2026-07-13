@@ -1,3 +1,6 @@
+//! Behavioral smoke tests for the tracing facade.
+#![allow(clippy::unwrap_used)]
+
 use rsproxy_trace::{Session, SessionKind, SessionStart, TraceEvent, TraceStore};
 use std::time::Duration;
 

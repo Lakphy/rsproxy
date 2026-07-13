@@ -1,3 +1,9 @@
+//! Standalone HTTP/1 benchmark driver for measuring requests through rsproxy.
+//!
+//! The program opens persistent proxy connections across a fixed worker count
+//! and emits one `rsproxy-benchmark/v1` JSON report for repository performance
+//! scripts; it is not part of the product CLI.
+
 use serde::Serialize;
 use std::io::{self, BufRead, BufReader, Read, Write};
 use std::net::{SocketAddr, TcpStream};

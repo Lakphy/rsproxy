@@ -18,44 +18,91 @@ pub(crate) use mitm_failures::MitmFailureCache;
 /// the composition root and are intentionally absent from this type.
 #[derive(Clone, Debug)]
 pub struct ProxyConfig {
+    /// Persistent root for rules, trace spill segments and leaf certificates.
     pub storage: PathBuf,
     /// Root CA material supplied by the composition root. The engine never
     /// discovers this material from `storage`.
     pub ca_material: Option<CaMaterial>,
+    /// Enables live rule-file watching after the initial synchronous load.
     pub rules_watch: bool,
+    /// Coalescing interval applied to rule filesystem notifications.
     pub rules_watch_debounce: Duration,
+    /// Optional `Basic` credential expected from downstream proxy clients.
     pub proxy_auth: Option<String>,
+    /// Maximum encoded bytes in an HTTP header or trailer block.
+    ///
+    /// For HTTP/1 this includes the start line and complete header section; for
+    /// HTTP/2 it limits the decoded header list.
     pub max_header_size: usize,
+    /// Maximum accepted field count in each HTTP header or trailer block.
     pub max_header_count: usize,
+    /// Maximum request or response bytes collected for body-dependent rules and rewrites.
+    ///
+    /// Larger bodies continue on a streaming path with complete-body operations skipped.
     pub body_buffer_limit: usize,
+    /// Maximum body bytes retained per direction in a trace session.
     pub trace_body_limit: usize,
+    /// Excludes recognized media payloads from trace bodies when enabled.
     pub trace_exclude_media_body: bool,
+    /// Maximum number of pending trace commands.
     pub trace_queue_capacity: usize,
+    /// Total in-memory trace budget in bytes, including pending commands.
     pub trace_memory_budget: usize,
+    /// Target maximum encoded size of each trace spill segment in bytes.
     pub trace_spill_segment_size: usize,
+    /// Total on-disk trace spill budget in bytes; zero disables spilling.
     pub trace_disk_budget: usize,
+    /// Compression applied independently to newly written spill records.
     pub trace_spill_compression: TraceSpillCompression,
+    /// Passes CONNECT traffic through without attempting MITM inspection.
     pub no_mitm: bool,
+    /// Rejects MITM failures instead of remembering and falling back to passthrough.
     pub strict_mitm: bool,
+    /// Maximum number of generated leaf server configurations retained in memory.
     pub mitm_cert_cache_capacity: usize,
+    /// Maximum number of host-specific MITM failures remembered for fallback.
     pub mitm_failure_cache_capacity: usize,
+    /// Lifetime of a remembered MITM failure before inspection is retried.
     pub mitm_failure_ttl: Duration,
+    /// Time allowed after a successful CONNECT to classify peeked client bytes as HTTP or TLS.
     pub connect_probe_timeout: Duration,
+    /// Maximum simultaneous HTTP/1 upstream leases for one pool key.
+    ///
+    /// A lease is held through response-body completion because HTTP/1 cannot
+    /// multiplex another request on that connection meanwhile.
     pub h1_pool_max_active_per_key: usize,
+    /// Maximum wait from requesting HTTP/1 keyed-pool admission to reserving a lease.
     pub h1_pool_wait_timeout: Duration,
+    /// Maximum simultaneous HTTP/2 streams for one pool key, held through stream completion.
     pub h2_pool_max_active_streams_per_key: usize,
+    /// Maximum wait from HTTP/2 checkout to a stream slot or permission to connect.
     pub h2_pool_wait_timeout: Duration,
+    /// Per-resolution DNS timeout, measured from the resolver call and clipped by request total.
     pub dns_timeout: Duration,
+    /// Lifetime of positive and negative DNS cache entries.
     pub dns_cache_ttl: Duration,
+    /// Explicit recursive DNS servers; an empty list uses system configuration.
     pub dns_servers: Vec<SocketAddr>,
+    /// Shared budget for TCP attempts across all addresses returned by one resolution.
     pub tcp_connect_timeout: Duration,
+    /// Maximum duration from starting to completing a downstream client TLS handshake.
     pub client_tls_handshake_timeout: Duration,
+    /// Maximum duration of each upstream TLS handshake after its TCP route is established.
     pub upstream_tls_handshake_timeout: Duration,
+    /// Maximum wait after request send for the upstream response head to begin.
+    ///
+    /// HTTP/1 records TTFB at the first response byte; HTTP/2 completes this
+    /// stage when the response headers become available.
     pub upstream_ttfb_timeout: Duration,
+    /// Absolute deadline from data-plane request dispatch through response completion.
+    ///
+    /// The downstream request head is parsed before this clock starts. Every
+    /// later stage budget is clipped to the time remaining.
     pub request_total_timeout: Duration,
 }
 
 impl ProxyConfig {
+    /// Creates a configuration with production defaults and the supplied storage root.
     pub fn new(storage: impl Into<PathBuf>) -> Self {
         Self {
             storage: storage.into(),
@@ -105,6 +152,12 @@ impl Default for ProxyConfig {
 }
 
 #[derive(Clone)]
+/// Thread-safe runtime state shared by connection handlers.
+///
+/// Clones share atomic rule snapshots, trace collection, the DNS resolver and
+/// bounded caches. Configuration is copied but cannot be mutated through the
+/// public API. Construction performs the initial rule load and optional watcher
+/// setup before any clone can be handed to a connection thread.
 pub struct SharedState {
     pub(crate) config: ProxyConfig,
     pub(crate) rules: RuleStore,
@@ -118,7 +171,10 @@ pub struct SharedState {
 }
 
 impl SharedState {
-    /// Builds all runtime-owned resources from the data-plane configuration.
+    /// Builds all runtime-owned resources before publishing a usable state.
+    ///
+    /// Initial rules and DNS configuration are validated synchronously. When
+    /// enabled, the rules watcher is retained for the lifetime of all clones.
     pub fn new(config: ProxyConfig) -> EngineResult<Self> {
         let rules = RuleStore::load(&config.storage)?;
         let rule_watch = if config.rules_watch {
@@ -167,6 +223,7 @@ impl SharedState {
         Ok(state)
     }
 
+    /// Creates a cloneable control handle sharing this runtime's mutable subsystems.
     pub fn handle(&self) -> EngineHandle {
         EngineHandle::new(self.clone())
     }

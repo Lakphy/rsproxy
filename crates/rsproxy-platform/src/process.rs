@@ -1,6 +1,7 @@
 use crate::{PlatformError, PlatformResult};
 use std::process::Command;
 
+/// Parses a pidfile value and rejects non-numeric, zero, and init-process identifiers.
 pub fn parse_pid(input: &str) -> PlatformResult<u32> {
     let pid = input.trim().parse::<u32>().map_err(|_| {
         PlatformError::InvalidState("pidfile does not contain a numeric process id".to_string())
@@ -14,6 +15,9 @@ pub fn parse_pid(input: &str) -> PlatformResult<u32> {
 }
 
 #[cfg(unix)]
+/// Configures a child command to start in a new session after fork and before exec.
+///
+/// The change takes effect when the command is spawned; failure of `setsid` fails that spawn.
 pub fn detach_daemon(command: &mut Command) {
     use std::os::unix::process::CommandExt;
 
@@ -30,6 +34,7 @@ pub fn detach_daemon(command: &mut Command) {
 }
 
 #[cfg(windows)]
+/// Configures a child command as a detached process in a new process group.
 pub fn detach_daemon(command: &mut Command) {
     use std::os::windows::process::CommandExt;
     use windows_sys::Win32::System::Threading::{CREATE_NEW_PROCESS_GROUP, DETACHED_PROCESS};
@@ -38,9 +43,11 @@ pub fn detach_daemon(command: &mut Command) {
 }
 
 #[cfg(all(not(unix), not(windows)))]
+/// Leaves child process settings unchanged on platforms without a supported detach mechanism.
 pub fn detach_daemon(_command: &mut Command) {}
 
 #[cfg(unix)]
+/// Tests whether `pid` exists or is inaccessible to the caller without sending a signal.
 pub fn process_alive(pid: u32) -> bool {
     let Ok(pid) = i32::try_from(pid) else {
         return false;
@@ -52,6 +59,9 @@ pub fn process_alive(pid: u32) -> bool {
 }
 
 #[cfg(unix)]
+/// Sends `SIGTERM` to `pid`, treating an already absent process as successfully terminated.
+///
+/// Callers must ensure the identifier still belongs to the intended process.
 pub fn terminate_process(pid: u32) -> PlatformResult<()> {
     let pid = i32::try_from(pid)
         .map_err(|_| PlatformError::InvalidState(format!("invalid process id {pid}")))?;
@@ -69,6 +79,7 @@ pub fn terminate_process(pid: u32) -> PlatformResult<()> {
 }
 
 #[cfg(windows)]
+/// Tests whether `pid` names a running process using a query-only process handle.
 pub fn process_alive(pid: u32) -> bool {
     use windows_sys::Win32::Foundation::{
         CloseHandle, ERROR_ACCESS_DENIED, GetLastError, WAIT_TIMEOUT,
@@ -99,6 +110,9 @@ pub fn process_alive(pid: u32) -> bool {
 }
 
 #[cfg(windows)]
+/// Terminates `pid` immediately through the Windows process API.
+///
+/// Callers must ensure the identifier still belongs to the intended process.
 pub fn terminate_process(pid: u32) -> PlatformResult<()> {
     use windows_sys::Win32::Foundation::CloseHandle;
     use windows_sys::Win32::System::Threading::{OpenProcess, PROCESS_TERMINATE, TerminateProcess};
@@ -128,11 +142,13 @@ pub fn terminate_process(pid: u32) -> PlatformResult<()> {
 }
 
 #[cfg(all(not(unix), not(windows)))]
+/// Returns `false` where process liveness inspection is unsupported.
 pub fn process_alive(_pid: u32) -> bool {
     false
 }
 
 #[cfg(all(not(unix), not(windows)))]
+/// Reports that graceful process termination is unsupported on this target.
 pub fn terminate_process(pid: u32) -> PlatformResult<()> {
     Err(PlatformError::Unsupported(format!(
         "process termination is unsupported for pid {pid}"
@@ -140,6 +156,9 @@ pub fn terminate_process(pid: u32) -> PlatformResult<()> {
 }
 
 #[cfg(unix)]
+/// Sends `SIGKILL` to `pid`, treating an already absent process as successfully terminated.
+///
+/// Callers must ensure the identifier still belongs to the intended process.
 pub fn force_terminate_process(pid: u32) -> PlatformResult<()> {
     let pid = i32::try_from(pid)
         .map_err(|_| PlatformError::InvalidState(format!("invalid process id {pid}")))?;
@@ -157,11 +176,13 @@ pub fn force_terminate_process(pid: u32) -> PlatformResult<()> {
 }
 
 #[cfg(windows)]
+/// Immediately terminates `pid`; Windows uses the same primitive as [`terminate_process`].
 pub fn force_terminate_process(pid: u32) -> PlatformResult<()> {
     terminate_process(pid)
 }
 
 #[cfg(all(not(unix), not(windows)))]
+/// Reports that forced process termination is unsupported on this target.
 pub fn force_terminate_process(pid: u32) -> PlatformResult<()> {
     Err(PlatformError::Unsupported(format!(
         "forced process termination is unsupported for pid {pid}"
@@ -169,9 +190,10 @@ pub fn force_terminate_process(pid: u32) -> PlatformResult<()> {
 }
 
 #[cfg(target_os = "macos")]
+/// Returns the current resident set size for `pid` in KiB, or `None` when unavailable.
 pub fn resident_kib(pid: u32) -> Option<u64> {
     let mut info = std::mem::MaybeUninit::<libc::proc_taskinfo>::zeroed();
-    let size = std::mem::size_of::<libc::proc_taskinfo>();
+    let size = size_of::<libc::proc_taskinfo>();
     // SAFETY: proc_pidinfo receives a correctly sized writable proc_taskinfo;
     // the return-size check proves initialization before assume_init.
     let written = unsafe {
@@ -192,6 +214,9 @@ pub fn resident_kib(pid: u32) -> Option<u64> {
 }
 
 #[cfg(target_os = "linux")]
+/// Reads `/proc/<pid>/status` and returns the current resident set size in KiB.
+///
+/// Returns `None` if procfs is unavailable, the process has exited, or the value cannot be parsed.
 pub fn resident_kib(pid: u32) -> Option<u64> {
     std::fs::read_to_string(format!("/proc/{pid}/status"))
         .ok()?
@@ -204,6 +229,7 @@ pub fn resident_kib(pid: u32) -> Option<u64> {
 }
 
 #[cfg(windows)]
+/// Returns the current process working set for `pid` in KiB, or `None` when unavailable.
 pub fn resident_kib(pid: u32) -> Option<u64> {
     use windows_sys::Win32::Foundation::CloseHandle;
     use windows_sys::Win32::System::ProcessStatus::{
@@ -221,7 +247,7 @@ pub fn resident_kib(pid: u32) -> Option<u64> {
     }
 
     let mut counters = PROCESS_MEMORY_COUNTERS {
-        cb: std::mem::size_of::<PROCESS_MEMORY_COUNTERS>() as u32,
+        cb: size_of::<PROCESS_MEMORY_COUNTERS>() as u32,
         ..PROCESS_MEMORY_COUNTERS::default()
     };
     // SAFETY: `handle` is valid and `counters` is a writable, correctly sized
@@ -230,7 +256,7 @@ pub fn resident_kib(pid: u32) -> Option<u64> {
         GetProcessMemoryInfo(
             handle,
             &raw mut counters,
-            std::mem::size_of::<PROCESS_MEMORY_COUNTERS>() as u32,
+            size_of::<PROCESS_MEMORY_COUNTERS>() as u32,
         )
     };
     // SAFETY: `handle` is a valid owned process handle and is closed exactly once.
@@ -239,6 +265,9 @@ pub fn resident_kib(pid: u32) -> Option<u64> {
 }
 
 #[cfg(not(any(target_os = "macos", target_os = "linux", windows)))]
+/// Queries `ps` for the current resident set size of `pid` in KiB.
+///
+/// Returns `None` if the command fails or its output cannot be parsed.
 pub fn resident_kib(pid: u32) -> Option<u64> {
     let output = Command::new("ps")
         .args(["-o", "rss=", "-p", &pid.to_string()])
@@ -248,6 +277,10 @@ pub fn resident_kib(pid: u32) -> Option<u64> {
 }
 
 #[cfg(unix)]
+/// Selects a Unix-domain control socket path for the given storage root.
+///
+/// Paths up to 96 display bytes remain under `storage/run`; longer paths use a deterministic
+/// per-user name in `/tmp` to stay below common Unix socket address limits.
 pub fn unix_control_socket_path(storage: &std::path::Path) -> std::path::PathBuf {
     use sha2::{Digest, Sha256};
 

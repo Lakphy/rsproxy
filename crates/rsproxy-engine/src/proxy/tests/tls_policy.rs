@@ -4,7 +4,7 @@ use super::*;
 fn upstream_mtls_flag_only_applies_to_origin_tls_paths() {
     let state = test_state();
     let direct = meta("https://origin.test/secure");
-    let rules = rsproxy_rules::RuleSet::parse(
+    let rules = RuleSet::parse(
         "default",
         "origin.test tls(client-cert=client.pem, client-key=client.key)",
     )
@@ -17,7 +17,7 @@ fn upstream_mtls_flag_only_applies_to_origin_tls_paths() {
         &state
     ));
 
-    let proxied = rsproxy_rules::RuleSet::parse(
+    let proxied = RuleSet::parse(
             "default",
             "origin.test upstream(https-proxy://secure-proxy.test:18443) tls(client-cert=client.pem, client-key=client.key)",
         )
@@ -44,7 +44,7 @@ fn upstream_mtls_flag_only_applies_to_origin_tls_paths() {
 fn upstream_tls_policy_flags_apply_without_mtls() {
     let state = test_state();
     let request = meta("https://origin.test/secure");
-    let rules = rsproxy_rules::RuleSet::parse(
+    let rules = RuleSet::parse(
         "default",
         "origin.test tls(min=1.3, ciphers=TLS_AES_128_GCM_SHA256)",
     )
@@ -84,7 +84,7 @@ fn upstream_tls_policy_flags_apply_without_mtls() {
 fn https_origin_via_http_proxy_uses_connect_tunnel() {
     let state = test_state();
     let request = meta("https://origin.test:18443/secure");
-    let rules = rsproxy_rules::RuleSet::parse(
+    let rules = RuleSet::parse(
             "default",
             "origin.test upstream(proxy://127.0.0.1:18888) tls(client-cert=client.pem, client-key=client.key)",
         )
@@ -125,8 +125,8 @@ fn tls_file_path_prefers_storage_relative_files() {
         std::process::id(),
         rsproxy_trace::now_millis()
     ));
-    std::fs::create_dir_all(storage.join("certs")).unwrap();
-    std::fs::write(storage.join("certs/client.pem"), b"cert").unwrap();
+    fs::create_dir_all(storage.join("certs")).unwrap();
+    fs::write(storage.join("certs/client.pem"), b"cert").unwrap();
     let mut state = test_state();
     state.config.storage = storage.clone();
 
@@ -138,14 +138,14 @@ fn tls_file_path_prefers_storage_relative_files() {
         resolve_tls_file_path("certs/missing.pem", &state),
         PathBuf::from("certs/missing.pem")
     );
-    let _ = std::fs::remove_dir_all(storage);
+    let _ = fs::remove_dir_all(storage);
 }
 
 #[test]
 fn upstream_route_parses_https_proxy_tunnel_target() {
     let state = test_state();
     let request = meta("tunnel://secure-origin.test:443");
-    let rules = rsproxy_rules::RuleSet::parse(
+    let rules = RuleSet::parse(
         "default",
         "secure-origin.test bypass upstream(https-proxy://secure-proxy.test:18443)",
     )

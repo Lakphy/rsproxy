@@ -51,7 +51,7 @@ fn h2_request_conversion_maps_pseudo_headers_and_strips_connection_headers() {
 
 #[test]
 fn h2_response_conversion_preserves_body_and_trailers() {
-    let (sender, receiver) = tokio::sync::mpsc::channel(4);
+    let (sender, receiver) = mpsc::channel(4);
     sender
         .try_send(Ok(DownstreamH2ResponseFrame::Data(Bytes::from_static(
             b"hello",
@@ -98,13 +98,13 @@ fn h2_request_trailer_validation_uses_downstream_config() {
     let mut too_many = HeaderMap::new();
     too_many.insert("x-one", "1".parse().unwrap());
     too_many.insert("x-two", "2".parse().unwrap());
-    let error = super::message::request_trailers(&too_many, &config).unwrap_err();
+    let error = message::request_trailers(&too_many, &config).unwrap_err();
     assert_eq!(error.status, StatusCode::REQUEST_HEADER_FIELDS_TOO_LARGE);
     assert!(error.message.contains("trailer count limit exceeded"));
 
     let mut forbidden = HeaderMap::new();
     forbidden.insert("content-length", "1".parse().unwrap());
-    let error = super::message::request_trailers(&forbidden, &config).unwrap_err();
+    let error = message::request_trailers(&forbidden, &config).unwrap_err();
     assert_eq!(error.status, StatusCode::BAD_REQUEST);
     assert!(error.message.contains("forbidden request trailer"));
 }
@@ -145,7 +145,7 @@ fn downstream_h2_server_delegates_streams_through_callback() {
                         .send((method, target, authority, framing, body, trailers))
                         .unwrap();
 
-                    let (body_sender, response_body) = tokio::sync::mpsc::channel(2);
+                    let (body_sender, response_body) = mpsc::channel(2);
                     body_sender
                         .send(Ok(DownstreamH2ResponseFrame::Data(Bytes::from_static(
                             b"callback-response",

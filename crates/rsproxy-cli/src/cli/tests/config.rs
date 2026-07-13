@@ -85,47 +85,48 @@ request_timeout_ms = 1900
         config.api_token.as_deref(),
         Some("0123456789abcdef0123456789abcdef")
     );
-    assert_eq!(config.storage, PathBuf::from("/tmp/rsproxy-from-config"));
-    assert!(config.rules_watch);
-    assert_eq!(config.rules_watch_debounce, Duration::from_millis(75));
-    assert_eq!(config.proxy_auth.as_deref(), Some("alice:secret"));
-    assert_eq!(config.max_header_size, 512 * 1024);
-    assert_eq!(config.max_header_count, 300);
-    assert_eq!(config.body_buffer_limit, 6 * 1024 * 1024);
-    assert_eq!(config.trace_body_limit, 8 * 1024);
-    assert!(config.trace_exclude_media_body);
-    assert_eq!(config.trace_queue_capacity, 33);
-    assert_eq!(config.trace_memory_budget, 48 * 1024 * 1024);
-    assert_eq!(config.trace_spill_segment_size, 1024 * 1024);
-    assert_eq!(config.trace_disk_budget, 2 * 1024 * 1024);
+    let engine = config.engine();
+    assert_eq!(engine.storage, PathBuf::from("/tmp/rsproxy-from-config"));
+    assert!(engine.rules_watch);
+    assert_eq!(engine.rules_watch_debounce, Duration::from_millis(75));
+    assert_eq!(engine.proxy_auth.as_deref(), Some("alice:secret"));
+    assert_eq!(engine.max_header_size, 512 * 1024);
+    assert_eq!(engine.max_header_count, 300);
+    assert_eq!(engine.body_buffer_limit, 6 * 1024 * 1024);
+    assert_eq!(engine.trace_body_limit, 8 * 1024);
+    assert!(engine.trace_exclude_media_body);
+    assert_eq!(engine.trace_queue_capacity, 33);
+    assert_eq!(engine.trace_memory_budget, 48 * 1024 * 1024);
+    assert_eq!(engine.trace_spill_segment_size, 1024 * 1024);
+    assert_eq!(engine.trace_disk_budget, 2 * 1024 * 1024);
     assert_eq!(
-        config.trace_spill_compression,
+        engine.trace_spill_compression,
         rsproxy_trace::TraceSpillCompression::Zstd { level: 2 }
     );
-    assert!(!config.no_mitm);
-    assert!(config.strict_mitm);
-    assert_eq!(config.mitm_cert_cache_capacity, 17);
-    assert_eq!(config.mitm_failure_cache_capacity, 23);
-    assert_eq!(config.mitm_failure_ttl, Duration::from_secs(41));
-    assert_eq!(config.connect_probe_timeout, Duration::from_millis(325));
-    assert_eq!(config.h1_pool_max_active_per_key, 11);
-    assert_eq!(config.h1_pool_wait_timeout, Duration::from_millis(1200));
-    assert_eq!(config.h2_pool_max_active_streams_per_key, 13);
-    assert_eq!(config.h2_pool_wait_timeout, Duration::from_millis(1300));
-    assert_eq!(config.dns_timeout, Duration::from_millis(1400));
-    assert_eq!(config.dns_cache_ttl, Duration::from_secs(23));
-    assert_eq!(config.dns_servers, vec!["9.9.9.9:53".parse().unwrap()]);
-    assert_eq!(config.tcp_connect_timeout, Duration::from_millis(1500));
+    assert!(!engine.no_mitm);
+    assert!(engine.strict_mitm);
+    assert_eq!(engine.mitm_cert_cache_capacity, 17);
+    assert_eq!(engine.mitm_failure_cache_capacity, 23);
+    assert_eq!(engine.mitm_failure_ttl, Duration::from_secs(41));
+    assert_eq!(engine.connect_probe_timeout, Duration::from_millis(325));
+    assert_eq!(engine.h1_pool_max_active_per_key, 11);
+    assert_eq!(engine.h1_pool_wait_timeout, Duration::from_millis(1200));
+    assert_eq!(engine.h2_pool_max_active_streams_per_key, 13);
+    assert_eq!(engine.h2_pool_wait_timeout, Duration::from_millis(1300));
+    assert_eq!(engine.dns_timeout, Duration::from_millis(1400));
+    assert_eq!(engine.dns_cache_ttl, Duration::from_secs(23));
+    assert_eq!(engine.dns_servers, vec!["9.9.9.9:53".parse().unwrap()]);
+    assert_eq!(engine.tcp_connect_timeout, Duration::from_millis(1500));
     assert_eq!(
-        config.client_tls_handshake_timeout,
+        engine.client_tls_handshake_timeout,
         Duration::from_millis(1600)
     );
     assert_eq!(
-        config.upstream_tls_handshake_timeout,
+        engine.upstream_tls_handshake_timeout,
         Duration::from_millis(1700)
     );
-    assert_eq!(config.upstream_ttfb_timeout, Duration::from_millis(1800));
-    assert_eq!(config.request_total_timeout, Duration::from_millis(1900));
+    assert_eq!(engine.upstream_ttfb_timeout, Duration::from_millis(1800));
+    assert_eq!(engine.request_total_timeout, Duration::from_millis(1900));
 
     let _ = fs::remove_file(path);
 }
@@ -268,8 +269,8 @@ fn default_config_is_optional_but_loaded_when_present() {
 
     let no_mitm = temp_config("no-mitm", "no_mitm = true\n");
     let config = runtime_config_with_default_path(&[], Some(no_mitm.clone())).unwrap();
-    assert!(config.no_mitm);
-    assert!(!config.strict_mitm);
+    assert!(config.engine().no_mitm);
+    assert!(!config.engine().strict_mitm);
 
     let _ = fs::remove_file(present);
     let _ = fs::remove_file(no_mitm);

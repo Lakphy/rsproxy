@@ -35,8 +35,7 @@ fn upstream_mtls_succeeds_with_client_identity_and_fails_without_it_over_real_tl
     let mut missing_state = success_state.clone();
     missing_state.rules = RuleStore::from_compiled(
         &missing_state.config.storage,
-        rsproxy_rules::RuleSet::parse("default", &format!("{HOST} host({origin_address})"))
-            .unwrap(),
+        RuleSet::parse("default", &format!("{HOST} host({origin_address})")).unwrap(),
     );
     missing_state.trace = rsproxy_trace::TraceStore::new(8);
 

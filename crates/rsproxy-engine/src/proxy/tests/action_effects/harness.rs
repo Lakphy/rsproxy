@@ -83,7 +83,7 @@ pub(super) fn state_with_rules(name: &str, rules: &str) -> SharedState {
     ));
     state.rules = RuleStore::from_compiled(
         &state.config.storage,
-        rsproxy_rules::RuleSet::parse("effects", rules).unwrap(),
+        RuleSet::parse("effects", rules).unwrap(),
     );
     state
 }

@@ -1,6 +1,7 @@
 use super::*;
 
 impl RuleSet {
+    /// Creates an indexed snapshot with no rules and a fresh publication version.
     pub fn empty() -> Self {
         Self {
             version: now_millis(),
@@ -9,10 +10,17 @@ impl RuleSet {
         }
     }
 
+    /// Parses one named DSL group, returning every source-located error found.
+    ///
+    /// No partially valid snapshot is published when any non-empty line fails.
     pub fn parse(group: &str, text: &str) -> Result<Self, Vec<RuleError>> {
         Self::parse_groups([(group, text)])
     }
 
+    /// Parses groups in iteration order and compiles one immutable candidate index.
+    ///
+    /// Group order precedes line order during resolution. All diagnostics across
+    /// all groups are accumulated before this returns `Err`.
     pub fn parse_groups<I, G, T>(groups: I) -> Result<Self, Vec<RuleError>>
     where
         I: IntoIterator<Item = (G, T)>,
@@ -58,18 +66,26 @@ impl RuleSet {
         }
     }
 
+    /// Resolves request-phase actions with request-body-dependent rules enabled.
+    ///
+    /// Response-only conditions do not match because no response snapshot exists.
     pub fn resolve(&self, req: &RequestMeta) -> ResolveResult {
         self.resolve_inner(req, None, true)
     }
 
+    /// Resolves with an immutable response snapshot available to conditions and templates.
     pub fn resolve_response(&self, req: &RequestMeta, res: &ResponseMeta) -> ResolveResult {
         self.resolve_inner(req, Some(res), true)
     }
 
+    /// Resolves request-phase actions while omitting body-dependent conditions and actions.
+    ///
+    /// Non-body operations in a mixed [`DeleteOp`] action are retained.
     pub fn resolve_without_request_body(&self, req: &RequestMeta) -> ResolveResult {
         self.resolve_inner(req, None, false)
     }
 
+    /// Resolves response-phase actions without evaluating or returning request-body work.
     pub fn resolve_response_without_request_body(
         &self,
         req: &RequestMeta,
@@ -78,6 +94,10 @@ impl RuleSet {
         self.resolve_inner(req, Some(res), false)
     }
 
+    /// Reports whether any still-viable rule needs the request body to decide or execute.
+    ///
+    /// Matcher and body-independent conditions are evaluated first, avoiding body
+    /// buffering when every candidate has already been ruled out.
     pub fn request_body_required(&self, req: &RequestMeta) -> bool {
         let parts = UrlParts::parse(&req.url);
         self.candidate_rule_indices(parts.as_ref().ok(), &req.url)
@@ -243,14 +263,17 @@ impl RuleSet {
         indices
     }
 
+    /// Returns candidate-index counts for diagnostics and local resolver benchmarks.
     pub fn stats(&self) -> RuleSetStats {
         self.index.stats(&self.rules)
     }
 
+    /// Formats request-phase resolution as stable human-readable rule provenance.
     pub fn explain(&self, req: &RequestMeta) -> String {
         explain_result(self.resolve(req), req)
     }
 
+    /// Formats response-aware resolution with response templates available.
     pub fn explain_response(&self, req: &RequestMeta, res: &ResponseMeta) -> String {
         explain_result(self.resolve_response(req, res), req)
     }

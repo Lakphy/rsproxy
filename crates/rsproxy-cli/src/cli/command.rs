@@ -7,10 +7,12 @@ mod proxy;
 mod rules;
 mod trace;
 
-pub use ca::{CaArgs, CaCommand, CaExportArgs, CaInitArgs, CaIssueArgs, CaStatusArgs, CaTrustArgs};
-pub use proxy::{ProxyArgs, ProxyCommand, ProxyMutationArgs, ProxyPlatformArg};
-pub use rules::{RequestArgs, RulesArgs, RulesBenchArgs, RulesCommand, RulesTestArgs};
-pub use trace::{ReplayArgs, TraceArgs, TraceCommand, TuiArgs, ValuesArgs, ValuesCommand};
+pub(crate) use ca::{
+    CaArgs, CaCommand, CaExportArgs, CaInitArgs, CaIssueArgs, CaStatusArgs, CaTrustArgs,
+};
+pub(crate) use proxy::{ProxyArgs, ProxyCommand, ProxyMutationArgs, ProxyPlatformArg};
+pub(crate) use rules::{RequestArgs, RulesArgs, RulesBenchArgs, RulesCommand, RulesTestArgs};
+pub(crate) use trace::{ReplayArgs, TraceArgs, TraceCommand, TuiArgs, ValuesArgs, ValuesCommand};
 
 #[derive(Parser)]
 #[command(
@@ -18,17 +20,21 @@ pub use trace::{ReplayArgs, TraceArgs, TraceCommand, TuiArgs, ValuesArgs, Values
     version,
     about = "Local intercepting proxy and rule engine"
 )]
+/// Parsed top-level CLI state passed across the executable/library boundary.
+///
+/// Subcommand details remain owned by this crate; external callers inspect the
+/// global JSON flag and pass the value to [`crate::run_parsed`].
 pub struct Cli {
     /// Emit machine-readable JSON where the selected command supports it.
     #[arg(long, global = true)]
     pub json: bool,
 
     #[command(subcommand)]
-    pub command: Option<TopLevelCommand>,
+    pub(crate) command: Option<TopLevelCommand>,
 }
 
 #[derive(Subcommand)]
-pub enum TopLevelCommand {
+pub(crate) enum TopLevelCommand {
     /// Run the proxy in the foreground.
     Run(RuntimeArgs),
     /// Start the proxy as a daemon.
@@ -58,19 +64,19 @@ pub enum TopLevelCommand {
 }
 
 #[derive(Clone, Default, Args)]
-pub struct ClientArgs {
+pub(crate) struct ClientArgs {
     /// Control endpoint (HOST:PORT, unix:/path.sock, or pipe:NAME).
     #[arg(long, global = true)]
-    pub api: Option<String>,
+    pub(crate) api: Option<String>,
     /// Control API bearer token.
     #[arg(long, global = true)]
-    pub api_token: Option<String>,
+    pub(crate) api_token: Option<String>,
     /// Data and runtime storage directory.
     #[arg(long, global = true)]
-    pub storage: Option<PathBuf>,
+    pub(crate) storage: Option<PathBuf>,
     /// TOML configuration file.
     #[arg(long, global = true)]
-    pub config: Option<PathBuf>,
+    pub(crate) config: Option<PathBuf>,
 }
 
 impl fmt::Debug for ClientArgs {
@@ -86,82 +92,82 @@ impl fmt::Debug for ClientArgs {
 }
 
 #[derive(Clone, Default, Args)]
-pub struct RuntimeArgs {
+pub(crate) struct RuntimeArgs {
     #[command(flatten)]
-    pub client: ClientArgs,
+    pub(crate) client: ClientArgs,
 
     #[arg(short = 'p', long)]
-    pub port: Option<u16>,
+    pub(crate) port: Option<u16>,
     #[arg(long)]
-    pub host: Option<String>,
+    pub(crate) host: Option<String>,
     #[arg(long)]
-    pub watch: bool,
+    pub(crate) watch: bool,
     #[arg(long)]
-    pub watch_debounce_ms: Option<u64>,
+    pub(crate) watch_debounce_ms: Option<u64>,
     #[arg(long)]
-    pub proxy_auth: Option<String>,
+    pub(crate) proxy_auth: Option<String>,
     #[arg(long)]
-    pub max_header_size: Option<String>,
+    pub(crate) max_header_size: Option<String>,
     #[arg(long)]
-    pub max_header_count: Option<usize>,
+    pub(crate) max_header_count: Option<usize>,
     #[arg(long)]
-    pub body_buffer_limit: Option<String>,
+    pub(crate) body_buffer_limit: Option<String>,
     #[arg(long)]
-    pub trace_body_limit: Option<String>,
+    pub(crate) trace_body_limit: Option<String>,
     #[arg(long)]
-    pub trace_filter: Option<String>,
+    pub(crate) trace_filter: Option<String>,
     #[arg(long)]
-    pub trace_queue_capacity: Option<usize>,
+    pub(crate) trace_queue_capacity: Option<usize>,
     #[arg(long)]
-    pub trace_mem_budget: Option<String>,
+    pub(crate) trace_mem_budget: Option<String>,
     #[arg(long)]
-    pub trace_segment_size: Option<String>,
+    pub(crate) trace_segment_size: Option<String>,
     #[arg(long)]
-    pub trace_disk_budget: Option<String>,
+    pub(crate) trace_disk_budget: Option<String>,
     #[arg(long)]
-    pub trace_spill_compression: Option<String>,
+    pub(crate) trace_spill_compression: Option<String>,
     #[arg(long)]
-    pub no_mitm: bool,
+    pub(crate) no_mitm: bool,
     #[arg(long)]
-    pub strict_mitm: bool,
+    pub(crate) strict_mitm: bool,
     #[arg(long)]
-    pub mitm_cert_cache_capacity: Option<usize>,
+    pub(crate) mitm_cert_cache_capacity: Option<usize>,
     #[arg(long)]
-    pub mitm_failure_cache_capacity: Option<usize>,
+    pub(crate) mitm_failure_cache_capacity: Option<usize>,
     #[arg(long)]
-    pub mitm_failure_ttl_seconds: Option<u64>,
+    pub(crate) mitm_failure_ttl_seconds: Option<u64>,
     #[arg(long)]
-    pub connect_probe_timeout_ms: Option<u64>,
+    pub(crate) connect_probe_timeout_ms: Option<u64>,
     #[arg(long)]
-    pub h1_pool_max_active_per_key: Option<usize>,
+    pub(crate) h1_pool_max_active_per_key: Option<usize>,
     #[arg(long)]
-    pub h1_pool_wait_timeout_ms: Option<u64>,
+    pub(crate) h1_pool_wait_timeout_ms: Option<u64>,
     #[arg(long)]
-    pub h2_pool_max_active_streams_per_key: Option<usize>,
+    pub(crate) h2_pool_max_active_streams_per_key: Option<usize>,
     #[arg(long)]
-    pub h2_pool_wait_timeout_ms: Option<u64>,
+    pub(crate) h2_pool_wait_timeout_ms: Option<u64>,
     #[arg(long)]
-    pub tcp_connect_timeout_ms: Option<u64>,
+    pub(crate) tcp_connect_timeout_ms: Option<u64>,
     #[arg(long)]
-    pub dns_timeout_ms: Option<u64>,
+    pub(crate) dns_timeout_ms: Option<u64>,
     #[arg(long)]
-    pub dns_cache: Option<u64>,
+    pub(crate) dns_cache: Option<u64>,
     #[arg(long, action = clap::ArgAction::Append)]
-    pub dns_server: Vec<String>,
+    pub(crate) dns_server: Vec<String>,
     #[arg(long)]
-    pub client_tls_handshake_timeout_ms: Option<u64>,
+    pub(crate) client_tls_handshake_timeout_ms: Option<u64>,
     #[arg(long)]
-    pub upstream_tls_handshake_timeout_ms: Option<u64>,
+    pub(crate) upstream_tls_handshake_timeout_ms: Option<u64>,
     #[arg(long)]
-    pub upstream_ttfb_timeout_ms: Option<u64>,
+    pub(crate) upstream_ttfb_timeout_ms: Option<u64>,
     #[arg(long)]
-    pub request_timeout_ms: Option<u64>,
+    pub(crate) request_timeout_ms: Option<u64>,
     #[arg(long)]
-    pub no_trace_body: bool,
+    pub(crate) no_trace_body: bool,
 }
 
 impl RuntimeArgs {
-    pub fn from_client(client: ClientArgs) -> Self {
+    pub(crate) fn from_client(client: ClientArgs) -> Self {
         Self {
             client,
             ..Self::default()
@@ -170,13 +176,13 @@ impl RuntimeArgs {
 }
 
 #[derive(Args)]
-pub struct CompletionsArgs {
+pub(crate) struct CompletionsArgs {
     #[arg(value_enum)]
-    pub shell: CompletionShell,
+    pub(crate) shell: CompletionShell,
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, ValueEnum)]
-pub enum CompletionShell {
+pub(crate) enum CompletionShell {
     Bash,
     Zsh,
     Fish,

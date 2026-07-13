@@ -140,7 +140,7 @@ fn ratatui_frame_renders_status_table_detail_and_footer_without_overlap() {
         detail_tab: DetailTab::Headers,
         replay_status: Some("replayed id=1 status=200".to_string()),
         snapshot,
-        last_refresh: std::time::Instant::now(),
+        last_refresh: Instant::now(),
     };
     let backend = TestBackend::new(120, 30);
     let mut terminal = Terminal::new(backend).unwrap();
@@ -222,7 +222,7 @@ fn app_refresh_and_replay_use_live_control_api_and_preserve_selection() {
             selected_detail: None,
             error: None,
         },
-        last_refresh: std::time::Instant::now(),
+        last_refresh: Instant::now(),
     };
     app.refresh();
     assert_eq!(app.selected, 0);

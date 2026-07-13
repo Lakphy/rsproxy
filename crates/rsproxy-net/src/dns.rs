@@ -14,12 +14,17 @@ use std::time::Duration;
 const DNS_CACHE_CAPACITY: u64 = 8_192;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+/// Resolver inputs applied uniformly to system and explicitly configured servers.
 pub struct DnsConfig {
+    /// DNS server socket addresses, or an empty list to use the system configuration.
     pub servers: Vec<SocketAddr>,
+    /// Maximum wall time for one lookup, measured from resolver dispatch.
     pub timeout: Duration,
+    /// Maximum positive and negative cache lifetime; zero disables caching.
     pub cache_ttl: Duration,
 }
 
+/// Synchronous facade over the shared Tokio DNS resolver and its counters.
 pub struct DnsResolver {
     resolver: TokioResolver,
     timeout: Duration,
@@ -36,15 +41,22 @@ struct DnsStats {
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+/// Monotonic resolver counters captured at one instant.
 pub struct DnsStatsSnapshot {
+    /// Hostname lookups dispatched to DNS, excluding IP-literal bypasses.
     pub lookups: u64,
+    /// DNS lookups that returned at least one unique address.
     pub successes: u64,
+    /// DNS lookups that failed, including timeouts.
     pub failures: u64,
+    /// Failed lookups whose caller-owned wall-clock timeout elapsed.
     pub timeouts: u64,
+    /// Targets parsed as IP literals without contacting DNS.
     pub literal_bypasses: u64,
 }
 
 impl DnsResolver {
+    /// Builds a resolver from explicit servers or the host's resolver configuration.
     pub fn new(config: &DnsConfig) -> NetResult<Self> {
         let mut builder = if config.servers.is_empty() {
             TokioResolver::builder_tokio().map_err(|error| NetError::Protocol {
@@ -91,10 +103,12 @@ impl DnsResolver {
         })
     }
 
+    /// Resolves `host:port` using the timeout captured when this resolver was built.
     pub fn resolve_socket_addrs(&self, target: &str) -> io::Result<Vec<SocketAddr>> {
         self.resolve_socket_addrs_with_timeout(target, self.timeout)
     }
 
+    /// Resolves `host:port`, timing from lookup dispatch until the resolver completes.
     pub fn resolve_socket_addrs_with_timeout(
         &self,
         target: &str,
@@ -150,6 +164,7 @@ impl DnsResolver {
         }
     }
 
+    /// Reads the current counters without resetting them.
     pub fn stats(&self) -> DnsStatsSnapshot {
         DnsStatsSnapshot {
             lookups: self.stats.lookups.load(Ordering::Relaxed),

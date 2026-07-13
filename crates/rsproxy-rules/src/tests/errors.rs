@@ -45,8 +45,7 @@ fn internal_parser_errors_retain_typed_numeric_and_regex_sources() {
         }
     ));
 
-    let regex =
-        crate::template::transform::validate_template("${x.replace(/[/, value)}").unwrap_err();
+    let regex = template::transform::validate_template("${x.replace(/[/, value)}").unwrap_err();
     assert!(matches!(
         regex,
         RuleModelError::InvalidRegex {

@@ -106,7 +106,7 @@ impl H2Pool {
 impl Drop for H2PoolLease {
     fn drop(&mut self) {
         let state = h2_pool();
-        let mut pool = state.inner.lock().unwrap();
+        let mut pool = state.inner.lock().expect("HTTP/2 pool lock poisoned");
         pool.release(&self.key);
         if let Some(generation) = self.connector_generation {
             pool.cancel_connector(&self.key, generation);
@@ -171,7 +171,7 @@ pub(super) fn wait_for_entry_or_connector(
     started: Instant,
 ) -> io::Result<Option<PoolEntry>> {
     let state = h2_pool();
-    let mut pool = state.inner.lock().unwrap();
+    let mut pool = state.inner.lock().expect("HTTP/2 pool lock poisoned");
     loop {
         if let Some(entry) = pool.get(pool_key) {
             return Ok(Some(entry));
@@ -223,7 +223,7 @@ pub(super) fn remove_pool_entry(key: &str, generation: u64) {
     h2_pool()
         .inner
         .lock()
-        .unwrap()
+        .expect("HTTP/2 pool lock poisoned")
         .remove_if_generation(key, generation);
 }
 
@@ -231,7 +231,7 @@ pub(super) fn spawn_idle_eviction(key: String, generation: u64) {
     tokio::spawn(async move {
         loop {
             tokio::time::sleep(H2_POOL_IDLE_TTL).await;
-            let mut pool = h2_pool().inner.lock().unwrap();
+            let mut pool = h2_pool().inner.lock().expect("HTTP/2 pool lock poisoned");
             let Some(entry) = pool.entries.get(&key) else {
                 return;
             };

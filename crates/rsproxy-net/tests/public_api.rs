@@ -1,3 +1,6 @@
+//! Compile-time and behavioral smoke tests for the networking facade.
+#![allow(clippy::unwrap_used)]
+
 use bytes::Bytes;
 use rsproxy_net::{
     ActivityStore, AsyncIo, DnsConfig, DnsResolver, DnsStatsSnapshot, DownstreamH2Config,

@@ -29,7 +29,11 @@ pub(super) fn decide(
         && !rule_bypass
         && ca_initialized
         && !state.config.strict_mitm
-        && state.mitm_failures.lock().unwrap().is_active(&host);
+        && state
+            .mitm_failures
+            .lock()
+            .expect("MITM failure cache lock poisoned")
+            .is_active(&host);
     let reason = passthrough_reason(
         state.config.no_mitm,
         rule_bypass,

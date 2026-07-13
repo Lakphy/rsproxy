@@ -1,5 +1,6 @@
 use super::*;
 
+/// Writes a complete HTTP/1.1 response and flushes the destination.
 pub fn write_response<W: Write + ?Sized>(
     stream: &mut W,
     status: u16,
@@ -23,6 +24,7 @@ pub(crate) fn write_response_with_connection<W: Write + ?Sized>(
     )
 }
 
+/// Writes a complete response for an explicit HTTP version and connection policy.
 pub fn write_response_with_version_and_connection<W: Write + ?Sized>(
     stream: &mut W,
     version: &str,
@@ -62,6 +64,7 @@ pub fn write_response_with_version_and_connection<W: Write + ?Sized>(
     stream.flush()
 }
 
+/// Writes a response status line and headers without body bytes.
 pub fn write_response_head<W: Write + ?Sized>(
     stream: &mut W,
     head: &RawResponseHead,
@@ -70,6 +73,7 @@ pub fn write_response_head<W: Write + ?Sized>(
     write_response_head_with_connection(stream, head, headers, false)
 }
 
+/// Writes a response head after normalizing its connection header.
 pub fn write_response_head_with_connection<W: Write + ?Sized>(
     stream: &mut W,
     head: &RawResponseHead,
@@ -102,6 +106,7 @@ pub fn write_response_head_with_connection<W: Write + ?Sized>(
     stream.write_all(&encoded)
 }
 
+/// Returns the first ASCII-case-insensitive header value.
 pub fn header<'a>(headers: &'a [(String, String)], name: &str) -> Option<&'a str> {
     headers
         .iter()
@@ -109,6 +114,7 @@ pub fn header<'a>(headers: &'a [(String, String)], name: &str) -> Option<&'a str
         .map(|(_, value)| value.as_str())
 }
 
+/// Replaces the first matching header or appends one canonical entry.
 pub fn set_header(headers: &mut Vec<(String, String)>, name: &str, value: String) {
     if let Some((_, existing)) = headers
         .iter_mut()
@@ -120,10 +126,12 @@ pub fn set_header(headers: &mut Vec<(String, String)>, name: &str, value: String
     }
 }
 
+/// Removes all ASCII-case-insensitive occurrences of a header.
 pub fn remove_header(headers: &mut Vec<(String, String)>, name: &str) {
     headers.retain(|(header_name, _)| !header_name.eq_ignore_ascii_case(name));
 }
 
+/// Returns the standard reason phrase used by the HTTP/1 response writer.
 pub fn reason_phrase(status: u16) -> &'static str {
     match status {
         200 => "OK",

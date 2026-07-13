@@ -37,7 +37,7 @@ pub(super) fn handle_connect(
     let hidden = trace_hidden(&resolved.actions);
     let deadline = RequestDeadline::new(state.config.request_total_timeout)?;
 
-    match super::connect_policy::decide(&state, &target, &resolved.actions) {
+    match connect_policy::decide(&state, &target, &resolved.actions) {
         ConnectDecision::Passthrough { flags } => {
             session.flags.extend(flags);
             handle_passthrough(PassthroughInput {
@@ -59,7 +59,7 @@ pub(super) fn handle_connect(
             let probe_timeout = deadline
                 .remaining()?
                 .min(state.config.connect_probe_timeout);
-            let protocol = match super::probe::detect(&mut client, probe_timeout) {
+            let protocol = match probe::detect(&mut client, probe_timeout) {
                 Ok(protocol) => protocol,
                 Err(error) => {
                     session.status = Some(502);
@@ -126,28 +126,20 @@ fn handle_inspected(input: InspectedInput) -> io::Result<()> {
         ConnectProtocol::Tls => {
             session.flags.push("connect-probe-tls".to_string());
             initial_flags.push("connect-probe-tls".to_string());
-            super::mitm::handle_connect_mitm(
-                client,
-                target,
-                host,
-                state,
-                session,
-                hidden,
-                initial_flags,
-            )
+            mitm::handle_connect_mitm(client, target, host, state, session, hidden, initial_flags)
         }
         ConnectProtocol::Http => {
             session.flags.push("connect-probe-http".to_string());
             initial_flags.push("connect-probe-http".to_string());
             initial_flags.push("connect-http".to_string());
             let mut client = client;
-            super::inner_http::serve(
+            inner_http::serve(
                 &mut client,
                 state,
                 target,
                 session,
                 hidden,
-                super::inner_http::ConnectHttpMode::Plain {
+                inner_http::ConnectHttpMode::Plain {
                     first_flags: initial_flags,
                 },
             )

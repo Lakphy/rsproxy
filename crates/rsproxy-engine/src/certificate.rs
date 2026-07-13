@@ -18,6 +18,7 @@ pub struct CaMaterial {
 }
 
 impl CaMaterial {
+    /// Wraps an already-validated PEM certificate/key pair without reading disk.
     pub fn from_pem(
         certificate_pem: impl Into<Arc<str>>,
         private_key_pem: impl Into<Arc<str>>,
@@ -28,10 +29,12 @@ impl CaMaterial {
         }
     }
 
+    /// Borrows the root certificate PEM supplied at construction.
     pub fn certificate_pem(&self) -> &str {
         &self.certificate_pem
     }
 
+    /// Borrows the root private-key PEM; callers must keep it out of logs.
     pub fn private_key_pem(&self) -> &str {
         &self.private_key_pem
     }
@@ -50,8 +53,11 @@ impl fmt::Debug for CaMaterial {
 /// PEM material for a leaf certificate signed by an rsproxy root CA.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct IssuedLeafCertificate {
+    /// PEM-encoded leaf certificate.
     pub certificate_pem: String,
+    /// PEM-encoded leaf private key generated for this issuance.
     pub private_key_pem: String,
+    /// PEM chain containing the leaf followed by its signing root.
     pub chain_pem: String,
 }
 

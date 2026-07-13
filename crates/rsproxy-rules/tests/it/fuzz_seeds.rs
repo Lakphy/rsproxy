@@ -1,6 +1,4 @@
-#[path = "support/fuzz_harness.rs"]
-mod fuzz_harness;
-
+use crate::fuzz_harness;
 use rsproxy_rules::RuleSet;
 use std::fs;
 use std::path::{Path, PathBuf};

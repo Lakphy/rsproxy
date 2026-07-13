@@ -2,6 +2,7 @@ use std::io;
 use std::sync::OnceLock;
 use tokio::runtime::{Builder as RuntimeBuilder, Runtime};
 
+/// Returns the process-wide Tokio runtime used by synchronous HTTP/2 and DNS facades.
 pub fn h2_runtime() -> io::Result<&'static Runtime> {
     static RUNTIME: OnceLock<Runtime> = OnceLock::new();
     if let Some(runtime) = RUNTIME.get() {

@@ -1,3 +1,8 @@
+//! Blocking clients and authentication discovery for the control protocol.
+//!
+//! Requests select TCP, Unix-domain socket or Windows named-pipe transport from
+//! the endpoint prefix while preserving one response/error contract.
+
 use crate::server::{unix_api_path, windows_pipe_path};
 use crate::{ControlError, ControlResult};
 use std::io::{BufRead, BufReader, Read, Write};
@@ -11,9 +16,14 @@ pub use auth::{
     api_token_path, prepare_server_api_auth, resolve_client_api_token, validate_api_token,
 };
 
-/// Configures the bearer token sent by subsequent control API requests.
+/// Configures the process-global bearer token copied into subsequent client requests.
+///
+/// The token is stored behind a read/write lock, so setting it is atomic with
+/// respect to concurrent requests. Passing `None` removes the authorization header.
 pub fn set_api_token(token: Option<String>) {
-    *api_token_state().write().expect("API token state poisoned") = token;
+    *api_token_state()
+        .write()
+        .expect("API token state lock poisoned") = token;
 }
 
 fn api_token_state() -> &'static RwLock<Option<String>> {
@@ -24,11 +34,19 @@ fn api_token_state() -> &'static RwLock<Option<String>> {
 fn configured_api_token() -> Option<String> {
     api_token_state()
         .read()
-        .expect("API token state poisoned")
+        .expect("API token state lock poisoned")
         .clone()
 }
 
-/// Sends one request to the configured control API endpoint.
+/// Sends one connection-closing HTTP/1.1 request and returns its response body.
+///
+/// Transport is selected from `api`: `unix:` uses a Unix socket, `pipe:` or
+/// `npipe:` uses a Windows named pipe, and all other values are TCP addresses.
+/// The configured bearer token is copied when the request is built. TCP and Unix
+/// reads have a five-second timeout. Non-2xx responses become
+/// [`ControlError::HttpStatus`], while malformed response framing becomes
+/// [`ControlError::Protocol`]. Response bytes are converted to a string with
+/// invalid UTF-8 replaced lossily.
 pub fn api_request(method: &str, api: &str, path: &str, body: &str) -> ControlResult<String> {
     if let Some(socket_path) = unix_api_path(api) {
         return api_request_unix(method, api, socket_path, path, body);
@@ -46,7 +64,12 @@ pub fn api_request(method: &str, api: &str, path: &str, body: &str) -> ControlRe
     api_request_stream(&mut stream, method, api, path, body)
 }
 
-/// Streams newline-delimited response records from the control API.
+/// Sends a GET and streams non-empty newline-delimited response records.
+///
+/// The callback receives lines without CR/LF and returning `false` ends the
+/// operation successfully. Empty heartbeat lines are ignored. TCP and Unix reads
+/// time out after 65 seconds without data; an unexpected EOF is a protocol error.
+/// Transport and authentication selection match [`api_request`].
 pub fn api_stream_lines(
     api: &str,
     path: &str,

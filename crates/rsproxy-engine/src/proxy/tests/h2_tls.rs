@@ -132,8 +132,7 @@ fn h2_bridge_reuses_rule_and_trace_pipeline() {
     let mut state = test_state();
     state.rules = RuleStore::from_compiled(
         &state.config.storage,
-        rsproxy_rules::RuleSet::parse("default", "example.test status(218) tag(h2:${path})")
-            .unwrap(),
+        RuleSet::parse("default", "example.test status(218) tag(h2:${path})").unwrap(),
     );
     let request = RawRequest {
         method: "POST".to_string(),
@@ -193,7 +192,7 @@ fn upstream_h2_response_reuses_response_rules_and_preserves_grpc_trailers() {
     let mut state = test_state();
     state.rules = RuleStore::from_compiled(
         &state.config.storage,
-        rsproxy_rules::RuleSet::parse(
+        RuleSet::parse(
             "default",
             "example.test res.header(x-h2-rule: yes) res.trailer(x-rule-trailer: done) when status(200)",
         )
@@ -256,7 +255,7 @@ fn http10_buffered_response_uses_length_and_suppresses_trailers() {
     let mut state = test_state();
     state.rules = RuleStore::from_compiled(
         &state.config.storage,
-        rsproxy_rules::RuleSet::parse(
+        RuleSet::parse(
             "default",
             "example.test res.trailer(x-rule-trailer: legacy)",
         )

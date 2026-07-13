@@ -13,9 +13,8 @@ use std::fs;
 use std::path::Path;
 
 pub(super) fn ca_cmd(args: CaArgs, json: bool) -> CliResult<()> {
-    let storage = runtime_config(&RuntimeArgs::from_client(args.client))?
-        .storage
-        .clone();
+    let config = runtime_config(&RuntimeArgs::from_client(args.client))?;
+    let storage = config.engine().storage.clone();
     let ca_directory = storage.join("ca");
     match args.command {
         None => ca_status(CaStatusArgs { keychain: None }, &ca_directory, json),

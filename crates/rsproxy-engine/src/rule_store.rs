@@ -16,19 +16,30 @@ pub(crate) use watch::RuleWatchHandle;
 pub use watch::RuleWatchStatus;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+/// One ordered, independently enabled rule source persisted under the rules directory.
 pub struct RuleGroup {
+    /// Stable group identifier used for storage and control API lookup.
     pub name: String,
+    /// Whether this group's rules participate in the compiled active set.
     pub enabled: bool,
+    /// Original DSL text preserved for editing and export.
     pub text: String,
 }
 
 #[derive(Clone, Debug)]
+/// Immutable ordered rules view published atomically to request handlers.
 pub struct RuleSnapshot {
+    /// All configured groups, including disabled groups, in evaluation order.
     pub groups: Vec<RuleGroup>,
+    /// Compiled rule set containing only enabled groups.
     pub compiled: RuleSet,
 }
 
 #[derive(Clone)]
+/// Cloneable rule repository with atomic reader snapshots and serialized writes.
+///
+/// An update is compiled and persisted before publication, so readers retain a
+/// valid previous snapshot if validation or storage fails.
 pub struct RuleStore {
     inner: Arc<RuleStoreInner>,
 }
@@ -41,19 +52,35 @@ struct RuleStoreInner {
 }
 
 #[derive(Debug)]
+/// Validation, compilation, persistence or watcher failure from [`RuleStore`].
 pub enum RuleStoreError {
+    /// A group name or requested mutation violates a store invariant.
     Invalid(String),
+    /// The requested named group does not exist.
     NotFound(String),
+    /// One or more DSL diagnostics prevented snapshot compilation.
     Parse(Vec<RuleError>),
-    Io { context: String, source: io::Error },
+    /// A filesystem operation failed before a new snapshot could be published.
+    Io {
+        /// Description of the failed storage operation.
+        context: String,
+        /// Underlying filesystem error.
+        source: io::Error,
+    },
+    /// Filesystem watching could not be created or maintained.
     Watch(notify::Error),
 }
 
 impl RuleStore {
+    /// Validates a group name using the same rules as persistent mutations.
     pub fn validate_name(name: &str) -> Result<(), RuleStoreError> {
         validate_group_name(name)
     }
 
+    /// Loads all persisted groups and compiles the initial atomic snapshot.
+    ///
+    /// Missing storage is treated as an empty/default store; malformed existing
+    /// rules are returned rather than silently discarded.
     pub fn load(storage: &Path) -> Result<Self, RuleStoreError> {
         let rules_dir = storage.join("rules");
         let snapshot = load_snapshot(&rules_dir)?;
@@ -87,6 +114,7 @@ impl RuleStore {
         }
     }
 
+    /// Clones the currently published immutable snapshot without blocking writers.
     pub fn snapshot(&self) -> Arc<RuleSnapshot> {
         self.inner.snapshot.load_full()
     }
@@ -95,9 +123,10 @@ impl RuleStore {
         Arc::as_ptr(&self.inner) as usize
     }
 
+    /// Creates or replaces a group after compiling the complete prospective snapshot.
     pub fn set_group(&self, name: &str, text: String) -> Result<Arc<RuleSnapshot>, RuleStoreError> {
         validate_group_name(name)?;
-        let _update = self.inner.update.lock().expect("rule store poisoned");
+        let _update = self.inner.update.lock().expect("rule store lock poisoned");
         let current = self.snapshot();
         let mut groups = current.groups.clone();
         match groups.iter_mut().find(|group| group.name == name) {
@@ -115,7 +144,7 @@ impl RuleStore {
             .groups
             .iter()
             .find(|group| group.name == name)
-            .expect("updated group should exist");
+            .expect("updated rule group must exist after insertion");
         atomic_write(
             &group_path(&self.inner.rules_dir, name),
             group.text.as_bytes(),
@@ -126,6 +155,7 @@ impl RuleStore {
         Ok(snapshot)
     }
 
+    /// Removes a non-default group and publishes the remaining compiled rules.
     pub fn remove_group(&self, name: &str) -> Result<Arc<RuleSnapshot>, RuleStoreError> {
         validate_group_name(name)?;
         if name == "default" {
@@ -133,7 +163,7 @@ impl RuleStore {
                 "the default rule group cannot be removed".to_string(),
             ));
         }
-        let _update = self.inner.update.lock().expect("rule store poisoned");
+        let _update = self.inner.update.lock().expect("rule store lock poisoned");
         let current = self.snapshot();
         if !current.groups.iter().any(|group| group.name == name) {
             return Err(RuleStoreError::NotFound(name.to_string()));
@@ -156,13 +186,14 @@ impl RuleStore {
         Ok(snapshot)
     }
 
+    /// Enables or disables a group without changing its stored DSL text or order.
     pub fn set_enabled(
         &self,
         name: &str,
         enabled: bool,
     ) -> Result<Arc<RuleSnapshot>, RuleStoreError> {
         validate_group_name(name)?;
-        let _update = self.inner.update.lock().expect("rule store poisoned");
+        let _update = self.inner.update.lock().expect("rule store lock poisoned");
         let current = self.snapshot();
         let mut groups = current.groups.clone();
         let group = groups
@@ -196,6 +227,7 @@ impl RuleSnapshot {
         Ok(Self { groups, compiled })
     }
 
+    /// Finds a group by its stable name, including disabled groups.
     pub fn group(&self, name: &str) -> Option<&RuleGroup> {
         self.groups.iter().find(|group| group.name == name)
     }

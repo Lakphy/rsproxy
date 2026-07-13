@@ -5,6 +5,10 @@ use std::io::{self, Read};
 const REQUEST_BODY_CHUNK_SIZE: usize = 16 * 1024;
 type BodyAndTrailers = (Vec<u8>, Vec<(String, String)>);
 
+/// Buffers a request body until it ends or its decoded byte limit is exceeded.
+///
+/// On overflow, the returned reader retains framing state so the caller can
+/// stream the remainder without reparsing already consumed bytes.
 pub fn read_request_body_bounded<R: Read + ?Sized>(
     stream: &mut R,
     framing: RequestBodyFraming,
@@ -54,7 +58,7 @@ pub fn read_request_body_bounded<R: Read + ?Sized>(
     }
 }
 
-pub fn read_request_body_all<R: Read + ?Sized>(
+pub(crate) fn read_request_body_all<R: Read + ?Sized>(
     stream: &mut R,
     mut reader: RequestBodyReader,
     max_header_size: usize,

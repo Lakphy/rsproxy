@@ -22,20 +22,37 @@ pub(super) use codec::parse_index_entry;
 pub(super) use path::index_path_for_segment as test_index_path_for_segment;
 
 #[derive(Clone, Debug)]
+/// Disk-spill policy applied when completed sessions leave resident memory.
 pub struct TraceSpillConfig {
+    /// Directory that owns numbered data segments and their integrity indexes.
     pub dir: PathBuf,
+    /// Preferred maximum encoded size of each data segment, in bytes.
+    ///
+    /// A single record larger than this value is retained intact in its own segment.
     pub segment_bytes: u64,
+    /// Target combined size for data and index files; zero disables eviction by disk size.
+    ///
+    /// Whole oldest segments are removed, but the active segment is retained even if it alone
+    /// exceeds this budget.
     pub disk_budget_bytes: u64,
+    /// Encoding applied independently to each spill record.
     pub compression: TraceSpillCompression,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// Per-record compression used by trace spill segments.
 pub enum TraceSpillCompression {
+    /// Store newline-delimited JSON records without compression.
     None,
-    Zstd { level: i32 },
+    /// Compress each record as an independent zstd frame.
+    Zstd {
+        /// zstd compression level passed to the encoder.
+        level: i32,
+    },
 }
 
 impl TraceSpillCompression {
+    /// Returns the stable lowercase encoding token used in paths and statistics.
     pub fn name(self) -> &'static str {
         match self {
             TraceSpillCompression::None => "none",
@@ -69,6 +86,7 @@ pub(super) struct SpillSegment {
 }
 
 impl TraceSpillConfig {
+    /// Creates an uncompressed spill policy and clamps `segment_bytes` to at least one byte.
     pub fn new(dir: PathBuf, segment_bytes: u64, disk_budget_bytes: u64) -> Self {
         Self {
             dir,
@@ -78,6 +96,7 @@ impl TraceSpillConfig {
         }
     }
 
+    /// Replaces the record compression policy while preserving all size budgets.
     pub fn with_compression(mut self, compression: TraceSpillCompression) -> Self {
         self.compression = compression;
         self
@@ -125,7 +144,10 @@ pub(super) fn append_spill(spill: &mut TraceSpillState, session: &Session) -> st
         start_spill_segment(spill);
     }
 
-    let segment = spill.segments.back().expect("spill segment should exist");
+    let segment = spill
+        .segments
+        .back()
+        .expect("initialized spill state must contain an active segment");
     let path = segment.path.clone();
     let idx_path = segment.idx_path.clone();
     let offset = segment.bytes;

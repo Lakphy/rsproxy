@@ -23,12 +23,12 @@ fn mock_file_candidates_infer_content_type() {
         std::process::id(),
         rsproxy_trace::now_millis()
     ));
-    std::fs::create_dir_all(storage.join("mocks")).unwrap();
-    std::fs::write(storage.join("mocks/fallback.json"), br#"{"ok":true}"#).unwrap();
+    fs::create_dir_all(storage.join("mocks")).unwrap();
+    fs::write(storage.join("mocks/fallback.json"), br#"{"ok":true}"#).unwrap();
     let mut state = test_state();
     state.config.storage = storage.clone();
     let request = meta("http://example.com/mock");
-    let rules = rsproxy_rules::RuleSet::parse(
+    let rules = RuleSet::parse(
         "default",
         "example.com mock(<mocks/missing.json|mocks/fallback.json>)",
     )
@@ -45,7 +45,7 @@ fn mock_file_candidates_infer_content_type() {
         http::header(&response.headers, "content-type"),
         Some("application/json")
     );
-    let _ = std::fs::remove_dir_all(storage);
+    let _ = fs::remove_dir_all(storage);
 }
 
 #[test]
@@ -55,12 +55,12 @@ fn mock_directory_candidate_joins_request_path() {
         std::process::id(),
         rsproxy_trace::now_millis()
     ));
-    std::fs::create_dir_all(storage.join("mocks/api")).unwrap();
-    std::fs::write(storage.join("mocks/api/item.json"), br#"{"dir":true}"#).unwrap();
+    fs::create_dir_all(storage.join("mocks/api")).unwrap();
+    fs::write(storage.join("mocks/api/item.json"), br#"{"dir":true}"#).unwrap();
     let mut state = test_state();
     state.config.storage = storage.clone();
     let request = meta("http://example.com/api/item.json");
-    let rules = rsproxy_rules::RuleSet::parse("default", "example.com mock(<mocks>)").unwrap();
+    let rules = RuleSet::parse("default", "example.com mock(<mocks>)").unwrap();
     let resolved = rules.resolve(&request);
 
     let response = first_mock(&resolved.actions, &request, &state)
@@ -72,7 +72,7 @@ fn mock_directory_candidate_joins_request_path() {
         http::header(&response.headers, "content-type"),
         Some("application/json")
     );
-    let _ = std::fs::remove_dir_all(storage);
+    let _ = fs::remove_dir_all(storage);
 }
 
 #[test]

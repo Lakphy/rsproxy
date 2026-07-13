@@ -1,0 +1,302 @@
+pub mod rsproxy_trace
+pub enum rsproxy_trace::BodyDirection
+pub rsproxy_trace::BodyDirection::Request
+pub rsproxy_trace::BodyDirection::Response
+impl core::clone::Clone for rsproxy_trace::BodyDirection
+pub fn rsproxy_trace::BodyDirection::clone(&self) -> rsproxy_trace::BodyDirection
+impl core::cmp::Eq for rsproxy_trace::BodyDirection
+impl core::cmp::PartialEq for rsproxy_trace::BodyDirection
+pub fn rsproxy_trace::BodyDirection::eq(&self, &rsproxy_trace::BodyDirection) -> bool
+impl core::fmt::Debug for rsproxy_trace::BodyDirection
+pub fn rsproxy_trace::BodyDirection::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for rsproxy_trace::BodyDirection
+impl core::marker::StructuralPartialEq for rsproxy_trace::BodyDirection
+pub enum rsproxy_trace::FrameDataEncoding
+pub rsproxy_trace::FrameDataEncoding::Hex
+pub rsproxy_trace::FrameDataEncoding::Utf8
+impl rsproxy_trace::FrameDataEncoding
+pub fn rsproxy_trace::FrameDataEncoding::name(self) -> &'static str
+impl core::clone::Clone for rsproxy_trace::FrameDataEncoding
+pub fn rsproxy_trace::FrameDataEncoding::clone(&self) -> rsproxy_trace::FrameDataEncoding
+impl core::cmp::Eq for rsproxy_trace::FrameDataEncoding
+impl core::cmp::PartialEq for rsproxy_trace::FrameDataEncoding
+pub fn rsproxy_trace::FrameDataEncoding::eq(&self, &rsproxy_trace::FrameDataEncoding) -> bool
+impl core::fmt::Debug for rsproxy_trace::FrameDataEncoding
+pub fn rsproxy_trace::FrameDataEncoding::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for rsproxy_trace::FrameDataEncoding
+impl core::marker::StructuralPartialEq for rsproxy_trace::FrameDataEncoding
+pub enum rsproxy_trace::FrameDirection
+pub rsproxy_trace::FrameDirection::ClientToServer
+pub rsproxy_trace::FrameDirection::ServerToClient
+impl core::clone::Clone for rsproxy_trace::FrameDirection
+pub fn rsproxy_trace::FrameDirection::clone(&self) -> rsproxy_trace::FrameDirection
+impl core::cmp::Eq for rsproxy_trace::FrameDirection
+impl core::cmp::PartialEq for rsproxy_trace::FrameDirection
+pub fn rsproxy_trace::FrameDirection::eq(&self, &rsproxy_trace::FrameDirection) -> bool
+impl core::fmt::Debug for rsproxy_trace::FrameDirection
+pub fn rsproxy_trace::FrameDirection::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for rsproxy_trace::FrameDirection
+impl core::marker::StructuralPartialEq for rsproxy_trace::FrameDirection
+pub enum rsproxy_trace::SessionKind
+pub rsproxy_trace::SessionKind::Http
+pub rsproxy_trace::SessionKind::Sse
+pub rsproxy_trace::SessionKind::Tunnel
+pub rsproxy_trace::SessionKind::WebSocket
+impl core::clone::Clone for rsproxy_trace::SessionKind
+pub fn rsproxy_trace::SessionKind::clone(&self) -> rsproxy_trace::SessionKind
+impl core::cmp::Eq for rsproxy_trace::SessionKind
+impl core::cmp::PartialEq for rsproxy_trace::SessionKind
+pub fn rsproxy_trace::SessionKind::eq(&self, &rsproxy_trace::SessionKind) -> bool
+impl core::fmt::Debug for rsproxy_trace::SessionKind
+pub fn rsproxy_trace::SessionKind::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for rsproxy_trace::SessionKind
+impl core::marker::StructuralPartialEq for rsproxy_trace::SessionKind
+pub enum rsproxy_trace::TraceEvent
+pub rsproxy_trace::TraceEvent::Abort
+pub rsproxy_trace::TraceEvent::Abort::id: u64
+pub rsproxy_trace::TraceEvent::BodyChunk
+pub rsproxy_trace::TraceEvent::BodyChunk::data: bytes::bytes::Bytes
+pub rsproxy_trace::TraceEvent::BodyChunk::direction: rsproxy_trace::BodyDirection
+pub rsproxy_trace::TraceEvent::BodyChunk::id: u64
+pub rsproxy_trace::TraceEvent::BodyChunk::observed_bytes: u64
+pub rsproxy_trace::TraceEvent::BodySnapshot
+pub rsproxy_trace::TraceEvent::BodySnapshot::data: bytes::bytes::Bytes
+pub rsproxy_trace::TraceEvent::BodySnapshot::direction: rsproxy_trace::BodyDirection
+pub rsproxy_trace::TraceEvent::BodySnapshot::id: u64
+pub rsproxy_trace::TraceEvent::BodySnapshot::observed_bytes: u64
+pub rsproxy_trace::TraceEvent::End
+pub rsproxy_trace::TraceEvent::End::connect_ms: u64
+pub rsproxy_trace::TraceEvent::End::dns_ms: u64
+pub rsproxy_trace::TraceEvent::End::duration_ms: u64
+pub rsproxy_trace::TraceEvent::End::error: core::option::Option<alloc::string::String>
+pub rsproxy_trace::TraceEvent::End::flags: alloc::vec::Vec<alloc::string::String>
+pub rsproxy_trace::TraceEvent::End::id: u64
+pub rsproxy_trace::TraceEvent::End::kind: rsproxy_trace::SessionKind
+pub rsproxy_trace::TraceEvent::End::pool_wait_ms: u64
+pub rsproxy_trace::TraceEvent::End::request_send_ms: core::option::Option<u64>
+pub rsproxy_trace::TraceEvent::End::response_receive_ms: core::option::Option<u64>
+pub rsproxy_trace::TraceEvent::End::ttfb_ms: u64
+pub rsproxy_trace::TraceEvent::End::upstream: core::option::Option<alloc::string::String>
+pub rsproxy_trace::TraceEvent::Frame
+pub rsproxy_trace::TraceEvent::Frame::frame: rsproxy_trace::FrameRecord
+pub rsproxy_trace::TraceEvent::Frame::id: u64
+pub rsproxy_trace::TraceEvent::Request
+pub rsproxy_trace::TraceEvent::Request::headers: alloc::vec::Vec<(alloc::string::String, alloc::string::String)>
+pub rsproxy_trace::TraceEvent::Request::id: u64
+pub rsproxy_trace::TraceEvent::Request::matched_rules: alloc::vec::Vec<rsproxy_rules::model::MatchedRule>
+pub rsproxy_trace::TraceEvent::Request::method: core::option::Option<alloc::string::String>
+pub rsproxy_trace::TraceEvent::Request::trailers: alloc::vec::Vec<(alloc::string::String, alloc::string::String)>
+pub rsproxy_trace::TraceEvent::Request::url: core::option::Option<alloc::string::String>
+pub rsproxy_trace::TraceEvent::Response
+pub rsproxy_trace::TraceEvent::Response::headers: alloc::vec::Vec<(alloc::string::String, alloc::string::String)>
+pub rsproxy_trace::TraceEvent::Response::id: u64
+pub rsproxy_trace::TraceEvent::Response::status: core::option::Option<u16>
+pub rsproxy_trace::TraceEvent::Response::trailers: alloc::vec::Vec<(alloc::string::String, alloc::string::String)>
+pub rsproxy_trace::TraceEvent::Start
+pub rsproxy_trace::TraceEvent::Start::id: u64
+pub rsproxy_trace::TraceEvent::Start::start: rsproxy_trace::SessionStart
+pub rsproxy_trace::TraceEvent::Tls
+pub rsproxy_trace::TraceEvent::Tls::id: u64
+pub rsproxy_trace::TraceEvent::Tls::record: rsproxy_trace::TlsRecord
+impl rsproxy_trace::TraceEvent
+pub fn rsproxy_trace::TraceEvent::session_id(&self) -> u64
+impl core::clone::Clone for rsproxy_trace::TraceEvent
+pub fn rsproxy_trace::TraceEvent::clone(&self) -> rsproxy_trace::TraceEvent
+impl core::fmt::Debug for rsproxy_trace::TraceEvent
+pub fn rsproxy_trace::TraceEvent::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub enum rsproxy_trace::TraceSpillCompression
+pub rsproxy_trace::TraceSpillCompression::None
+pub rsproxy_trace::TraceSpillCompression::Zstd
+pub rsproxy_trace::TraceSpillCompression::Zstd::level: i32
+impl rsproxy_trace::TraceSpillCompression
+pub fn rsproxy_trace::TraceSpillCompression::name(self) -> &'static str
+impl core::clone::Clone for rsproxy_trace::TraceSpillCompression
+pub fn rsproxy_trace::TraceSpillCompression::clone(&self) -> rsproxy_trace::TraceSpillCompression
+impl core::cmp::Eq for rsproxy_trace::TraceSpillCompression
+impl core::cmp::PartialEq for rsproxy_trace::TraceSpillCompression
+pub fn rsproxy_trace::TraceSpillCompression::eq(&self, &rsproxy_trace::TraceSpillCompression) -> bool
+impl core::fmt::Debug for rsproxy_trace::TraceSpillCompression
+pub fn rsproxy_trace::TraceSpillCompression::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for rsproxy_trace::TraceSpillCompression
+impl core::marker::StructuralPartialEq for rsproxy_trace::TraceSpillCompression
+pub struct rsproxy_trace::FrameRecord
+pub rsproxy_trace::FrameRecord::at_ms: u64
+pub rsproxy_trace::FrameRecord::data: alloc::vec::Vec<u8>
+pub rsproxy_trace::FrameRecord::data_encoding: rsproxy_trace::FrameDataEncoding
+pub rsproxy_trace::FrameRecord::direction: rsproxy_trace::FrameDirection
+pub rsproxy_trace::FrameRecord::fin: bool
+pub rsproxy_trace::FrameRecord::opcode: alloc::string::String
+pub rsproxy_trace::FrameRecord::payload_len: u64
+pub rsproxy_trace::FrameRecord::truncated: bool
+impl rsproxy_trace::FrameRecord
+pub fn rsproxy_trace::FrameRecord::new(rsproxy_trace::FrameDirection, u64, impl core::convert::Into<alloc::string::String>, bool, &[u8], usize, rsproxy_trace::FrameDataEncoding) -> Self
+pub fn rsproxy_trace::FrameRecord::preview_len(&self) -> usize
+impl core::clone::Clone for rsproxy_trace::FrameRecord
+pub fn rsproxy_trace::FrameRecord::clone(&self) -> rsproxy_trace::FrameRecord
+impl core::fmt::Debug for rsproxy_trace::FrameRecord
+pub fn rsproxy_trace::FrameRecord::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub struct rsproxy_trace::Session
+pub rsproxy_trace::Session::client: alloc::string::String
+pub rsproxy_trace::Session::connect_ms: u64
+pub rsproxy_trace::Session::dns_ms: u64
+pub rsproxy_trace::Session::duration_ms: u64
+pub rsproxy_trace::Session::error: core::option::Option<alloc::string::String>
+pub rsproxy_trace::Session::flags: alloc::vec::Vec<alloc::string::String>
+pub rsproxy_trace::Session::frames: alloc::vec::Vec<rsproxy_trace::FrameRecord>
+pub rsproxy_trace::Session::id: u64
+pub rsproxy_trace::Session::kind: rsproxy_trace::SessionKind
+pub rsproxy_trace::Session::matched_rules: alloc::vec::Vec<rsproxy_rules::model::MatchedRule>
+pub rsproxy_trace::Session::method: alloc::string::String
+pub rsproxy_trace::Session::pool_wait_ms: u64
+pub rsproxy_trace::Session::req_body_head: alloc::vec::Vec<u8>
+pub rsproxy_trace::Session::req_headers: alloc::vec::Vec<(alloc::string::String, alloc::string::String)>
+pub rsproxy_trace::Session::req_trailers: alloc::vec::Vec<(alloc::string::String, alloc::string::String)>
+pub rsproxy_trace::Session::request_bytes: u64
+pub rsproxy_trace::Session::request_send_ms: core::option::Option<u64>
+pub rsproxy_trace::Session::res_body_head: alloc::vec::Vec<u8>
+pub rsproxy_trace::Session::res_headers: alloc::vec::Vec<(alloc::string::String, alloc::string::String)>
+pub rsproxy_trace::Session::res_trailers: alloc::vec::Vec<(alloc::string::String, alloc::string::String)>
+pub rsproxy_trace::Session::response_bytes: u64
+pub rsproxy_trace::Session::response_receive_ms: core::option::Option<u64>
+pub rsproxy_trace::Session::started_ms: u64
+pub rsproxy_trace::Session::status: core::option::Option<u16>
+pub rsproxy_trace::Session::tls: alloc::vec::Vec<rsproxy_trace::TlsRecord>
+pub rsproxy_trace::Session::ttfb_ms: u64
+pub rsproxy_trace::Session::upstream: core::option::Option<alloc::string::String>
+pub rsproxy_trace::Session::url: alloc::string::String
+impl rsproxy_trace::Session
+pub fn rsproxy_trace::Session::finish(&mut self)
+pub fn rsproxy_trace::Session::new(rsproxy_trace::SessionKind, alloc::string::String, alloc::string::String, alloc::string::String) -> Self
+impl core::clone::Clone for rsproxy_trace::Session
+pub fn rsproxy_trace::Session::clone(&self) -> rsproxy_trace::Session
+impl core::fmt::Debug for rsproxy_trace::Session
+pub fn rsproxy_trace::Session::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub struct rsproxy_trace::SessionStart
+pub rsproxy_trace::SessionStart::client: alloc::string::String
+pub rsproxy_trace::SessionStart::kind: rsproxy_trace::SessionKind
+pub rsproxy_trace::SessionStart::method: alloc::string::String
+pub rsproxy_trace::SessionStart::started_ms: u64
+pub rsproxy_trace::SessionStart::url: alloc::string::String
+impl rsproxy_trace::SessionStart
+pub fn rsproxy_trace::SessionStart::from_session(&rsproxy_trace::Session) -> Self
+impl core::clone::Clone for rsproxy_trace::SessionStart
+pub fn rsproxy_trace::SessionStart::clone(&self) -> rsproxy_trace::SessionStart
+impl core::fmt::Debug for rsproxy_trace::SessionStart
+pub fn rsproxy_trace::SessionStart::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub struct rsproxy_trace::TlsRecord
+pub rsproxy_trace::TlsRecord::alpn: core::option::Option<alloc::string::String>
+pub rsproxy_trace::TlsRecord::cipher_suite: core::option::Option<alloc::string::String>
+pub rsproxy_trace::TlsRecord::error: core::option::Option<alloc::string::String>
+pub rsproxy_trace::TlsRecord::handshake_ms: u64
+pub rsproxy_trace::TlsRecord::host: alloc::string::String
+pub rsproxy_trace::TlsRecord::peer_certificates: usize
+pub rsproxy_trace::TlsRecord::phase: alloc::string::String
+pub rsproxy_trace::TlsRecord::protocol: core::option::Option<alloc::string::String>
+impl core::clone::Clone for rsproxy_trace::TlsRecord
+pub fn rsproxy_trace::TlsRecord::clone(&self) -> rsproxy_trace::TlsRecord
+impl core::cmp::Eq for rsproxy_trace::TlsRecord
+impl core::cmp::PartialEq for rsproxy_trace::TlsRecord
+pub fn rsproxy_trace::TlsRecord::eq(&self, &rsproxy_trace::TlsRecord) -> bool
+impl core::fmt::Debug for rsproxy_trace::TlsRecord
+pub fn rsproxy_trace::TlsRecord::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for rsproxy_trace::TlsRecord
+pub struct rsproxy_trace::TraceFollow
+impl rsproxy_trace::TraceFollow
+pub fn rsproxy_trace::TraceFollow::recv_timeout(&mut self, core::time::Duration) -> core::result::Result<alloc::sync::Arc<rsproxy_trace::Session>, std::sync::mpsc::RecvTimeoutError>
+pub fn rsproxy_trace::TraceFollow::try_recv(&mut self) -> core::result::Result<alloc::sync::Arc<rsproxy_trace::Session>, std::sync::mpsc::TryRecvError>
+impl core::fmt::Debug for rsproxy_trace::TraceFollow
+pub fn rsproxy_trace::TraceFollow::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub struct rsproxy_trace::TraceSpillConfig
+pub rsproxy_trace::TraceSpillConfig::compression: rsproxy_trace::TraceSpillCompression
+pub rsproxy_trace::TraceSpillConfig::dir: std::path::PathBuf
+pub rsproxy_trace::TraceSpillConfig::disk_budget_bytes: u64
+pub rsproxy_trace::TraceSpillConfig::segment_bytes: u64
+impl rsproxy_trace::TraceSpillConfig
+pub fn rsproxy_trace::TraceSpillConfig::new(std::path::PathBuf, u64, u64) -> Self
+pub fn rsproxy_trace::TraceSpillConfig::with_compression(self, rsproxy_trace::TraceSpillCompression) -> Self
+impl core::clone::Clone for rsproxy_trace::TraceSpillConfig
+pub fn rsproxy_trace::TraceSpillConfig::clone(&self) -> rsproxy_trace::TraceSpillConfig
+impl core::fmt::Debug for rsproxy_trace::TraceSpillConfig
+pub fn rsproxy_trace::TraceSpillConfig::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub struct rsproxy_trace::TraceStats
+pub rsproxy_trace::TraceStats::completed_memory_bytes: usize
+pub rsproxy_trace::TraceStats::dropped: u64
+pub rsproxy_trace::TraceStats::evicted_sessions: u64
+pub rsproxy_trace::TraceStats::follow_dropped: u64
+pub rsproxy_trace::TraceStats::follow_subscribers: usize
+pub rsproxy_trace::TraceStats::incomplete_sessions: u64
+pub rsproxy_trace::TraceStats::last_spill_error: core::option::Option<alloc::string::String>
+pub rsproxy_trace::TraceStats::max_sessions: usize
+pub rsproxy_trace::TraceStats::memory_budget_bytes: usize
+pub rsproxy_trace::TraceStats::memory_bytes: usize
+pub rsproxy_trace::TraceStats::next_id: u64
+pub rsproxy_trace::TraceStats::orphan_events: u64
+pub rsproxy_trace::TraceStats::pending_memory_bytes: usize
+pub rsproxy_trace::TraceStats::pending_sessions: usize
+pub rsproxy_trace::TraceStats::queue_bytes: usize
+pub rsproxy_trace::TraceStats::queue_capacity: usize
+pub rsproxy_trace::TraceStats::queue_dropped: u64
+pub rsproxy_trace::TraceStats::queue_memory_budget_bytes: usize
+pub rsproxy_trace::TraceStats::queue_memory_dropped: u64
+pub rsproxy_trace::TraceStats::resident_memory_budget_bytes: usize
+pub rsproxy_trace::TraceStats::sessions: usize
+pub rsproxy_trace::TraceStats::spill_bytes: u64
+pub rsproxy_trace::TraceStats::spill_compression: core::option::Option<alloc::string::String>
+pub rsproxy_trace::TraceStats::spill_corrupt_records: u64
+pub rsproxy_trace::TraceStats::spill_dir: core::option::Option<alloc::string::String>
+pub rsproxy_trace::TraceStats::spill_disk_budget_bytes: u64
+pub rsproxy_trace::TraceStats::spill_errors: u64
+pub rsproxy_trace::TraceStats::spill_evicted_segments: u64
+pub rsproxy_trace::TraceStats::spill_index_entries: u64
+pub rsproxy_trace::TraceStats::spill_path: core::option::Option<alloc::string::String>
+pub rsproxy_trace::TraceStats::spill_segment_bytes: u64
+pub rsproxy_trace::TraceStats::spill_segments: usize
+pub rsproxy_trace::TraceStats::spilled: u64
+pub rsproxy_trace::TraceStats::total_memory_bytes: usize
+impl core::clone::Clone for rsproxy_trace::TraceStats
+pub fn rsproxy_trace::TraceStats::clone(&self) -> rsproxy_trace::TraceStats
+impl core::fmt::Debug for rsproxy_trace::TraceStats
+pub fn rsproxy_trace::TraceStats::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub struct rsproxy_trace::TraceStore
+impl rsproxy_trace::TraceStore
+pub fn rsproxy_trace::TraceStore::abort(&self, u64) -> bool
+pub fn rsproxy_trace::TraceStore::clear(&self)
+pub fn rsproxy_trace::TraceStore::emit(&self, rsproxy_trace::TraceEvent) -> bool
+pub fn rsproxy_trace::TraceStore::finish(&self, rsproxy_trace::Session) -> bool
+pub fn rsproxy_trace::TraceStore::follow(&self, u64, usize, usize) -> core::option::Option<rsproxy_trace::TraceFollow>
+pub fn rsproxy_trace::TraceStore::get(&self, u64) -> core::option::Option<rsproxy_trace::Session>
+pub fn rsproxy_trace::TraceStore::list(&self, usize) -> alloc::vec::Vec<rsproxy_trace::Session>
+pub fn rsproxy_trace::TraceStore::list_after(&self, u64, usize) -> alloc::vec::Vec<rsproxy_trace::Session>
+pub fn rsproxy_trace::TraceStore::new(usize) -> Self
+pub fn rsproxy_trace::TraceStore::new_with_config(rsproxy_trace::TraceStoreConfig) -> Self
+pub fn rsproxy_trace::TraceStore::new_with_limits(usize, usize, usize, core::option::Option<rsproxy_trace::TraceSpillConfig>) -> Self
+pub fn rsproxy_trace::TraceStore::new_with_spill(usize, core::option::Option<std::path::PathBuf>) -> Self
+pub fn rsproxy_trace::TraceStore::new_with_spill_config(usize, core::option::Option<rsproxy_trace::TraceSpillConfig>) -> Self
+pub fn rsproxy_trace::TraceStore::record(&self, rsproxy_trace::Session) -> u64
+pub fn rsproxy_trace::TraceStore::spill_ndjson(&self) -> core::io::error::Result<alloc::vec::Vec<u8>>
+pub fn rsproxy_trace::TraceStore::spill_path(&self) -> core::option::Option<std::path::PathBuf>
+pub fn rsproxy_trace::TraceStore::spill_paths(&self) -> alloc::vec::Vec<std::path::PathBuf>
+pub fn rsproxy_trace::TraceStore::start(&self, rsproxy_trace::SessionStart) -> u64
+pub fn rsproxy_trace::TraceStore::stats(&self) -> rsproxy_trace::TraceStats
+impl core::clone::Clone for rsproxy_trace::TraceStore
+pub fn rsproxy_trace::TraceStore::clone(&self) -> rsproxy_trace::TraceStore
+impl core::fmt::Debug for rsproxy_trace::TraceStore
+pub fn rsproxy_trace::TraceStore::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub struct rsproxy_trace::TraceStoreConfig
+pub rsproxy_trace::TraceStoreConfig::body_limit: usize
+pub rsproxy_trace::TraceStoreConfig::max_sessions: usize
+pub rsproxy_trace::TraceStoreConfig::memory_budget_bytes: usize
+pub rsproxy_trace::TraceStoreConfig::queue_capacity: usize
+pub rsproxy_trace::TraceStoreConfig::queue_memory_budget_bytes: core::option::Option<usize>
+pub rsproxy_trace::TraceStoreConfig::spill: core::option::Option<rsproxy_trace::TraceSpillConfig>
+impl core::clone::Clone for rsproxy_trace::TraceStoreConfig
+pub fn rsproxy_trace::TraceStoreConfig::clone(&self) -> rsproxy_trace::TraceStoreConfig
+impl core::default::Default for rsproxy_trace::TraceStoreConfig
+pub fn rsproxy_trace::TraceStoreConfig::default() -> Self
+impl core::fmt::Debug for rsproxy_trace::TraceStoreConfig
+pub fn rsproxy_trace::TraceStoreConfig::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub const rsproxy_trace::DEFAULT_TRACE_BODY_LIMIT: usize
+pub const rsproxy_trace::DEFAULT_TRACE_MEMORY_BUDGET: usize
+pub const rsproxy_trace::DEFAULT_TRACE_QUEUE_CAPACITY: usize
+pub const rsproxy_trace::DEFAULT_TRACE_QUEUE_MEMORY_BUDGET: usize
+pub fn rsproxy_trace::now_millis() -> u64

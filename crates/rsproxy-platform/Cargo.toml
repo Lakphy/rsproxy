@@ -1,5 +1,6 @@
 [package]
 name = "rsproxy-platform"
+description = "Operating system integrations for certificates, processes, and system proxy configuration."
 version.workspace = true
 edition.workspace = true
 license.workspace = true

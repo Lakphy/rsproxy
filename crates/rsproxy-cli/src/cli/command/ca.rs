@@ -4,15 +4,15 @@ use std::path::PathBuf;
 use super::ClientArgs;
 
 #[derive(Args)]
-pub struct CaArgs {
+pub(crate) struct CaArgs {
     #[command(flatten)]
-    pub client: ClientArgs,
+    pub(crate) client: ClientArgs,
     #[command(subcommand)]
-    pub command: Option<CaCommand>,
+    pub(crate) command: Option<CaCommand>,
 }
 
 #[derive(Subcommand)]
-pub enum CaCommand {
+pub(crate) enum CaCommand {
     Init(CaInitArgs),
     Status(CaStatusArgs),
     Export(CaExportArgs),
@@ -22,36 +22,36 @@ pub enum CaCommand {
 }
 
 #[derive(Args)]
-pub struct CaInitArgs {
+pub(crate) struct CaInitArgs {
     #[arg(long)]
-    pub force: bool,
+    pub(crate) force: bool,
     #[arg(long)]
-    pub name: Option<String>,
+    pub(crate) name: Option<String>,
 }
 
 #[derive(Args)]
-pub struct CaStatusArgs {
+pub(crate) struct CaStatusArgs {
     #[arg(long)]
-    pub keychain: Option<PathBuf>,
+    pub(crate) keychain: Option<PathBuf>,
 }
 
 #[derive(Args)]
-pub struct CaExportArgs {
+pub(crate) struct CaExportArgs {
     #[arg(short = 'o', long = "out")]
-    pub output: Option<PathBuf>,
+    pub(crate) output: Option<PathBuf>,
 }
 
 #[derive(Args)]
-pub struct CaIssueArgs {
-    pub host: String,
+pub(crate) struct CaIssueArgs {
+    pub(crate) host: String,
     #[arg(long)]
-    pub force: bool,
+    pub(crate) force: bool,
 }
 
 #[derive(Args)]
-pub struct CaTrustArgs {
+pub(crate) struct CaTrustArgs {
     #[arg(long)]
-    pub keychain: Option<PathBuf>,
+    pub(crate) keychain: Option<PathBuf>,
     #[arg(long)]
-    pub dry_run: bool,
+    pub(crate) dry_run: bool,
 }

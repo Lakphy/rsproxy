@@ -1,0 +1,100 @@
+pub mod rsproxy_control
+pub mod rsproxy_control::client
+pub fn rsproxy_control::client::api_request(&str, &str, &str, &str) -> rsproxy_control::ControlResult<alloc::string::String>
+pub fn rsproxy_control::client::api_stream_lines(&str, &str, impl core::ops::function::FnMut(&str) -> bool) -> rsproxy_control::ControlResult<()>
+pub fn rsproxy_control::client::api_token_path(&std::path::Path) -> std::path::PathBuf
+pub fn rsproxy_control::client::prepare_server_api_auth(&str, &std::path::Path, &mut core::option::Option<alloc::string::String>) -> rsproxy_control::ControlResult<()>
+pub fn rsproxy_control::client::resolve_client_api_token(&str, &std::path::Path, core::option::Option<alloc::string::String>, core::option::Option<alloc::string::String>, core::option::Option<alloc::string::String>) -> rsproxy_control::ControlResult<core::option::Option<alloc::string::String>>
+pub fn rsproxy_control::client::set_api_token(core::option::Option<alloc::string::String>)
+pub fn rsproxy_control::client::validate_api_token(&str) -> rsproxy_control::ControlResult<alloc::string::String>
+pub mod rsproxy_control::server
+pub struct rsproxy_control::server::ControlListener(_)
+impl rsproxy_control::server::ControlListener
+pub fn rsproxy_control::server::ControlListener::endpoint(&self) -> rsproxy_control::ControlResult<alloc::string::String>
+pub struct rsproxy_control::server::ControlOptions
+pub rsproxy_control::server::ControlOptions::api: alloc::string::String
+pub rsproxy_control::server::ControlOptions::api_token: core::option::Option<alloc::string::String>
+pub rsproxy_control::server::ControlOptions::config_path: core::option::Option<std::path::PathBuf>
+pub rsproxy_control::server::ControlOptions::host: alloc::string::String
+pub rsproxy_control::server::ControlOptions::max_body_size: usize
+pub rsproxy_control::server::ControlOptions::max_header_count: usize
+pub rsproxy_control::server::ControlOptions::max_header_size: usize
+pub rsproxy_control::server::ControlOptions::port: u16
+pub rsproxy_control::server::ControlOptions::rules_watch: bool
+pub rsproxy_control::server::ControlOptions::rules_watch_debounce: core::time::Duration
+pub rsproxy_control::server::ControlOptions::storage: std::path::PathBuf
+impl core::clone::Clone for rsproxy_control::server::ControlOptions
+pub fn rsproxy_control::server::ControlOptions::clone(&self) -> rsproxy_control::server::ControlOptions
+impl core::fmt::Debug for rsproxy_control::server::ControlOptions
+pub fn rsproxy_control::server::ControlOptions::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub struct rsproxy_control::server::ControlState
+impl rsproxy_control::server::ControlState
+pub fn rsproxy_control::server::ControlState::new(rsproxy_control::server::ControlOptions, rsproxy_engine::handle::EngineHandle) -> Self
+impl core::clone::Clone for rsproxy_control::server::ControlState
+pub fn rsproxy_control::server::ControlState::clone(&self) -> rsproxy_control::server::ControlState
+pub fn rsproxy_control::server::bind(&str) -> rsproxy_control::ControlResult<rsproxy_control::server::ControlListener>
+pub fn rsproxy_control::server::serve(rsproxy_control::server::ControlListener, rsproxy_control::server::ControlState) -> rsproxy_control::ControlResult<()>
+pub fn rsproxy_control::server::unix_api_path(&str) -> core::option::Option<&str>
+pub fn rsproxy_control::server::windows_pipe_path(&str) -> core::option::Option<&str>
+#[non_exhaustive] pub enum rsproxy_control::ControlError
+pub rsproxy_control::ControlError::Authentication(alloc::string::String)
+pub rsproxy_control::ControlError::Engine(rsproxy_engine::error::EngineError)
+pub rsproxy_control::ControlError::HttpStatus
+pub rsproxy_control::ControlError::HttpStatus::body: alloc::string::String
+pub rsproxy_control::ControlError::HttpStatus::status: u16
+pub rsproxy_control::ControlError::InvalidRequest(alloc::string::String)
+pub rsproxy_control::ControlError::Io
+pub rsproxy_control::ControlError::Io::context: alloc::string::String
+pub rsproxy_control::ControlError::Io::source: core::io::error::Error
+pub rsproxy_control::ControlError::Json
+pub rsproxy_control::ControlError::Json::context: alloc::string::String
+pub rsproxy_control::ControlError::Json::source: serde_json::error::Error
+pub rsproxy_control::ControlError::Protocol(alloc::string::String)
+pub rsproxy_control::ControlError::Random
+pub rsproxy_control::ControlError::Random::context: alloc::string::String
+pub rsproxy_control::ControlError::Random::source: getrandom::error::Error
+pub rsproxy_control::ControlError::Unsupported(alloc::string::String)
+impl core::convert::From<rsproxy_engine::error::EngineError> for rsproxy_control::ControlError
+pub fn rsproxy_control::ControlError::from(rsproxy_engine::error::EngineError) -> Self
+impl core::error::Error for rsproxy_control::ControlError
+pub fn rsproxy_control::ControlError::source(&self) -> core::option::Option<&(dyn core::error::Error + 'static)>
+impl core::fmt::Debug for rsproxy_control::ControlError
+pub fn rsproxy_control::ControlError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for rsproxy_control::ControlError
+pub fn rsproxy_control::ControlError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub struct rsproxy_control::ControlListener(_)
+impl rsproxy_control::server::ControlListener
+pub fn rsproxy_control::server::ControlListener::endpoint(&self) -> rsproxy_control::ControlResult<alloc::string::String>
+pub struct rsproxy_control::ControlOptions
+pub rsproxy_control::ControlOptions::api: alloc::string::String
+pub rsproxy_control::ControlOptions::api_token: core::option::Option<alloc::string::String>
+pub rsproxy_control::ControlOptions::config_path: core::option::Option<std::path::PathBuf>
+pub rsproxy_control::ControlOptions::host: alloc::string::String
+pub rsproxy_control::ControlOptions::max_body_size: usize
+pub rsproxy_control::ControlOptions::max_header_count: usize
+pub rsproxy_control::ControlOptions::max_header_size: usize
+pub rsproxy_control::ControlOptions::port: u16
+pub rsproxy_control::ControlOptions::rules_watch: bool
+pub rsproxy_control::ControlOptions::rules_watch_debounce: core::time::Duration
+pub rsproxy_control::ControlOptions::storage: std::path::PathBuf
+impl core::clone::Clone for rsproxy_control::server::ControlOptions
+pub fn rsproxy_control::server::ControlOptions::clone(&self) -> rsproxy_control::server::ControlOptions
+impl core::fmt::Debug for rsproxy_control::server::ControlOptions
+pub fn rsproxy_control::server::ControlOptions::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub struct rsproxy_control::ControlState
+impl rsproxy_control::server::ControlState
+pub fn rsproxy_control::server::ControlState::new(rsproxy_control::server::ControlOptions, rsproxy_engine::handle::EngineHandle) -> Self
+impl core::clone::Clone for rsproxy_control::server::ControlState
+pub fn rsproxy_control::server::ControlState::clone(&self) -> rsproxy_control::server::ControlState
+pub fn rsproxy_control::api_request(&str, &str, &str, &str) -> rsproxy_control::ControlResult<alloc::string::String>
+pub fn rsproxy_control::api_stream_lines(&str, &str, impl core::ops::function::FnMut(&str) -> bool) -> rsproxy_control::ControlResult<()>
+pub fn rsproxy_control::api_token_path(&std::path::Path) -> std::path::PathBuf
+pub fn rsproxy_control::bind(&str) -> rsproxy_control::ControlResult<rsproxy_control::server::ControlListener>
+pub fn rsproxy_control::prepare_server_api_auth(&str, &std::path::Path, &mut core::option::Option<alloc::string::String>) -> rsproxy_control::ControlResult<()>
+pub fn rsproxy_control::resolve_client_api_token(&str, &std::path::Path, core::option::Option<alloc::string::String>, core::option::Option<alloc::string::String>, core::option::Option<alloc::string::String>) -> rsproxy_control::ControlResult<core::option::Option<alloc::string::String>>
+pub fn rsproxy_control::serve(rsproxy_control::server::ControlListener, rsproxy_control::server::ControlState) -> rsproxy_control::ControlResult<()>
+pub fn rsproxy_control::set_api_token(core::option::Option<alloc::string::String>)
+pub fn rsproxy_control::unix_api_path(&str) -> core::option::Option<&str>
+pub fn rsproxy_control::validate_api_token(&str) -> rsproxy_control::ControlResult<alloc::string::String>
+pub fn rsproxy_control::windows_pipe_path(&str) -> core::option::Option<&str>
+pub type rsproxy_control::ControlResult<T> = core::result::Result<T, rsproxy_control::ControlError>

@@ -43,12 +43,6 @@ fn violations(root: &Path) -> Result<Vec<Violation>, CheckError> {
                 ));
             }
         }
-        if contract.file == "ci.yml" && source.matches("cargo xtask check all").count() < 2 {
-            violations.push(Violation::new(
-                &relative,
-                "CI must run `cargo xtask check all` in both the workspace matrix and repository-contract job",
-            ));
-        }
         match YamlLoader::load_from_str(&source) {
             Ok(documents) if documents.len() == 1 => {
                 stable_action_violations(&documents[0], &relative, &mut violations);
@@ -150,7 +144,7 @@ fn command_violations(yaml: &Yaml, workflow: &str, path: &Path, violations: &mut
     let mut commands = Vec::new();
     collect_strings_for_key(yaml, "run", &mut commands);
     let required: &[&str] = match workflow {
-        "ci.yml" => &["cargo xtask check all", "cargo xtask check all"],
+        "ci.yml" => &["cargo xtask check all"],
         "performance.yml" => &[
             "cargo xtask targets criterion target/performance/criterion.json",
             "cargo xtask targets regression \"$RUNNER_TEMP/criterion-base.json\" target/performance/criterion.json 10",
@@ -159,6 +153,18 @@ fn command_violations(yaml: &Yaml, workflow: &str, path: &Path, violations: &mut
         _ => &[],
     };
     let mut available = commands;
+    if workflow == "ci.yml"
+        && available
+            .iter()
+            .filter(|command| command.contains("cargo xtask check all"))
+            .count()
+            != 1
+    {
+        violations.push(Violation::new(
+            path,
+            "CI must run `cargo xtask check all` once in the Ubuntu repository-contract job",
+        ));
+    }
     for expected in required {
         if let Some(index) = available
             .iter()

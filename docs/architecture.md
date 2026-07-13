@@ -9,6 +9,32 @@ and the workspace lint policy. Release binaries use thin LTO, one codegen unit,
 and stripped symbols; unwinding remains enabled because connection threads use
 panic isolation as a reliability boundary.
 
+The workspace denies `unwrap` in production code. A panic is reserved for an
+already-broken process-local invariant, principally poisoned synchronization
+state or a value whose shape was established immediately beforehand. Such sites
+must use `expect` and name the violated invariant (for example, `trace collector
+worker lock poisoned`); recoverable input, protocol, filesystem and network
+failures continue through typed results. Tests may use `unwrap` and `expect` for
+fixture ergonomics. This preserves the D-04 connection-thread panic boundary
+while making every intentional panic searchable and useful in a crash report.
+
+The Rust facade of each product library is snapshotted in
+`crates/<crate>/api.txt`. `cargo xtask check api` regenerates those views with
+the pinned `nightly-2026-07-10` rustdoc JSON toolchain and
+`cargo-public-api 0.52.0`, then rejects additions, removals or signature/trait
+changes. After reviewing an intentional change, use
+`cargo xtask check api --bless`; the resulting snapshot diff must be explained
+in the PR description, including why the affected cross-crate contract changes.
+`cargo xtask check all` includes this check, while product builds remain on the
+stable/MSRV toolchains.
+
+Install the two review-only tools before running the API gate locally:
+
+```sh
+rustup toolchain install nightly-2026-07-10 --profile minimal
+cargo install cargo-public-api --version 0.52.0 --locked
+```
+
 ## rsproxy-rules
 
 `rsproxy-rules` owns the rule language. Its public facade re-exports stable rule,
@@ -384,8 +410,8 @@ or transforms in isolation.
 
 Executable product contracts are also split by responsibility:
 `tests/cli_daemon_lifecycle.rs` owns process recovery and identity safety,
-`tests/cli_json_contracts.rs` owns machine-readable shapes,
-`tests/cli_completions.rs` owns shell generation, and
+`tests/it/cli_json_contracts.rs` owns machine-readable shapes,
+`tests/it/cli_completions.rs` owns shell generation, and
 `tests/cli_product_matrix/{offline,online}.rs` owns command-family workflows.
 
 Trace collector white-box tests are split into `src/tests/collector.rs` for
@@ -408,9 +434,9 @@ CA/trust, process, system-proxy and Unix socket-path facade; eight platform unit
 tests remain beside private native implementations.
 Phase 6 applied the public-only D-15 test criterion without widening any API:
 35 tests moved into crate integration targets across
-`rsproxy-net/tests/{dns,errors,http_buffered_head,http_tcp_head,request_deadline}.rs`,
-`rsproxy-engine/tests/{errors,rule_store}.rs`, and
-`rsproxy-platform/tests/{ca,errors,process}.rs`. Protocol/H2/body/timing,
+`rsproxy-net/tests/it/{dns,errors,http_buffered_head,http_tcp_head,request_deadline}.rs`,
+`rsproxy-engine/tests/it/{errors,rule_store}.rs`, and
+`rsproxy-platform/tests/it/{ca,errors,process}.rs`. Protocol/H2/body/timing,
 watcher, system-proxy and native trust suites still need private or
 `test-support` constructors and deliberately remain white-box tests.
 Across `rsproxy-net`, `rsproxy-control`, `rsproxy-rules`, `rsproxy-engine`,
@@ -442,7 +468,7 @@ engine listener path with local TCP/TLS fixtures and enforces an exact one-owner
 partition of all 46 public families; `scripts/verify.sh actions` combines it
 with the parser and migration contracts. Public DSL source classification, parse matrix,
 Whistle migration contract, and bounded-complexity gate live in
-`rsproxy-rules/tests/{value_sources,value_matrix,whistle_migration,complexity}.rs`;
+`rsproxy-rules/tests/it/{value_sources,value_matrix,whistle_migration,complexity}.rs`;
 these are deliberately separate from private parser unit tests.
 
 Machine-readable Whistle registry and option classifications live under
@@ -462,11 +488,14 @@ version. `cargo xtask check typed-errors` parses Rust with `syn` and rejects
 ## Automation boundaries
 
 `.github/workflows/ci.yml` keeps portable Rust check/test/release-build work in
-an Ubuntu/macOS/Windows matrix, runs `cargo xtask check all` on every matrix OS,
-and checks the workspace separately on the declared Rust 1.88 MSRV. Formatting,
-Clippy, fuzz-target compilation, quality-gate contracts and coverage run in
-dedicated Ubuntu jobs. A cargo-deny job enforces advisory, license, ban and
-registry-source policy. `.github/workflows/performance.yml` compares Criterion
+an Ubuntu/macOS/Windows matrix and checks the workspace separately on the
+declared Rust 1.88 MSRV. The matrix runs filesystem, source and workflow checks;
+the Ubuntu repository-contract job runs `cargo xtask check all`, including the
+pinned-nightly API snapshot gate, so one checked-in snapshot is not compared
+against three host-specific `cfg` surfaces. Formatting, Clippy, fuzz-target
+compilation, quality-gate contracts and coverage run in dedicated Ubuntu jobs.
+A cargo-deny job enforces advisory, license, ban and registry-source policy.
+`.github/workflows/performance.yml` compares Criterion
 results for the base and current commits on one runner and blocks regressions
 above 10% through typed `cargo xtask targets` report parsing.
 `.github/workflows/fuzz.yml` owns the daily nightly/libFuzzer run. The npm

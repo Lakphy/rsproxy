@@ -107,12 +107,12 @@ pub(in crate::proxy) fn forward_unpooled<W: WsIo + Send>(
 
     if websocket_request && is_websocket_response(&head.headers, head.status) {
         let request = take_request_observation(req, &mut request_summary);
-        return crate::proxy::websocket_forward::finish(
+        return websocket_forward::finish(
             client,
             ctx,
             plain_client_clone,
             upstream,
-            crate::proxy::websocket_forward::WebSocketUpgrade {
+            websocket_forward::WebSocketUpgrade {
                 head,
                 matched_rules: response_matched_rules,
                 actions: response_actions,
@@ -282,9 +282,9 @@ pub(in crate::proxy) fn forward_unpooled<W: WsIo + Send>(
 fn take_request_observation(
     request: &RawRequest,
     summary: &mut Option<RequestStreamSummary>,
-) -> crate::proxy::websocket_forward::RequestObservation {
+) -> websocket_forward::RequestObservation {
     let Some(summary) = summary.take() else {
-        return crate::proxy::websocket_forward::RequestObservation {
+        return websocket_forward::RequestObservation {
             bytes: request.body.len() as u64,
             body_head: None,
             trailers: None,
@@ -298,7 +298,7 @@ fn take_request_observation(
     if !summary.completed {
         flags.push("request-stream-ended-by-upstream".to_string());
     }
-    crate::proxy::websocket_forward::RequestObservation {
+    websocket_forward::RequestObservation {
         bytes: summary.bytes,
         body_head: Some(summary.body_head),
         trailers: Some(summary.trailers),

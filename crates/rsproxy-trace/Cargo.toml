@@ -1,5 +1,6 @@
 [package]
 name = "rsproxy-trace"
+description = "Bounded trace collection, storage, and serialization for rsproxy traffic."
 version.workspace = true
 edition.workspace = true
 license.workspace = true

@@ -95,7 +95,7 @@ fn body_rewrite_collects_only_when_the_payload_fits_the_limit() {
     state.config.body_buffer_limit = 16;
     state.rules = RuleStore::from_compiled(
         &state.config.storage,
-        rsproxy_rules::RuleSet::parse(
+        RuleSet::parse(
             "default",
             "example.test res.body.append(\"!\") res.trailer(x-rule-end: yes)",
         )
@@ -133,7 +133,7 @@ fn body_rewrite_limit_falls_back_to_complete_unmodified_stream() {
     state.config.body_buffer_limit = 4;
     state.rules = RuleStore::from_compiled(
         &state.config.storage,
-        rsproxy_rules::RuleSet::parse(
+        RuleSet::parse(
             "default",
             "example.test res.body.append(\"!\") res.trailer(x-rule-end: yes)",
         )

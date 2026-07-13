@@ -18,7 +18,7 @@ pub(super) fn isolated_state(name: &str, rules: &str) -> SharedState {
     ));
     state.rules = RuleStore::from_compiled(
         &state.config.storage,
-        rsproxy_rules::RuleSet::parse("default", rules).unwrap(),
+        RuleSet::parse("default", rules).unwrap(),
     );
     install_test_ca(&mut state);
     state

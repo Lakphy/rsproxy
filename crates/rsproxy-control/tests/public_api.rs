@@ -1,3 +1,9 @@
+//! Black-box checks for the supported `rsproxy-control` facade.
+//!
+//! These tests verify typed error conversion, engine/control composition,
+//! listener binding, endpoint-prefix vocabulary, and authentication discovery
+//! without depending on private router or wire-format helpers.
+
 use rsproxy_control::{
     ControlError, ControlListener, ControlOptions, ControlResult, ControlState, api_request,
     api_token_path, bind, prepare_server_api_auth, resolve_client_api_token, serve, set_api_token,

@@ -23,7 +23,7 @@ fn dispatches_status_and_rules_without_changing_route_contracts() {
     let mut state = test_state();
     state.options.config_path = Some(state.options.storage.join("config.toml"));
     state.options.rules_watch = true;
-    state.options.rules_watch_debounce = std::time::Duration::from_millis(75);
+    state.options.rules_watch_debounce = Duration::from_millis(75);
 
     let mut status = Vec::new();
     dispatch(&mut status, &request("GET", "/api/status", &[]), &state).unwrap();

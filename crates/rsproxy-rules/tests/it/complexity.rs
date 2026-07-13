@@ -1,6 +1,4 @@
-#[path = "support/fuzz_harness.rs"]
-mod fuzz_harness;
-
+use crate::fuzz_harness;
 use std::time::{Duration, Instant};
 
 const MAX_INPUT: usize = 64 * 1024;

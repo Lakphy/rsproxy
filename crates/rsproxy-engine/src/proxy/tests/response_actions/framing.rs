@@ -109,7 +109,7 @@ fn decoded_chunked_request_without_trailers_becomes_content_length() {
 
 #[test]
 fn streaming_sse_decodes_chunked_and_captures_frames() {
-    let mut upstream = io::Cursor::new(
+    let mut upstream = Cursor::new(
         b"6\r\ndata: \r\n7\r\none\r\n\r\n\r\n11\r\nid: 2\r\ndata: two\n\r\n0\r\nx-ignored: yes\r\n\r\n"
             .to_vec(),
     );

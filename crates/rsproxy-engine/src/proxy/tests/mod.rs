@@ -17,10 +17,7 @@ fn meta(url: &str) -> RequestMeta {
 
 fn test_state() -> SharedState {
     let config = ProxyConfig::default();
-    let rules = RuleStore::from_compiled(
-        &config.storage,
-        rsproxy_rules::RuleSet::parse("default", "").unwrap(),
-    );
+    let rules = RuleStore::from_compiled(&config.storage, RuleSet::parse("default", "").unwrap());
     let dns_config = rsproxy_net::DnsConfig {
         servers: config.dns_servers.clone(),
         timeout: config.dns_timeout,
@@ -66,7 +63,7 @@ fn request_with_proxy_authorization(value: Option<&str>) -> RawRequest {
 fn resolved(action: Action) -> ResolvedAction {
     ResolvedAction::new(
         action,
-        rsproxy_rules::MatchedRule {
+        MatchedRule {
             group: "default".to_string(),
             line: 1,
             raw: String::new(),

@@ -4,15 +4,15 @@ use std::path::PathBuf;
 use super::ClientArgs;
 
 #[derive(Args)]
-pub struct ValuesArgs {
+pub(crate) struct ValuesArgs {
     #[command(flatten)]
-    pub client: ClientArgs,
+    pub(crate) client: ClientArgs,
     #[command(subcommand)]
-    pub command: ValuesCommand,
+    pub(crate) command: ValuesCommand,
 }
 
 #[derive(Subcommand)]
-pub enum ValuesCommand {
+pub(crate) enum ValuesCommand {
     #[command(name = "ls")]
     List(ValuesListArgs),
     Cat(ValueKeyArgs),
@@ -22,30 +22,30 @@ pub enum ValuesCommand {
 }
 
 #[derive(Args)]
-pub struct ValuesListArgs {}
+pub(crate) struct ValuesListArgs {}
 
 #[derive(Args)]
-pub struct ValueKeyArgs {
-    pub key: String,
+pub(crate) struct ValueKeyArgs {
+    pub(crate) key: String,
 }
 
 #[derive(Args)]
-pub struct ValueSetArgs {
-    pub key: String,
+pub(crate) struct ValueSetArgs {
+    pub(crate) key: String,
     #[arg(long)]
-    pub file: Option<PathBuf>,
+    pub(crate) file: Option<PathBuf>,
 }
 
 #[derive(Args)]
-pub struct TraceArgs {
+pub(crate) struct TraceArgs {
     #[command(flatten)]
-    pub client: ClientArgs,
+    pub(crate) client: ClientArgs,
     #[command(subcommand)]
-    pub command: TraceCommand,
+    pub(crate) command: TraceCommand,
 }
 
 #[derive(Subcommand)]
-pub enum TraceCommand {
+pub(crate) enum TraceCommand {
     #[command(name = "ls")]
     List(TraceListArgs),
     Get(TraceGetArgs),
@@ -56,57 +56,57 @@ pub enum TraceCommand {
 }
 
 #[derive(Args)]
-pub struct TraceStatsArgs {}
+pub(crate) struct TraceStatsArgs {}
 
 #[derive(Args)]
-pub struct TraceClearArgs {}
+pub(crate) struct TraceClearArgs {}
 
 #[derive(Args)]
-pub struct TraceListArgs {
+pub(crate) struct TraceListArgs {
     #[arg(short = 'n', long, default_value_t = 20)]
-    pub limit: usize,
+    pub(crate) limit: usize,
 }
 
 #[derive(Args)]
-pub struct TraceGetArgs {
-    pub id: String,
+pub(crate) struct TraceGetArgs {
+    pub(crate) id: String,
 }
 
 #[derive(Args)]
-pub struct TraceFollowArgs {
+pub(crate) struct TraceFollowArgs {
     #[arg(long)]
-    pub count: Option<usize>,
+    pub(crate) count: Option<usize>,
     #[arg(long)]
-    pub poll_ms: Option<u64>,
+    pub(crate) poll_ms: Option<u64>,
 }
 
 #[derive(Args)]
-pub struct TraceExportArgs {
+pub(crate) struct TraceExportArgs {
     #[arg(long)]
-    pub har: bool,
+    pub(crate) har: bool,
     #[arg(short = 'o', long)]
-    pub output: Option<PathBuf>,
+    pub(crate) output: Option<PathBuf>,
 }
 
 #[derive(Args)]
-pub struct TuiArgs {
+pub(crate) struct TuiArgs {
     #[command(flatten)]
-    pub client: ClientArgs,
+    pub(crate) client: ClientArgs,
     #[arg(short = 'n', long)]
-    pub limit: Option<usize>,
+    pub(crate) limit: Option<usize>,
     #[arg(long)]
-    pub filter: Option<String>,
+    pub(crate) filter: Option<String>,
     #[arg(long, value_parser = ["overview", "headers", "body", "rules"])]
-    pub tab: Option<String>,
+    pub(crate) tab: Option<String>,
     #[arg(long)]
-    pub interval_ms: Option<u64>,
+    pub(crate) interval_ms: Option<u64>,
     #[arg(long)]
-    pub once: bool,
+    pub(crate) once: bool,
 }
 
 #[derive(Args)]
-pub struct ReplayArgs {
-    pub id: String,
+pub(crate) struct ReplayArgs {
+    pub(crate) id: String,
     #[command(flatten)]
-    pub client: ClientArgs,
+    pub(crate) client: ClientArgs,
 }

@@ -4,7 +4,7 @@ mod request;
 mod response;
 
 #[cfg(any(test, feature = "test-support"))]
-pub use request::read_request_body_all;
+pub(crate) use request::read_request_body_all;
 pub use request::{
     BoundedRequestBody, RawRequest, RequestBodyFraming, RequestBodyRead, RequestBodyReader,
     RequestHead, read_request, read_request_body_bounded, read_request_head, read_request_head_tcp,
@@ -20,13 +20,22 @@ pub use response::{
 const COALESCED_RESPONSE_LIMIT: usize = 64 * 1024;
 
 #[derive(Clone, Debug)]
+/// Parsed HTTP/1 response status line and headers, excluding the body.
 pub struct RawResponseHead {
+    /// Wire HTTP version token, such as `HTTP/1.1`.
     pub version: String,
+    /// Numeric response status.
     pub status: u16,
+    /// Reason phrase as received from the peer.
     pub reason: String,
+    /// Header fields in wire order.
     pub headers: Vec<(String, String)>,
 }
 
+/// Reads and parses one response head from an unbuffered byte stream.
+///
+/// The size limit covers bytes through the header terminator; the count limit
+/// applies to decoded header fields. This function does not read body bytes.
 pub fn read_response_head<R: Read + ?Sized>(
     stream: &mut R,
     max_header_size: usize,
@@ -37,6 +46,7 @@ pub fn read_response_head<R: Read + ?Sized>(
     parse_response_head(&head, max_header_count)
 }
 
+/// Reads one response head while preserving bytes already buffered after it.
 pub fn read_response_head_buffered<R: BufRead + ?Sized>(
     stream: &mut R,
     max_header_size: usize,

@@ -53,7 +53,7 @@ fn run_response(
     (result, capture, state)
 }
 
-fn completed_session(state: &SharedState) -> rsproxy_trace::Session {
+fn completed_session(state: &SharedState) -> Session {
     let sessions = state.trace.list(8);
     assert_eq!(sessions.len(), 1, "{sessions:#?}");
     sessions.into_iter().next().unwrap()

@@ -53,3 +53,19 @@ fn layout_rejects_inline_misplaced_and_missing_integration_tests() {
             .any(|violation| violation.message.contains("missing"))
     );
 }
+
+#[test]
+fn layout_rejects_empty_crate_directories_with_a_fix_hint() {
+    let fixture = Fixture::new();
+    fixture.basic_rust_tree();
+    fixture.write("crates/example/src/obsolete/.keep", "");
+    fixture.remove("crates/example/src/obsolete/.keep");
+
+    let violations = rust_violations_for_test(fixture.root()).expect("check empty directory");
+    assert_eq!(violations.len(), 1);
+    assert_eq!(
+        violations[0].path,
+        PathBuf::from("crates/example/src/obsolete")
+    );
+    assert!(violations[0].message.contains("remove it"));
+}

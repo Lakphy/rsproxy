@@ -15,7 +15,7 @@ struct Snapshot {
     evidence_files: usize,
 }
 
-pub fn assert_pinned() {
+pub(super) fn assert_pinned() {
     let source = fs::read_to_string(root().join("SNAPSHOT.toml")).unwrap();
     let snapshot: Snapshot = toml::from_str(&source).unwrap();
     assert_eq!(snapshot.schema, "rsproxy.whistle-fixture/v1");
@@ -26,7 +26,7 @@ pub fn assert_pinned() {
     assert_eq!(snapshot.evidence_files, 75);
 }
 
-pub fn read(relative: &str) -> String {
+pub(super) fn read(relative: &str) -> String {
     let path = Path::new(relative);
     assert!(
         !path.is_absolute()

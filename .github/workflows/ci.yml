@@ -33,8 +33,12 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
       - name: Restore Rust cache
         uses: Swatinem/rust-cache@v2
-      - name: Check repository contracts
-        run: cargo xtask check all
+      - name: Check portable repository contracts
+        run: |
+          cargo xtask check lines
+          cargo xtask check layout
+          cargo xtask check typed-errors
+          cargo xtask check workflows
       - name: Check all targets
         run: cargo check --workspace --all-targets --locked
       - name: Test all targets
@@ -73,6 +77,10 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
+      - name: Install pinned Rust public-API toolchain
+        run: rustup toolchain install nightly-2026-07-10 --profile minimal
+      - name: Install Rust public-API checker
+        run: cargo install cargo-public-api --version 0.52.0 --locked
       - name: Install Node
         uses: actions/setup-node@v6
         with:
@@ -87,6 +95,8 @@ jobs:
         run: cargo fmt --all -- --check
       - name: Run Clippy
         run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - name: Check Rust documentation
+        run: RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --locked
       - name: Check repository structure
         run: cargo xtask check all
       - name: Check shell syntax

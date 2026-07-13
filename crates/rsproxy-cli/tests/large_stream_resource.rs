@@ -1,4 +1,6 @@
+//! Unix process-level resource bounds for large streamed bodies.
 #![cfg(unix)]
+#![allow(clippy::unwrap_used)]
 
 use std::io::{self, BufRead, BufReader, Read, Write};
 use std::net::{SocketAddr, TcpListener, TcpStream};

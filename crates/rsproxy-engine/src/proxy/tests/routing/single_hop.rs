@@ -3,9 +3,7 @@ use super::*;
 #[test]
 fn upstream_route_parses_socks5_proxy_and_target() {
     let request = meta("http://origin.test:18080/path");
-    let rules =
-        rsproxy_rules::RuleSet::parse("default", "origin.test upstream(socks5://127.0.0.1:1081)")
-            .unwrap();
+    let rules = RuleSet::parse("default", "origin.test upstream(socks5://127.0.0.1:1081)").unwrap();
     let resolved = rules.resolve(&request);
     let url = UrlParts::parse(&request.url).unwrap();
     let route = test_upstream_route(&url, &resolved.actions, &request);
@@ -30,7 +28,7 @@ fn upstream_route_parses_socks5_proxy_and_target() {
 #[test]
 fn upstream_route_parses_socks5_auth_without_leaking_password() {
     let request = meta("http://origin.test/path");
-    let rules = rsproxy_rules::RuleSet::parse(
+    let rules = RuleSet::parse(
         "default",
         "origin.test upstream(socks5://alice:secret@127.0.0.1:1081)",
     )
@@ -61,9 +59,7 @@ fn upstream_route_parses_socks5_auth_without_leaking_password() {
 #[test]
 fn upstream_route_parses_http_proxy_tunnel_target() {
     let request = meta("tunnel://target.test:443");
-    let rules =
-        rsproxy_rules::RuleSet::parse("default", "target.test upstream(proxy://127.0.0.1:18888)")
-            .unwrap();
+    let rules = RuleSet::parse("default", "target.test upstream(proxy://127.0.0.1:18888)").unwrap();
     let resolved = rules.resolve(&request);
     let url = UrlParts::parse(&request.url).unwrap();
     let route = test_upstream_route(&url, &resolved.actions, &request);
@@ -86,7 +82,7 @@ fn upstream_route_parses_http_proxy_tunnel_target() {
 #[test]
 fn direct_route_overrides_matched_upstream_actions() {
     let request = meta("http://origin.test:18080/direct");
-    let rules = rsproxy_rules::RuleSet::parse(
+    let rules = RuleSet::parse(
         "default",
         "origin.test upstream(proxy://127.0.0.1:18888)\norigin.test/direct direct",
     )
@@ -116,7 +112,7 @@ fn direct_route_overrides_matched_upstream_actions() {
     );
     assert!(!route.uses_absolute_form());
 
-    let same_line = rsproxy_rules::RuleSet::parse(
+    let same_line = RuleSet::parse(
         "default",
         "origin.test direct upstream(proxy://127.0.0.1:18888)",
     )
@@ -135,7 +131,7 @@ fn direct_route_overrides_matched_upstream_actions() {
 #[test]
 fn upstream_route_parses_https_proxy() {
     let request = meta("http://origin.test/path");
-    let rules = rsproxy_rules::RuleSet::parse(
+    let rules = RuleSet::parse(
         "default",
         "origin.test upstream(https-proxy://secure-proxy.test:18443)",
     )

@@ -81,9 +81,16 @@ zstd = "0.13"
 
 [workspace.lints.rust]
 unsafe_code = "deny"
+missing_docs = "deny"
+unreachable_pub = "deny"
+unused_qualifications = "deny"
 
 [workspace.lints.clippy]
 all = { level = "deny", priority = -1 }
+unwrap_used = "deny"
+dbg_macro = "deny"
+todo = "deny"
+unimplemented = "deny"
 
 [profile.release]
 codegen-units = 1

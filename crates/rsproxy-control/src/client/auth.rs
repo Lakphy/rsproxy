@@ -6,7 +6,11 @@ use std::path::{Path, PathBuf};
 
 const MIN_API_TOKEN_BYTES: usize = 16;
 
-/// Prepares the token used to authenticate a TCP control API server.
+/// Prepares authentication for a non-Unix control server before it is bound.
+///
+/// Unix sockets clear `token` because owner-only socket permissions are the
+/// access boundary. Other transports validate and persist an explicit token,
+/// reuse the token file when present, or generate a new 32-byte random token.
 pub fn prepare_server_api_auth(
     api: &str,
     storage: &Path,
@@ -36,6 +40,9 @@ pub fn prepare_server_api_auth(
 }
 
 /// Resolves a client token using explicit, environment, configured, then stored values.
+///
+/// Unix endpoints always return `None`. A missing stored token is also `None`;
+/// malformed or unreadable existing token files remain errors.
 pub fn resolve_client_api_token(
     api: &str,
     storage: &Path,
@@ -61,7 +68,7 @@ pub fn resolve_client_api_token(
     }
 }
 
-/// Validates and normalizes a control API bearer token.
+/// Trims and validates a bearer token of at least 16 UTF-8 bytes with no control characters.
 pub fn validate_api_token(input: &str) -> ControlResult<String> {
     let token = input.trim();
     if token.len() < MIN_API_TOKEN_BYTES {
@@ -77,7 +84,7 @@ pub fn validate_api_token(input: &str) -> ControlResult<String> {
     Ok(token.to_string())
 }
 
-/// Returns the persistent token file used by the control API.
+/// Returns `<storage>/run/api-token`, whose Unix permissions are normalized to `0600`.
 pub fn api_token_path(storage: &Path) -> PathBuf {
     storage.join("run/api-token")
 }

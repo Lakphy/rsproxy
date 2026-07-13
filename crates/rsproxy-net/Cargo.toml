@@ -1,5 +1,6 @@
 [package]
 name = "rsproxy-net"
+description = "Protocol and transport primitives for rsproxy downstream and upstream connections."
 version.workspace = true
 edition.workspace = true
 license.workspace = true

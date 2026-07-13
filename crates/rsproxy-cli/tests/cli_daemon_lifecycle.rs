@@ -1,3 +1,6 @@
+//! Process-level daemon lifecycle integration tests.
+#![allow(clippy::unwrap_used)]
+
 #[path = "cli_daemon_lifecycle/support.rs"]
 mod support;
 
@@ -11,7 +14,7 @@ use support::*;
 
 #[test]
 fn daemon_lifecycle_recovers_stale_state_and_preserves_rules() {
-    let harness = DaemonHarness::new();
+    let mut harness = DaemonHarness::new();
     let rules_dir = harness.storage.join("rules");
     fs::create_dir_all(&rules_dir).unwrap();
     fs::write(
@@ -20,7 +23,7 @@ fn daemon_lifecycle_recovers_stale_state_and_preserves_rules() {
     )
     .unwrap();
 
-    let start = harness.run("start");
+    let start = harness.start();
     assert_success("start", &start);
     assert!(stdout(&start).contains("started pid="));
     let first_pid = harness.pid();
@@ -46,7 +49,7 @@ fn daemon_lifecycle_recovers_stale_state_and_preserves_rules() {
     wait_for_exit(restarted_pid);
     assert!(harness.pid_path().is_file(), "abnormal exit keeps pidfile");
 
-    let recovered = harness.run("start");
+    let recovered = harness.start();
     assert_success("start after abnormal exit", &recovered);
     assert_ne!(harness.pid(), restarted_pid);
     assert_eq!(status_json(&harness)["rules"], 1);
@@ -57,7 +60,7 @@ fn daemon_lifecycle_recovers_stale_state_and_preserves_rules() {
 
     fs::create_dir_all(harness.pid_path().parent().unwrap()).unwrap();
     fs::write(harness.pid_path(), "not-a-pid\n").unwrap();
-    let recovered = harness.run("start");
+    let recovered = harness.start();
     assert_success("start after malformed pidfile", &recovered);
     assert!(status_json(&harness)["uptime_ms"].is_number());
 
@@ -149,18 +152,18 @@ fn unix_daemon_defaults_to_a_private_storage_local_control_socket() {
     use std::os::unix::fs::PermissionsExt;
 
     let storage = unique_temp_dir("unix-default-control");
-    let proxy_port = unused_port().to_string();
-    let run = |command: &str| {
+    let run = |command: &str, proxy_port: u16| {
+        let port = proxy_port.to_string();
         command_output(
             Command::new(env!("CARGO_BIN_EXE_rsproxy"))
                 .arg(command)
-                .args(["--host", "127.0.0.1", "--port", &proxy_port, "--storage"])
+                .args(["--host", "127.0.0.1", "--port", &port, "--storage"])
                 .arg(&storage)
                 .args(["--no-mitm", "--trace-disk-budget", "0"]),
         )
     };
 
-    let start = run("start");
+    let (proxy_port, start) = start_daemon_on_probed_port(&storage, |port| run("start", port));
     assert_success("Unix default control start", &start);
     let socket = expected_default_unix_socket(&storage);
     assert!(socket.exists());
@@ -168,7 +171,7 @@ fn unix_daemon_defaults_to_a_private_storage_local_control_socket() {
         fs::metadata(&socket).unwrap().permissions().mode() & 0o777,
         0o600
     );
-    let status = run("status");
+    let status = run("status", proxy_port);
     assert_success("Unix default control status", &status);
     let status: Value = serde_json::from_slice(&status.stdout).unwrap();
     assert_eq!(status["api_auth"]["mode"], "peer");
@@ -188,7 +191,6 @@ fn unix_daemon_defaults_to_a_private_storage_local_control_socket() {
 #[test]
 fn windows_daemon_uses_the_authenticated_named_pipe_control_plane() {
     let storage = unique_temp_dir("windows-pipe-daemon");
-    let proxy_port = unused_port().to_string();
     let pipe = format!(
         "pipe:rsproxy-test-{}-{}",
         std::process::id(),
@@ -197,7 +199,8 @@ fn windows_daemon_uses_the_authenticated_named_pipe_control_plane() {
             .unwrap()
             .as_nanos()
     );
-    let run = |command: &str| {
+    let run = |command: &str, proxy_port: u16| {
+        let port = proxy_port.to_string();
         command_output(
             Command::new(env!("CARGO_BIN_EXE_rsproxy"))
                 .arg(command)
@@ -205,7 +208,7 @@ fn windows_daemon_uses_the_authenticated_named_pipe_control_plane() {
                     "--host",
                     "127.0.0.1",
                     "--port",
-                    &proxy_port,
+                    &port,
                     "--api",
                     &pipe,
                     "--storage",
@@ -215,15 +218,15 @@ fn windows_daemon_uses_the_authenticated_named_pipe_control_plane() {
         )
     };
 
-    let start = run("start");
+    let (proxy_port, start) = start_daemon_on_probed_port(&storage, |port| run("start", port));
     assert_success("Windows named pipe start", &start);
-    let status = run("status");
+    let status = run("status", proxy_port);
     assert_success("Windows named pipe status", &status);
     let status: Value = serde_json::from_slice(&status.stdout).unwrap();
     assert_eq!(status["status"], "running");
     assert_eq!(status["api_auth"]["mode"], "token");
     assert!(status["api"].as_str().unwrap().starts_with("pipe:"));
-    let stop = run("stop");
+    let stop = run("stop", proxy_port);
     assert_success("Windows named pipe stop", &stop);
     let _ = fs::remove_dir_all(storage);
 }

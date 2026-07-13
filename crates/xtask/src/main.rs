@@ -1,3 +1,5 @@
+#![allow(missing_docs)]
+
 use std::error::Error as _;
 use std::path::Path;
 use std::process::ExitCode;
@@ -30,6 +32,10 @@ struct CheckArgs {
     /// Check group to run.
     #[arg(value_enum)]
     kind: CheckKind,
+
+    /// Replace reviewed Rust public-API snapshots with the current facade.
+    #[arg(long)]
+    bless: bool,
 }
 
 #[derive(Debug, Args)]
@@ -76,7 +82,7 @@ fn run() -> Result<(), XtaskError> {
 
     match cli.command {
         Command::Check(args) => {
-            let report = xtask::check::run(root, args.kind)?;
+            let report = xtask::check::run_with_options(root, args.kind, args.bless)?;
             for check in report.checks {
                 println!("{}: {}", check.kind, check.summary);
             }

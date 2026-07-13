@@ -121,7 +121,10 @@ pub(super) fn checkin(key: &str, mut connection: FastConnection) {
 impl Drop for FastPermit {
     fn drop(&mut self) {
         let state = active_state();
-        let mut active = state.inner.lock().unwrap();
+        let mut active = state
+            .inner
+            .lock()
+            .expect("HTTP/1 fast-pool activity lock poisoned");
         active.release(&self.key);
         drop(active);
         state.available.notify_one();

@@ -3,6 +3,10 @@ use crate::{Captures, RequestMeta, ResolvedAction, ResponseMeta, UrlParts};
 use std::cell::OnceCell;
 
 impl ResolvedAction {
+    /// Associates a programmatic action with provenance and matcher captures.
+    ///
+    /// The resulting action has no response snapshot; response-only template
+    /// variables render empty unless the value came from response resolution.
     pub fn new(action: crate::Action, rule: crate::MatchedRule, captures: Captures) -> Self {
         Self {
             action,
@@ -12,17 +16,20 @@ impl ResolvedAction {
         }
     }
 
+    /// Renders captures and request/response variables using this action's match context.
     pub fn render(&self, input: &str, request: &RequestMeta) -> String {
         self.captures
             .render_with_response(input, request, self.response.as_deref())
     }
 
+    /// Borrows the response snapshot captured by response-phase resolution, if any.
     pub fn response_meta(&self) -> Option<&ResponseMeta> {
         self.response.as_deref()
     }
 }
 
 impl Captures {
+    /// Returns `$0` for the complete match or `$1` through `$9` for capture groups.
     pub fn get_index(&self, index: usize) -> Option<&str> {
         if index == 0 {
             self.whole.as_deref()
@@ -31,16 +38,22 @@ impl Captures {
         }
     }
 
+    /// Appends a numbered capture while enforcing the public `$1`–`$9` limit.
     pub fn insert_index(&mut self, value: String) {
         if self.indexed.len() < 9 {
             self.indexed.push(value);
         }
     }
 
+    /// Renders captures and request variables; response variables become empty.
     pub fn render(&self, input: &str, request: &RequestMeta) -> String {
         self.render_with_response(input, request, None)
     }
 
+    /// Renders captures plus request and optional response template variables.
+    ///
+    /// Header lookup is case-insensitive, cookie names are case-sensitive, and
+    /// malformed programmatic placeholders are preserved as literal text.
     pub fn render_with_response(
         &self,
         input: &str,

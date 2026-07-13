@@ -3,7 +3,7 @@ use super::*;
 #[test]
 fn request_header_replacements_stack_and_update_duplicate_values() {
     let request_meta = meta("http://example.test/users");
-    let rules = rsproxy_rules::RuleSet::parse(
+    let rules = RuleSet::parse(
         "default",
         concat!(
             r"example.test req.header(x-user ~ /user-(\d+)/id-$1)",
@@ -41,7 +41,7 @@ fn request_header_replacements_stack_and_update_duplicate_values() {
 #[test]
 fn response_header_replacements_apply_without_buffering_the_body() {
     let request_meta = meta("http://example.test/releases");
-    let rules = rsproxy_rules::RuleSet::parse(
+    let rules = RuleSet::parse(
         "default",
         concat!(
             r"example.test res.header(location ~ /old-(\d+)/new-$1)",
@@ -79,9 +79,7 @@ fn response_header_replacements_apply_without_buffering_the_body() {
 #[test]
 fn nested_response_delete_requires_the_bounded_body_path() {
     let request_meta = meta("http://example.test/releases");
-    let rules =
-        rsproxy_rules::RuleSet::parse("default", "example.test delete(resBody.payload.secret)")
-            .unwrap();
+    let rules = RuleSet::parse("default", "example.test delete(resBody.payload.secret)").unwrap();
     let actions = rules.resolve(&request_meta).actions;
 
     assert!(response_actions_require_body(&actions));
@@ -103,7 +101,7 @@ fn response_actions_render_response_headers_status_and_both_cookie_directions() 
             ),
         ],
     };
-    let rules = rsproxy_rules::RuleSet::parse(
+    let rules = RuleSet::parse(
         "default",
         "example.test res.header(x-derived: ${statusCode}|${resH.x-origin}|${reqCookies.client}|${resCookies.sid})",
     )

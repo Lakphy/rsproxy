@@ -5,6 +5,11 @@ use std::sync::Arc;
 use std::sync::OnceLock;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
+/// A non-empty per-rule round-robin pool for `host(...)` origin selection.
+///
+/// Clones share the atomic cursor but intentionally start with no local
+/// selection. Within one resolved action, the first [`selected_address`](Self::selected_address)
+/// call is cached so repeated route inspection cannot advance the pool.
 pub struct HostPool {
     addresses: Arc<[Value]>,
     cursor: Arc<AtomicUsize>,
@@ -12,6 +17,7 @@ pub struct HostPool {
 }
 
 impl HostPool {
+    /// Builds a pool after rejecting an empty list or an empty address source.
     pub fn new(addresses: Vec<Value>) -> Result<Self, RuleModelError> {
         if addresses.is_empty() {
             return Err(RuleModelError::empty(
@@ -36,10 +42,12 @@ impl HostPool {
         })
     }
 
+    /// Returns configured address sources in their round-robin order.
     pub fn addresses(&self) -> &[Value] {
         &self.addresses
     }
 
+    /// Selects once for this instance and returns the same address on later calls.
     pub fn selected_address(&self) -> &Value {
         let index = *self
             .selection

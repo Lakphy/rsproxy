@@ -1,6 +1,10 @@
 use super::*;
 
 impl Action {
+    /// Complete stable set of action-family identifiers used by contracts and `skip(...)`.
+    ///
+    /// Body and phase-sensitive operations have distinct family names even when
+    /// represented by the same Rust variant.
     pub const FAMILIES: &'static [&'static str] = &[
         "host",
         "upstream",
@@ -50,6 +54,7 @@ impl Action {
         "skip",
     ];
 
+    /// Returns this action's stable family identifier for ordering, skipping, and traces.
     pub fn family(&self) -> &'static str {
         match self {
             Action::Host(_) => "host",

@@ -12,6 +12,10 @@ use request::*;
 
 pub(in crate::proxy) use request::{is_h1_request_input_error, write_h1_request_input_error};
 
+/// Accepts proxy connections until the supplied listener fails.
+///
+/// Each accepted connection runs on an isolated thread; a panic terminates that
+/// connection while the accept loop remains available for subsequent clients.
 pub fn serve(listener: TcpListener, state: SharedState) -> crate::EngineResult<()> {
     let bound = listener
         .local_addr()

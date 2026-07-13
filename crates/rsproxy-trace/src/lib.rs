@@ -1,3 +1,15 @@
+//! Bounded traffic-trace assembly and storage for rsproxy.
+//!
+//! The crate accepts lifecycle [`TraceEvent`] values or completed [`Session`] values, assembles
+//! them on a dedicated collector thread, retains a bounded in-memory history, and can persist
+//! completed sessions to verified NDJSON segments. Queue, resident-memory, body-preview, and disk
+//! budgets are explicit so queue and resident growth stay bounded on the proxy data path; callers
+//! may also bound spill storage or deliberately disable its disk eviction.
+//!
+//! This crate does not observe sockets, apply rules, or expose an HTTP API. Callers decide which
+//! events and payload previews are safe to record; higher layers are responsible for access
+//! control and redaction before traces leave the process.
+
 mod event;
 mod model;
 mod serialize;

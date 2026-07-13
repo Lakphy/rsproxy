@@ -42,7 +42,7 @@ fn client_connection_processes_pipelined_requests_in_order() {
     let mut state = test_state();
     state.rules = RuleStore::from_compiled(
         &state.config.storage,
-        rsproxy_rules::RuleSet::parse("default", "example.test status(209)").unwrap(),
+        RuleSet::parse("default", "example.test status(209)").unwrap(),
     );
     let server_state = state.clone();
     let server = thread::spawn(move || {

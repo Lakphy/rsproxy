@@ -1,3 +1,4 @@
+mod api;
 mod fs_walk;
 mod layout;
 mod lines;
@@ -15,6 +16,7 @@ use thiserror::Error;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
 pub enum CheckKind {
+    Api,
     Lines,
     Layout,
     TypedErrors,
@@ -25,6 +27,7 @@ pub enum CheckKind {
 impl fmt::Display for CheckKind {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         let name = match self {
+            Self::Api => "api",
             Self::Lines => "lines",
             Self::Layout => "layout",
             Self::TypedErrors => "typed-errors",
@@ -86,6 +89,11 @@ impl std::error::Error for CheckFailures {}
 
 #[derive(Debug, Error)]
 pub enum CheckError {
+    #[error(
+        "`--bless` is only valid with `cargo xtask check api` or `cargo xtask check all`, not `cargo xtask check {kind}`"
+    )]
+    InvalidBlessKind { kind: CheckKind },
+
     #[error("failed to {action} {path}")]
     Io {
         action: &'static str,
@@ -120,21 +128,20 @@ pub enum CheckError {
 }
 
 pub fn run(workspace_root: &Path, kind: CheckKind) -> Result<CheckReport, CheckError> {
-    let requested: &[CheckKind] = match kind {
-        CheckKind::All => &[
-            CheckKind::Lines,
-            CheckKind::Layout,
-            CheckKind::TypedErrors,
-            CheckKind::Workflows,
-        ],
-        CheckKind::Lines => &[CheckKind::Lines],
-        CheckKind::Layout => &[CheckKind::Layout],
-        CheckKind::TypedErrors => &[CheckKind::TypedErrors],
-        CheckKind::Workflows => &[CheckKind::Workflows],
-    };
+    run_with_options(workspace_root, kind, false)
+}
+
+pub fn run_with_options(
+    workspace_root: &Path,
+    kind: CheckKind,
+    bless_api: bool,
+) -> Result<CheckReport, CheckError> {
+    validate_options(kind, bless_api)?;
+    let requested = expanded_checks(kind);
     let mut checks = Vec::with_capacity(requested.len());
     for &check in requested {
         let summary = match check {
+            CheckKind::Api => api::check(workspace_root, bless_api)?,
             CheckKind::Lines => lines::check(workspace_root)?,
             CheckKind::Layout => layout::check(workspace_root)?,
             CheckKind::TypedErrors => typed_errors::check(workspace_root)?,
@@ -147,6 +154,30 @@ pub fn run(workspace_root: &Path, kind: CheckKind) -> Result<CheckReport, CheckE
         });
     }
     Ok(CheckReport { checks })
+}
+
+fn validate_options(kind: CheckKind, bless_api: bool) -> Result<(), CheckError> {
+    if bless_api && !matches!(kind, CheckKind::Api | CheckKind::All) {
+        return Err(CheckError::InvalidBlessKind { kind });
+    }
+    Ok(())
+}
+
+fn expanded_checks(kind: CheckKind) -> &'static [CheckKind] {
+    match kind {
+        CheckKind::All => &[
+            CheckKind::Api,
+            CheckKind::Lines,
+            CheckKind::Layout,
+            CheckKind::TypedErrors,
+            CheckKind::Workflows,
+        ],
+        CheckKind::Api => &[CheckKind::Api],
+        CheckKind::Lines => &[CheckKind::Lines],
+        CheckKind::Layout => &[CheckKind::Layout],
+        CheckKind::TypedErrors => &[CheckKind::TypedErrors],
+        CheckKind::Workflows => &[CheckKind::Workflows],
+    }
 }
 
 fn fail_if_any(kind: CheckKind, violations: Vec<Violation>) -> Result<(), CheckError> {

@@ -1,3 +1,8 @@
+//! Minimal persistent HTTP/1 origin used by repository proxy benchmarks.
+//!
+//! The program prints its effective listener address once, then serves a fixed
+//! 1 KiB body so benchmark clients measure proxy overhead rather than application work.
+
 use bytes::Bytes;
 use http_body_util::Full;
 use hyper::Response;

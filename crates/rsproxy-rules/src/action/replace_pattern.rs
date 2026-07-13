@@ -3,6 +3,7 @@ use std::fmt;
 use std::sync::Arc;
 
 #[derive(Clone)]
+/// A Rust regular expression compiled once for repeated replacement operations.
 pub struct RegexReplacePattern {
     pattern: String,
     case_insensitive: bool,
@@ -10,6 +11,7 @@ pub struct RegexReplacePattern {
 }
 
 impl RegexReplacePattern {
+    /// Compiles a pattern with the requested case-sensitivity, returning regex syntax errors.
     pub fn new(pattern: String, case_insensitive: bool) -> Result<Self, regex::Error> {
         let compiled = RegexBuilder::new(&pattern)
             .case_insensitive(case_insensitive)
@@ -21,14 +23,17 @@ impl RegexReplacePattern {
         })
     }
 
+    /// Replaces every non-overlapping match using Rust-regex capture expansion.
     pub fn replace_all(&self, input: &str, replacement: &str) -> String {
         self.compiled.replace_all(input, replacement).into_owned()
     }
 
+    /// Returns pattern text without DSL slash delimiters or flags.
     pub fn pattern(&self) -> &str {
         &self.pattern
     }
 
+    /// Reports whether the compiled matcher ignores case.
     pub fn is_case_insensitive(&self) -> bool {
         self.case_insensitive
     }

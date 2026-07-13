@@ -6,6 +6,10 @@ use std::time::{SystemTime, UNIX_EPOCH};
 static FALLBACK_COUNTER: AtomicU64 = AtomicU64::new(1);
 
 #[derive(Clone, Debug)]
+/// Lazily generated values that remain stable across both phases of one request.
+///
+/// Clones share the same initialization cell. Generated IDs are 32 lowercase
+/// hexadecimal characters and generated UUIDs are RFC 4122 version 4 values.
 pub struct TemplateMetadata {
     values: Arc<OnceLock<TemplateValues>>,
 }
@@ -19,6 +23,7 @@ struct TemplateValues {
 }
 
 impl TemplateMetadata {
+    /// Generates all metadata immediately, using OS entropy with a deterministic fallback.
     pub fn generate() -> Self {
         Self::from_values(generate_values())
     }
@@ -36,6 +41,7 @@ impl TemplateMetadata {
         self.values.get_or_init(generate_values)
     }
 
+    /// Creates deterministic metadata for replay, tests, or an externally assigned request id.
     pub fn fixed(
         id: impl Into<String>,
         now_ms: u64,
@@ -50,18 +56,22 @@ impl TemplateMetadata {
         })
     }
 
+    /// Returns the request identifier exposed as `${id}`.
     pub fn id(&self) -> &str {
         &self.values().id
     }
 
+    /// Returns the Unix-millisecond timestamp exposed as `${now}`.
     pub fn now_ms(&self) -> u64 {
         self.values().now_ms
     }
 
+    /// Returns the per-request unsigned value exposed as `${random}`.
     pub fn random(&self) -> u64 {
         self.values().random
     }
 
+    /// Returns the per-request UUID string exposed as `${randomUUID}`.
     pub fn random_uuid(&self) -> &str {
         &self.values().random_uuid
     }
@@ -73,7 +83,11 @@ fn generate_values() -> TemplateValues {
     if getrandom::fill(&mut entropy).is_err() {
         fill_fallback_entropy(&mut entropy, now_ms);
     }
-    let random = u64::from_le_bytes(entropy[16..24].try_into().unwrap());
+    let random = u64::from_le_bytes(
+        entropy[16..24]
+            .try_into()
+            .expect("eight-byte entropy slice must form a u64"),
+    );
     entropy[24 + 6] = (entropy[24 + 6] & 0x0f) | 0x40;
     entropy[24 + 8] = (entropy[24 + 8] & 0x3f) | 0x80;
     TemplateValues {
@@ -126,7 +140,8 @@ fn splitmix64(mut value: u64) -> u64 {
 fn encode_hex(bytes: &[u8]) -> String {
     let mut output = String::with_capacity(bytes.len() * 2);
     for byte in bytes {
-        write!(&mut output, "{byte:02x}").unwrap();
+        write!(&mut output, "{byte:02x}")
+            .expect("formatting hexadecimal bytes into a String cannot fail");
     }
     output
 }

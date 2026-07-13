@@ -1,3 +1,8 @@
+//! Process entry point for the `rsproxy` executable.
+//!
+//! Argument parsing and execution live in `rsproxy_cli`; this boundary owns
+//! stable exit codes plus human/JSON error rendering.
+
 use clap::error::ErrorKind;
 use rsproxy_cli::CliError;
 

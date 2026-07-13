@@ -1,3 +1,6 @@
+//! Behavioral smoke tests for the platform facade.
+#![allow(clippy::unwrap_used)]
+
 use rsproxy_platform::ca::{
     CaInitialization, TrustOptions, generate_root_ca, initialize_root_ca, install_root_ca,
     read_root_ca, root_ca_status,

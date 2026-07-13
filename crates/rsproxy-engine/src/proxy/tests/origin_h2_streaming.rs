@@ -163,14 +163,14 @@ fn expected_h2_peer_close(error: &hyper::Error) -> bool {
     }
     let mut cause = error.source();
     while let Some(source) = cause {
-        if let Some(io_error) = source.downcast_ref::<std::io::Error>() {
+        if let Some(io_error) = source.downcast_ref::<io::Error>() {
             return matches!(
                 io_error.kind(),
-                std::io::ErrorKind::BrokenPipe
-                    | std::io::ErrorKind::ConnectionReset
-                    | std::io::ErrorKind::ConnectionAborted
-                    | std::io::ErrorKind::NotConnected
-                    | std::io::ErrorKind::UnexpectedEof
+                io::ErrorKind::BrokenPipe
+                    | io::ErrorKind::ConnectionReset
+                    | io::ErrorKind::ConnectionAborted
+                    | io::ErrorKind::NotConnected
+                    | io::ErrorKind::UnexpectedEof
             );
         }
         cause = source.source();

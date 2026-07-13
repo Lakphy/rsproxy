@@ -1,3 +1,6 @@
+//! Behavioral smoke tests for the workspace tooling facade.
+#![allow(clippy::unwrap_used)]
+
 use std::path::Path;
 
 use semver::Version;

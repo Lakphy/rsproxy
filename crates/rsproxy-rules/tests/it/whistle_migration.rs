@@ -1,6 +1,4 @@
-#[path = "support/whistle_fixture.rs"]
-mod whistle_fixture;
-
+use crate::whistle_fixture;
 use rsproxy_rules::{Action, RequestMeta, RuleSet};
 use serde::Deserialize;
 use std::collections::{BTreeSet, HashSet};

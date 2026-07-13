@@ -10,9 +10,53 @@ use super::{CheckError, CheckKind, Violation, fail_if_any, io_error, whistle};
 pub(super) fn check(root: &Path) -> Result<String, CheckError> {
     let mut violations = rust_layout_violations(root)?;
     violations.extend(missing_integration_directories(root)?);
+    violations.extend(empty_directory_violations(root)?);
     violations.extend(whistle::violations(root)?);
     fail_if_any(CheckKind::Layout, violations)?;
-    Ok("Rust test layout and pinned Whistle evidence are valid.".to_owned())
+    Ok("Rust test layout, crate directories, and pinned Whistle evidence are valid.".to_owned())
+}
+
+fn empty_directory_violations(root: &Path) -> Result<Vec<Violation>, CheckError> {
+    let crates = root.join("crates");
+    let mut violations = Vec::new();
+    collect_empty_directories(root, &crates, &mut violations)?;
+    Ok(violations)
+}
+
+fn collect_empty_directories(
+    root: &Path,
+    directory: &Path,
+    violations: &mut Vec<Violation>,
+) -> Result<(), CheckError> {
+    let metadata =
+        fs::symlink_metadata(directory).map_err(|source| io_error("inspect", directory, source))?;
+    if metadata.file_type().is_symlink() || !metadata.is_dir() {
+        return Ok(());
+    }
+
+    let entries = fs::read_dir(directory).map_err(|source| io_error("list", directory, source))?;
+    let mut children = entries
+        .map(|entry| {
+            entry
+                .map(|entry| entry.path())
+                .map_err(|source| io_error("list", directory, source))
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    children.sort();
+
+    if children.is_empty() {
+        let relative = directory.strip_prefix(root).unwrap_or(directory);
+        violations.push(Violation::new(
+            relative,
+            "empty directory is forbidden; remove it or add its intended tracked contents",
+        ));
+        return Ok(());
+    }
+
+    for child in children {
+        collect_empty_directories(root, &child, violations)?;
+    }
+    Ok(())
 }
 
 fn rust_layout_violations(root: &Path) -> Result<Vec<Violation>, CheckError> {
@@ -108,6 +152,7 @@ impl<'ast> Visit<'ast> for LayoutVisitor {
 pub(super) fn rust_violations_for_test(root: &Path) -> Result<Vec<Violation>, CheckError> {
     let mut violations = rust_layout_violations(root)?;
     violations.extend(missing_integration_directories(root)?);
+    violations.extend(empty_directory_violations(root)?);
     Ok(violations)
 }
 

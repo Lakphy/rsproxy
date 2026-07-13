@@ -17,15 +17,21 @@ use std::io;
 
 pub use command::Cli as ParsedCli;
 
+/// Parses process arguments without initializing logging or runtime services.
 pub fn parse_cli() -> Result<ParsedCli, clap::Error> {
     Cli::try_parse()
 }
 
+/// Parses process arguments and executes the selected composition-root action.
 pub fn run_cli() -> CliResult<()> {
     let cli = parse_cli()?;
     run_parsed(cli)
 }
 
+/// Executes an already parsed command, initializing only the selected services.
+///
+/// The caller retains responsibility for process-level exit-code and JSON error
+/// rendering; use [`crate::CliError::exit_code`] and [`crate::CliError::code`].
 pub fn run_parsed(cli: ParsedCli) -> CliResult<()> {
     let Some(command) = cli.command else {
         let mut command = Cli::command();

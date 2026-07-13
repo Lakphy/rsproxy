@@ -79,7 +79,7 @@ fn spill_json_covers_all_session_frame_tls_and_optional_shapes() {
             },
         ];
 
-        let line = crate::serialize::spill_session_line(&session);
+        let line = serialize::spill_session_line(&session);
         let value: serde_json::Value = serde_json::from_str(&line).unwrap();
         assert_eq!(value["id"], session.id);
         assert_eq!(value["kind"], ["http", "tunnel", "sse", "websocket"][index]);

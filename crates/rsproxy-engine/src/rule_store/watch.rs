@@ -7,12 +7,19 @@ use std::time::Duration;
 const EVENT_QUEUE_CAPACITY: usize = 64;
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
+/// Monotonic rule-watcher counters and the latest reload outcome.
 pub struct RuleWatchStatus {
+    /// Filesystem events accepted by the bounded watcher callback.
     pub events: u64,
+    /// Events dropped because the bounded callback queue was full.
     pub dropped_events: u64,
+    /// Successful reloads that published a changed snapshot.
     pub reloads: u64,
+    /// Reload attempts that retained the previous valid snapshot.
     pub failures: u64,
+    /// Unix timestamp in milliseconds of the latest successful changed reload.
     pub last_reload_ms: Option<u64>,
+    /// Display-safe diagnostic from the latest failed reload, cleared on success.
     pub last_error: Option<String>,
 }
 
@@ -60,16 +67,17 @@ impl RuleStore {
         })
     }
 
+    /// Copies watcher counters without holding the status lock after return.
     pub fn watch_status(&self) -> RuleWatchStatus {
         self.inner
             .watch_status
             .lock()
-            .expect("rule watch status poisoned")
+            .expect("rule watch status lock poisoned")
             .clone()
     }
 
     fn reload_from_disk(&self) -> Result<bool, RuleStoreError> {
-        let _update = self.inner.update.lock().expect("rule store poisoned");
+        let _update = self.inner.update.lock().expect("rule store lock poisoned");
         let next = load_snapshot(&self.inner.rules_dir)?;
         if self.snapshot().groups == next.groups {
             return Ok(false);
@@ -83,7 +91,7 @@ impl RuleStore {
             .inner
             .watch_status
             .lock()
-            .expect("rule watch status poisoned");
+            .expect("rule watch status lock poisoned");
         status.events = status.events.saturating_add(1);
     }
 
@@ -92,7 +100,7 @@ impl RuleStore {
             .inner
             .watch_status
             .lock()
-            .expect("rule watch status poisoned");
+            .expect("rule watch status lock poisoned");
         status.dropped_events = status.dropped_events.saturating_add(1);
     }
 
@@ -101,7 +109,7 @@ impl RuleStore {
             .inner
             .watch_status
             .lock()
-            .expect("rule watch status poisoned");
+            .expect("rule watch status lock poisoned");
         status.reloads = status.reloads.saturating_add(1);
         status.last_reload_ms = Some(rsproxy_trace::now_millis());
         status.last_error = None;
@@ -112,7 +120,7 @@ impl RuleStore {
             .inner
             .watch_status
             .lock()
-            .expect("rule watch status poisoned");
+            .expect("rule watch status lock poisoned");
         status.failures = status.failures.saturating_add(1);
         status.last_error = Some(error.to_string());
     }
