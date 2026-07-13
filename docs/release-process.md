@@ -75,9 +75,10 @@ local equivalents:
 | Supply chain policy | cargo-deny advisories, bans, licenses, sources | `cargo deny check --all-features --locked` |
 | Production line coverage | workspace line coverage ≥ 85%, `rsproxy-rules` ≥ 95% | `./scripts/verify.sh coverage-report` |
 
-Two workflows guard quality outside the PR loop; both run on a daily schedule
-and can also be dispatched manually, and must be green before every release
-(see the release-preparation checklist):
+Two workflows watch quality outside the PR loop; both run on a daily schedule
+and can also be dispatched manually. They are **advisory, not release
+gates**: a red run opens an issue to investigate a regression or crash, but
+never blocks tagging or shipping.
 
 - `performance.yml` (daily 02:41 UTC): Criterion benchmarks against absolute
   targets, and a 10% regression gate against the parent commit.
@@ -88,8 +89,9 @@ and can also be dispatched manually, and must be green before every release
 
 > 中文:CI 每个 PR 只跑一次(push 仅 main 触发,过期 PR 运行自动取消)。
 > 七个 job 分别覆盖三平台构建测试、MSRV、格式/Clippy/文档、仓库契约、
-> 分发契约、供应链策略、行覆盖率(workspace ≥85%,rules ≥95%);
-> 性能基准和模糊测试每日定时运行(也可手动触发),发布前必须全绿。
+> 分发契约、供应链策略、行覆盖率(workspace ≥85%,rules ≥95%)。
+> 性能基准和模糊测试每日定时运行(也可手动触发),定位是**质量雷达而非
+> 发布闸门**:变红开 issue 跟进,不阻断发布。
 > 注意:仓库 60 天无活动时 GitHub 会自动停用定时任务,需手动重新启用。
 
 ## Public API snapshots(公共 API 快照)
@@ -151,18 +153,14 @@ patterns (floating action tags, `continue-on-error`, workflow-level
    ```
 
 4. Open a release PR (`chore: release vX.Y.Z`) with the version bump and
-   changelog; merge it once CI is green.
-5. Confirm the latest `performance.yml` and `fuzz.yml` runs on `main` are
-   green — they run nightly but are not part of the per-PR gate. If the
-   latest run predates the release PR, dispatch them manually
-   (`gh workflow run performance.yml` / `gh workflow run fuzz.yml`) and wait
-   for both to pass.
+   changelog; merge it once CI is green. CI on the release commit is the
+   only pipeline gate — the scheduled performance/fuzz workflows are
+   advisory and do not block tagging.
 
 > 中文:确定版本号 → 把 CHANGELOG 的 Unreleased 整理成 `## [X.Y.Z] - 日期`
 > 段(发布说明即取自该段,缺失会导致发布失败)→ `cargo xtask release X.Y.Z`
-> 同步所有清单并用 `--check` 复核 → 提发布 PR,CI 绿后合并 → 确认
-> performance 和 fuzz 最近一次运行是绿的(每日定时跑,但不在 PR 门禁内;
-> 若最近运行早于发布 PR,手动触发并等待通过)。
+> 同步所有清单并用 `--check` 复核 → 提发布 PR,CI 绿后合并。发布唯一的
+> 流水线门禁是发布 commit 上的 CI;performance/fuzz 仅供参考,不阻断打标。
 
 ## Tagging and automation(打标签与自动化发布)
 

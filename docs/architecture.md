@@ -504,7 +504,7 @@ results for the parent and current commits on one runner and blocks
 regressions above 10% through typed `cargo xtask targets` report parsing.
 `.github/workflows/fuzz.yml` owns the nightly libFuzzer run; it and
 `performance.yml` run on daily schedules plus manual dispatch, decoupled from
-pushes and PRs, and are expected to pass before every release. The npm
+pushes and PRs; their findings open issues rather than gating releases. The npm
 distribution boundary lives under `packages/npm/`: `@rsproxy/runtime` resolves
 one of eight OS/architecture/libc packages, while `@rsproxy/cli` is the shared
 npm/Bun entry package. `release.yml` builds those native packages, publishes to
