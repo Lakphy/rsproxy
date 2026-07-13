@@ -1,4 +1,7 @@
 use crate::cli::command::{Cli, RulesCommand, TopLevelCommand};
+use crate::cli::rules::groups::{
+    load_rule_set, run_rules_cat, run_rules_list, run_rules_remove, run_rules_set, run_rules_toggle,
+};
 use crate::cli::rules::request::request_meta;
 use crate::cli::rules::{parse_header_arg, response_meta, rules_test_api_path};
 use clap::Parser;
@@ -109,4 +112,43 @@ fn rules_request_url_is_not_confused_with_global_config_values() {
         panic!("rules test command expected");
     };
     assert_eq!(args.url, "http://api.test/v1");
+}
+
+#[test]
+fn offline_group_helpers_cover_file_list_cat_toggle_remove_and_load_paths() {
+    let root = std::env::temp_dir().join(format!(
+        "rsproxy-cli-rules-unit-{}-{}",
+        std::process::id(),
+        rsproxy_trace::now_millis()
+    ));
+    let storage = root.join("storage");
+    let rules_file = root.join("input.rules");
+    std::fs::create_dir_all(&root).unwrap();
+    std::fs::write(&rules_file, "example.test status(218)\n").unwrap();
+    let api = "127.0.0.1:1";
+
+    run_rules_set("file-group", Some(&rules_file), api, &storage).unwrap();
+    run_rules_cat("file-group", false, api, &storage).unwrap();
+    run_rules_cat("file-group", true, api, &storage).unwrap();
+    run_rules_list(false, api, &storage).unwrap();
+    run_rules_list(true, api, &storage).unwrap();
+
+    run_rules_toggle("file-group", api, &storage, false).unwrap();
+    let disabled = load_rule_set(None, api, &storage).unwrap();
+    assert!(disabled.rules.is_empty());
+    run_rules_toggle("file-group", api, &storage, true).unwrap();
+    let enabled = load_rule_set(None, api, &storage).unwrap();
+    assert_eq!(enabled.rules.len(), 1);
+
+    let from_file = load_rule_set(Some(&rules_file), api, &storage).unwrap();
+    assert_eq!(from_file.rules[0].actions.len(), 1);
+    let missing_file = root.join("missing.rules");
+    assert!(run_rules_set("missing", Some(&missing_file), api, &storage).is_err());
+    assert!(load_rule_set(Some(&missing_file), api, &storage).is_err());
+    assert!(run_rules_cat("absent", false, api, &storage).is_err());
+    assert!(run_rules_set("../escape", Some(&rules_file), api, &storage).is_err());
+
+    run_rules_remove("file-group", api, &storage).unwrap();
+    assert!(run_rules_remove("file-group", api, &storage).is_err());
+    let _ = std::fs::remove_dir_all(root);
 }

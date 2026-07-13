@@ -5,8 +5,9 @@ use crate::cli::system_proxy::{
 };
 use clap::Parser;
 use rsproxy_platform::system_proxy::{
-    MacosBypassStatus, MacosEndpointStatus, MacosServiceStatus, ProxyAction, ProxyChange,
-    ProxyCommand, ProxyOutcome, ProxyPlan, ProxyPlanStep, ProxyPlatform, ProxyStatus, ProxyTarget,
+    LinuxSettingStatus, MacosBypassStatus, MacosEndpointStatus, MacosServiceStatus, ProxyAction,
+    ProxyChange, ProxyCommand, ProxyOutcome, ProxyPlan, ProxyPlanStep, ProxyPlatform, ProxyStatus,
+    ProxyTarget,
 };
 use std::fs;
 
@@ -161,4 +162,113 @@ fn cli_renders_typed_macos_status_without_platform_presentation_fields() {
     assert_eq!(json["platform"], "macos");
     assert_eq!(json["services"][0]["http"]["enabled"], true);
     assert_eq!(json["services"][0]["bypass"][0], "localhost");
+}
+
+#[test]
+fn cli_renders_changed_outcomes_for_every_platform_and_rejects_empty_results() {
+    for (platform, backend) in [
+        (ProxyPlatform::Macos, "networksetup"),
+        (ProxyPlatform::Windows, "wininet-registry"),
+        (ProxyPlatform::Linux, "gsettings"),
+    ] {
+        let report = SystemProxyResult::Outcome(ProxyOutcome::Changed(vec![proxy_change(
+            platform,
+            false,
+            (platform == ProxyPlatform::Macos).then(|| "Wi-Fi".to_string()),
+        )]));
+        let lines = proxy_report_lines(&report);
+        assert_eq!(lines.len(), 1);
+        assert!(lines[0].starts_with("proxy_off"));
+        let json = proxy_report_json(&report).unwrap();
+        assert_eq!(json["backend"], backend);
+        assert_eq!(json["enabled"], false);
+    }
+
+    let empty = SystemProxyResult::Outcome(ProxyOutcome::Changed(Vec::new()));
+    assert!(proxy_report_json(&empty).is_err());
+    assert!(proxy_report_lines(&empty).is_empty());
+}
+
+#[test]
+fn cli_renders_windows_linux_and_macos_error_status_shapes() {
+    let windows = SystemProxyResult::Outcome(ProxyOutcome::Status(ProxyStatus::Windows {
+        enabled: false,
+        server: None,
+        bypass: None,
+    }));
+    assert_eq!(
+        proxy_report_lines(&windows),
+        ["enabled=false", "server=-", "bypass=-"]
+    );
+    let windows_json = proxy_report_json(&windows).unwrap();
+    assert_eq!(windows_json["platform"], "windows");
+    assert!(windows_json["server"].is_null());
+
+    let linux = SystemProxyResult::Outcome(ProxyOutcome::Status(ProxyStatus::Linux {
+        settings: vec![LinuxSettingStatus {
+            schema: "org.gnome.system.proxy".to_string(),
+            key: "mode".to_string(),
+            value: "'manual'".to_string(),
+        }],
+    }));
+    assert_eq!(
+        proxy_report_lines(&linux),
+        ["org.gnome.system.proxy.mode='manual'"]
+    );
+    let linux_json = proxy_report_json(&linux).unwrap();
+    assert_eq!(linux_json["settings"][0]["key"], "mode");
+
+    let endpoint = MacosEndpointStatus {
+        enabled: false,
+        server: None,
+        port: None,
+        authenticated: false,
+        reported_enabled: None,
+        reported_port: None,
+        reported_authenticated: None,
+    };
+    let macos = SystemProxyResult::Outcome(ProxyOutcome::Status(ProxyStatus::Macos {
+        services: vec![MacosServiceStatus {
+            service: "Ethernet".to_string(),
+            http: endpoint.clone(),
+            https: endpoint,
+            bypass: MacosBypassStatus::QueryError(
+                " first failure \n\n second failure ".to_string(),
+            ),
+        }],
+    }));
+    let lines = proxy_report_lines(&macos);
+    assert_eq!(
+        lines[1],
+        "  http  enabled=- server=- port=- authenticated=-"
+    );
+    assert_eq!(lines[3], "  bypass error:  first failure,second failure");
+    let macos_json = proxy_report_json(&macos).unwrap();
+    assert_eq!(
+        macos_json["services"][0]["bypass"],
+        serde_json::json!(["error:  first failure", "second failure"])
+    );
+
+    let expected = if cfg!(target_os = "macos") {
+        ProxyPlatform::Macos
+    } else if cfg!(target_os = "windows") {
+        ProxyPlatform::Windows
+    } else {
+        ProxyPlatform::Linux
+    };
+    assert_eq!(proxy_platform(None), expected);
+    assert!(proxy_options(&ClientArgs::default(), None, None, ProxyAction::Enable).is_err());
+}
+
+fn proxy_change(platform: ProxyPlatform, enabled: bool, service: Option<String>) -> ProxyChange {
+    ProxyChange {
+        platform,
+        enabled,
+        target: ProxyTarget {
+            host: "127.0.0.1".to_string(),
+            port: 18916,
+        },
+        bypass: Some(vec!["localhost".to_string()]),
+        service,
+    }
 }

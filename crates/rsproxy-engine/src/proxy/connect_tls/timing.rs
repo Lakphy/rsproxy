@@ -185,6 +185,6 @@ pub(in crate::proxy) fn tcp_connect_timeout_error(timeout: Duration, addr: &str)
     )
 }
 
-fn staged_io_error(stage: &str, error: io::Error) -> io::Error {
+pub(in crate::proxy) fn staged_io_error(stage: &str, error: io::Error) -> io::Error {
     io::Error::new(error.kind(), format!("stage={stage}: {error}"))
 }

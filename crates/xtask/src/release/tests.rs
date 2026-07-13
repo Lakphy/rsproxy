@@ -8,6 +8,8 @@ use tempfile::TempDir;
 
 use super::{ReleaseError, release};
 
+mod edges;
+
 const MEMBERS: [&str; 8] = [
     "rsproxy-rules",
     "rsproxy-trace",
@@ -30,12 +32,12 @@ const NATIVE_PACKAGES: [&str; 8] = [
     "@rsproxy/win32-x64-msvc",
 ];
 
-struct Fixture {
+pub(super) struct Fixture {
     directory: TempDir,
 }
 
 impl Fixture {
-    fn new() -> Self {
+    pub(super) fn new() -> Self {
         let directory = tempfile::tempdir().expect("create fixture");
         let root = directory.path();
         let members = MEMBERS
@@ -127,7 +129,7 @@ impl Fixture {
         Self { directory }
     }
 
-    fn root(&self) -> &Path {
+    pub(super) fn root(&self) -> &Path {
         self.directory.path()
     }
 
@@ -274,13 +276,13 @@ fn fixture_files(root: &Path) -> Vec<PathBuf> {
     files
 }
 
-fn write(root: &Path, relative: &str, contents: &str) {
+pub(super) fn write(root: &Path, relative: &str, contents: &str) {
     let path = root.join(relative);
     fs::create_dir_all(path.parent().expect("fixture parent")).expect("create fixture parent");
     fs::write(path, contents).expect("write fixture");
 }
 
-fn write_json(root: &Path, relative: &str, value: &Value) {
+pub(super) fn write_json(root: &Path, relative: &str, value: &Value) {
     write(
         root,
         relative,
@@ -288,7 +290,7 @@ fn write_json(root: &Path, relative: &str, value: &Value) {
     );
 }
 
-fn read_json(root: &Path, relative: &str) -> Value {
+pub(super) fn read_json(root: &Path, relative: &str) -> Value {
     serde_json::from_slice(&fs::read(root.join(relative)).expect("read JSON fixture"))
         .expect("parse JSON fixture")
 }

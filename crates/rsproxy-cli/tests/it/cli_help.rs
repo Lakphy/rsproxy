@@ -151,9 +151,10 @@ fn every_command_help_exits_without_runtime_side_effects() {
             "{args:?}: {}",
             String::from_utf8_lossy(&output.stderr)
         );
+        let stdout = String::from_utf8_lossy(&output.stdout).replace("rsproxy.exe", "rsproxy");
         assert!(
-            String::from_utf8_lossy(&output.stdout).contains(expected),
-            "{args:?} did not contain {expected:?}"
+            stdout.contains(expected),
+            "{args:?} did not contain {expected:?}; stdout={stdout:?}"
         );
     }
     assert!(

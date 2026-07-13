@@ -73,8 +73,10 @@ fn resolved(action: Action) -> ResolvedAction {
 }
 
 mod action_effects;
+mod body_edges;
 mod connect_modes;
 mod connect_proxy;
+mod connect_routes;
 mod connection;
 mod h1_forward;
 mod h2_downstream_streaming;
@@ -91,6 +93,7 @@ mod support;
 mod template_actions;
 mod timeouts;
 mod tls_policy;
+mod tunnel_edges;
 mod value_actions;
 mod value_runtime_matrix;
 mod websocket;

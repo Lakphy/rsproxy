@@ -129,19 +129,13 @@ fn tcp_connect_timeout_and_refusal_remain_distinct() {
     );
     assert!(is_upstream_tcp_connect_timeout(&timeout));
 
-    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-    let addr = listener.local_addr().unwrap();
-    drop(listener);
-    let mut state = test_state();
-    state.config.tcp_connect_timeout = Duration::from_millis(100);
-    let refused = connect_tcp_with_timeouts(
-        &addr.to_string(),
-        &state,
-        &mut NetworkTimings::default(),
-        request_deadline(),
-    )
-    .expect_err("closed local port should refuse the connection");
+    // Freshly closed ports do not report refusal consistently across operating systems. The
+    // contract is that staging preserves a real refusal and does not classify it as a timeout.
+    let refused = staged_io_error(
+        "connect",
+        io::Error::new(io::ErrorKind::ConnectionRefused, "connection refused"),
+    );
     assert_eq!(refused.kind(), io::ErrorKind::ConnectionRefused);
-    assert!(refused.to_string().starts_with("stage=connect: "));
+    assert_eq!(refused.to_string(), "stage=connect: connection refused");
     assert!(!is_upstream_tcp_connect_timeout(&refused));
 }

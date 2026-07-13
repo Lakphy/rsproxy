@@ -1,4 +1,6 @@
 use super::super::{TargetCommand, TargetError};
+use serde_json::json;
+
 use super::support::{ReportFile, criterion_report, e2e_report, failed_labels, run};
 
 const TLS_METRIC: &str = "mitm_certificate/cached_tls_handshake";
@@ -175,4 +177,104 @@ fn criterion_schema_errors_identify_the_metric_field() {
     .expect_err("lower confidence bound cannot exceed mean");
     assert!(error.to_string().contains(TLS_METRIC));
     assert!(error.to_string().contains("lower_ns"));
+}
+
+#[test]
+fn criterion_rejects_invalid_envelopes_metrics_and_relations() {
+    let mut cases = Vec::new();
+
+    let mut report = criterion_report(TLS_METRIC, 10.0);
+    report["schema"] = json!("other");
+    cases.push((report, "schema"));
+
+    let mut report = criterion_report(TLS_METRIC, 10.0);
+    report["unit"] = json!("milliseconds");
+    cases.push((report, "unit"));
+
+    cases.push((criterion_report("other", 10.0), TLS_METRIC));
+
+    let mut report = criterion_report(TLS_METRIC, 10.0);
+    report["metrics"][TLS_METRIC] = json!({"mean_ns": "fast"});
+    cases.push((report, TLS_METRIC));
+
+    let mut report = criterion_report(TLS_METRIC, 10.0);
+    report["metrics"][TLS_METRIC]["mean_ns"] = json!(0);
+    cases.push((report, "mean_ns"));
+
+    let mut report = criterion_report(TLS_METRIC, 10.0);
+    report["metrics"][TLS_METRIC]["upper_ns"] = json!(9);
+    cases.push((report, "upper_ns"));
+
+    for (report, field) in cases {
+        let report = ReportFile::new(&report);
+        let error = run(
+            TargetCommand::Criterion {
+                report: report.path().to_path_buf(),
+            },
+            &[],
+        )
+        .expect_err("invalid Criterion report must fail");
+        assert!(error.to_string().contains(field), "{error}");
+    }
+
+    let empty = ReportFile::new(&json!({
+        "schema": "rsproxy.criterion/v1",
+        "unit": "nanoseconds",
+        "metrics": {}
+    }));
+    let error = run(
+        TargetCommand::Regression {
+            baseline: empty.path().to_path_buf(),
+            current: empty.path().to_path_buf(),
+            tolerance_percent: 10.0,
+        },
+        &[],
+    )
+    .expect_err("regression metrics cannot be empty");
+    assert!(error.to_string().contains("at least one metric"));
+}
+
+#[test]
+fn e2e_rejects_invalid_envelope_and_metric_relations() {
+    for (pointer, value, field) in [
+        ("/schema", json!("other"), "schema"),
+        ("/driver", json!("wrk"), "driver"),
+        ("/requests", json!(0), "requests"),
+        ("/concurrency", json!(0), "concurrency"),
+        (
+            "/direct/requests_per_second",
+            json!(0),
+            "direct.requests_per_second",
+        ),
+        ("/direct/p50_us", json!(-1), "direct.p50_us"),
+        ("/direct/p99_us", json!(79), "direct.p99_us"),
+        ("/direct/response_bytes", json!(0), "direct.response_bytes"),
+        ("/added_latency/p50_us", json!(-1), "added_latency.p50_us"),
+        ("/added_latency/p99_us", json!(-1), "added_latency.p99_us"),
+        ("/memory/empty_rss_kib", json!(0), "memory.empty_rss_kib"),
+    ] {
+        let mut report = e2e_report(80_000.0, 299.0, 1_999.0, 30_719.0, 10.0);
+        *report.pointer_mut(pointer).expect("fixture field") = value;
+        let report = ReportFile::new(&report);
+        let error = run(
+            TargetCommand::E2e {
+                report: report.path().to_path_buf(),
+            },
+            &[],
+        )
+        .expect_err("invalid e2e report must fail");
+        assert!(error.to_string().contains(field), "{error}");
+    }
+
+    let mut report = e2e_report(80_000.0, 299.0, 1_999.0, 30_719.0, 10.0);
+    report["whistle"] = serde_json::Value::Null;
+    let report = ReportFile::new(&report);
+    let error = run(
+        TargetCommand::E2e {
+            report: report.path().to_path_buf(),
+        },
+        &[("RSPROXY_PERF_REQUIRE_WHISTLE", "1")],
+    )
+    .expect_err("required Whistle metrics cannot be absent");
+    assert!(error.to_string().contains("missing x"));
 }

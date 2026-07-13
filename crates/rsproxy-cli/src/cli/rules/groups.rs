@@ -24,7 +24,7 @@ struct GroupExportEntry {
     text: String,
 }
 
-pub(super) fn run_rules_set(
+pub(crate) fn run_rules_set(
     group: &str,
     file: Option<&Path>,
     api: &str,
@@ -40,7 +40,7 @@ pub(super) fn run_rules_set(
     save_group(group, text, api, storage)
 }
 
-pub(super) fn run_rules_cat(group: &str, json: bool, api: &str, storage: &Path) -> CliResult<()> {
+pub(crate) fn run_rules_cat(group: &str, json: bool, api: &str, storage: &Path) -> CliResult<()> {
     validate_group(group)?;
     let path = group_api_path(group);
     let text = match api_request("GET", api, &path, "") {
@@ -59,7 +59,7 @@ pub(super) fn run_rules_cat(group: &str, json: bool, api: &str, storage: &Path) 
     Ok(())
 }
 
-pub(super) fn run_rules_list(json_output: bool, api: &str, storage: &Path) -> CliResult<()> {
+pub(crate) fn run_rules_list(json_output: bool, api: &str, storage: &Path) -> CliResult<()> {
     let json = match api_request("GET", api, "/api/rules", "") {
         Ok(json) => json,
         Err(_) => local_group_list_json(storage)?,
@@ -87,12 +87,12 @@ pub(super) fn run_rules_list(json_output: bool, api: &str, storage: &Path) -> Cl
     Ok(())
 }
 
-pub(super) fn run_rules_remove(group: &str, api: &str, storage: &Path) -> CliResult<()> {
+pub(crate) fn run_rules_remove(group: &str, api: &str, storage: &Path) -> CliResult<()> {
     validate_group(group)?;
     change_group(group, "DELETE", None, api, storage)
 }
 
-pub(super) fn run_rules_toggle(
+pub(crate) fn run_rules_toggle(
     group: &str,
     api: &str,
     storage: &Path,
@@ -148,7 +148,7 @@ pub(super) fn run_rules_edit(group: &str, api: &str, storage: &Path) -> CliResul
     save_group(group, text_result?, api, storage)
 }
 
-pub(super) fn load_rule_set(file: Option<&Path>, api: &str, storage: &Path) -> CliResult<RuleSet> {
+pub(crate) fn load_rule_set(file: Option<&Path>, api: &str, storage: &Path) -> CliResult<RuleSet> {
     if let Some(file) = file {
         let text = fs::read_to_string(file).map_err(|source| {
             CliError::io(format!("read rules file {}", file.display()), source)

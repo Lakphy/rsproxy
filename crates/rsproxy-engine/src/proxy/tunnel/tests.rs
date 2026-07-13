@@ -12,6 +12,7 @@ fn tunnel_trace_events_count_both_directions_without_capturing_payloads() {
     });
     let trace = TunnelTrace::new(store.clone(), id).unwrap();
 
+    trace.observe(rsproxy_trace::BodyDirection::Request, 0);
     trace.observe(rsproxy_trace::BodyDirection::Request, 11);
     trace.observe(rsproxy_trace::BodyDirection::Response, 7);
     store.emit(rsproxy_trace::TraceEvent::End {

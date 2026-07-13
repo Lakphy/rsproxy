@@ -183,3 +183,106 @@ fn delete_aliases_and_body_path_limits_are_explicit() {
     assert!(error.message.contains("exceeds 128 segments"));
     assert!(DeleteBodyPath::new(Vec::new()).is_err());
 }
+
+#[test]
+fn cookie_and_cache_aliases_canonicalize_every_documented_spelling() {
+    let rules = RuleSet::parse(
+        "edges",
+        concat!(
+            "example.test ",
+            "res.cookie(id=value; max_age=60; http-only; same_site=Lax; x-custom-flag=on) ",
+            "cache(max_age=60, s_maxage=120, stale_while_revalidate=30, ",
+            "stale_if_error=10, must_revalidate, proxy_revalidate, no_cache, ",
+            "no_store, no_transform)"
+        ),
+    )
+    .unwrap();
+
+    let Action::ResCookie(CookieOp::Set { attrs, .. }) = &rules.rules[0].actions[0] else {
+        panic!("response cookie action expected");
+    };
+    assert_eq!(
+        attrs
+            .iter()
+            .map(|attr| attr.name.as_str())
+            .collect::<Vec<_>>(),
+        ["Max-Age", "HttpOnly", "SameSite", "X-Custom-Flag"]
+    );
+
+    let Action::Cache(CacheOp::Directives(directives)) = &rules.rules[0].actions[1] else {
+        panic!("cache directives expected");
+    };
+    assert_eq!(
+        directives
+            .iter()
+            .map(|directive| directive.name.as_str())
+            .collect::<Vec<_>>(),
+        [
+            "max-age",
+            "s-maxage",
+            "stale-while-revalidate",
+            "stale-if-error",
+            "must-revalidate",
+            "proxy-revalidate",
+            "no-cache",
+            "no-store",
+            "no-transform",
+        ]
+    );
+
+    let error = parse_error("req.body.replace([, replacement)");
+    assert_eq!(error.code, RuleErrorCode::Action);
+    assert!(!error.message.is_empty());
+}
+
+#[test]
+fn matcher_and_delete_parsers_report_every_authority_and_path_shape() {
+    for matcher in [
+        "=",
+        "=http://[",
+        "=1http://example.test",
+        "1http://example.test",
+        "http:///path",
+        "[::1",
+        "[::1]suffix",
+        "host[",
+        "::1",
+        "example.test:",
+        "example.test:*x",
+        "example.test:0",
+        "example.test:70000",
+        "/(/",
+    ] {
+        assert!(
+            RuleSet::parse("edges", &format!("{matcher} status(200)")).is_err(),
+            "{matcher}"
+        );
+    }
+
+    let rules = RuleSet::parse("edges", "https://[::1]:4*/path?query status(200)").unwrap();
+    let Matcher::Glob(glob) = &rules.rules[0].matcher else {
+        panic!("glob matcher expected");
+    };
+    assert_eq!(glob.host, "::1");
+    assert_eq!(glob.port.as_deref(), Some("4*"));
+    assert_eq!(glob.path.as_deref(), Some("/path"));
+    assert_eq!(glob.query.as_deref(), Some("query"));
+
+    let rules = RuleSet::parse(
+        "edges",
+        concat!(
+            "example.test delete(",
+            "pathname.first, pathname.last, pathname.-2, ",
+            "reqBody.a], reqBody.a[], reqBody.a[01], reqBody.a[x], reqBody.[2], ",
+            "reqBody.\\r.\\t.\\f.\\v)"
+        ),
+    )
+    .unwrap();
+    let Action::Delete(operations) = &rules.rules[0].actions[0] else {
+        panic!("delete action expected");
+    };
+    assert_eq!(operations.len(), 9);
+
+    let error = parse_error("delete(pathname.not-an-index)");
+    assert_eq!(error.code, RuleErrorCode::Action);
+}

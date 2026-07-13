@@ -4,8 +4,8 @@ use windows_sys::Win32::Foundation::{
     GENERIC_WRITE, GetLastError, HANDLE, INVALID_HANDLE_VALUE,
 };
 use windows_sys::Win32::Storage::FileSystem::{
-    CreateFileW, FILE_FLAG_FIRST_PIPE_INSTANCE, OPEN_EXISTING, PIPE_ACCESS_DUPLEX, ReadFile,
-    WriteFile,
+    CreateFileW, FILE_FLAG_FIRST_PIPE_INSTANCE, FlushFileBuffers, OPEN_EXISTING,
+    PIPE_ACCESS_DUPLEX, ReadFile, WriteFile,
 };
 use windows_sys::Win32::System::Pipes::{
     ConnectNamedPipe, CreateNamedPipeW, DisconnectNamedPipe, PIPE_READMODE_BYTE,
@@ -191,7 +191,18 @@ impl Write for NamedPipeStream {
     }
 
     fn flush(&mut self) -> io::Result<()> {
-        Ok(())
+        if !self.server {
+            return Ok(());
+        }
+        // SAFETY: `handle` is a valid owned server pipe handle. A synchronous
+        // flush waits until the client consumes every buffered response byte,
+        // which is required before this server disconnects its pipe instance.
+        let result = unsafe { FlushFileBuffers(self.handle) };
+        if result == 0 {
+            Err(io::Error::last_os_error())
+        } else {
+            Ok(())
+        }
     }
 }
 
@@ -218,3 +229,6 @@ fn canonical_path(path: &str) -> String {
 fn wide(value: &str) -> Vec<u16> {
     value.encode_utf16().chain(std::iter::once(0)).collect()
 }
+
+#[cfg(test)]
+mod tests;

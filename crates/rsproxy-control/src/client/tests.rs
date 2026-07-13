@@ -1,4 +1,5 @@
 use super::*;
+use std::collections::VecDeque;
 use std::fs;
 use std::io::{self, Cursor};
 use std::path::PathBuf;
@@ -7,6 +8,78 @@ use std::time::{SystemTime, UNIX_EPOCH};
 struct ScriptedApiStream {
     response: Cursor<Vec<u8>>,
     request: Vec<u8>,
+}
+
+enum ReadStep {
+    Data(Vec<u8>),
+    Error(io::ErrorKind),
+    Eof,
+}
+
+struct FaultInjectedApiStream {
+    reads: VecDeque<ReadStep>,
+    request: Vec<u8>,
+    write_error: Option<io::ErrorKind>,
+    flush_error: Option<io::ErrorKind>,
+}
+
+impl FaultInjectedApiStream {
+    fn with_reads(reads: impl IntoIterator<Item = ReadStep>) -> Self {
+        Self {
+            reads: reads.into_iter().collect(),
+            request: Vec::new(),
+            write_error: None,
+            flush_error: None,
+        }
+    }
+
+    fn failing_write() -> Self {
+        Self {
+            write_error: Some(io::ErrorKind::BrokenPipe),
+            ..Self::with_reads([])
+        }
+    }
+
+    fn failing_flush() -> Self {
+        Self {
+            flush_error: Some(io::ErrorKind::BrokenPipe),
+            ..Self::with_reads([])
+        }
+    }
+}
+
+impl Read for FaultInjectedApiStream {
+    fn read(&mut self, buffer: &mut [u8]) -> io::Result<usize> {
+        match self.reads.pop_front().unwrap_or(ReadStep::Eof) {
+            ReadStep::Data(data) => {
+                let read = data.len().min(buffer.len());
+                buffer[..read].copy_from_slice(&data[..read]);
+                if read != data.len() {
+                    self.reads.push_front(ReadStep::Data(data[read..].to_vec()));
+                }
+                Ok(read)
+            }
+            ReadStep::Error(kind) => Err(io::Error::from(kind)),
+            ReadStep::Eof => Ok(0),
+        }
+    }
+}
+
+impl Write for FaultInjectedApiStream {
+    fn write(&mut self, buffer: &[u8]) -> io::Result<usize> {
+        if let Some(kind) = self.write_error {
+            return Err(io::Error::from(kind));
+        }
+        self.request.extend_from_slice(buffer);
+        Ok(buffer.len())
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        if let Some(kind) = self.flush_error {
+            return Err(io::Error::from(kind));
+        }
+        Ok(())
+    }
 }
 
 impl Read for ScriptedApiStream {
@@ -224,4 +297,156 @@ fn stored_token_resolution_distinguishes_missing_and_invalid_files() {
     assert!(matches!(error, ControlError::Authentication(_)));
 
     let _ = fs::remove_dir_all(storage);
+}
+
+fn assert_control_io(error: ControlError, context_fragment: &str) {
+    match error {
+        ControlError::Io { context, source } => {
+            assert!(
+                context.contains(context_fragment),
+                "unexpected context: {context}"
+            );
+            assert_eq!(source.kind(), io::ErrorKind::BrokenPipe);
+        }
+        other => panic!("expected control I/O error, got {other:?}"),
+    }
+}
+
+#[test]
+fn streaming_reader_classifies_write_flush_read_and_eof_boundaries() {
+    let mut callback = |_: &str| true;
+
+    let mut stream = FaultInjectedApiStream::failing_write();
+    assert_control_io(
+        api_stream_lines_from(&mut stream, "test-api", "/follow", &mut callback).unwrap_err(),
+        "write control request",
+    );
+
+    let mut stream = FaultInjectedApiStream::failing_flush();
+    assert_control_io(
+        api_stream_lines_from(&mut stream, "test-api", "/follow", &mut callback).unwrap_err(),
+        "flush control request",
+    );
+
+    let mut stream =
+        FaultInjectedApiStream::with_reads([ReadStep::Error(io::ErrorKind::BrokenPipe)]);
+    assert_control_io(
+        api_stream_lines_from(&mut stream, "test-api", "/follow", &mut callback).unwrap_err(),
+        "read control response",
+    );
+
+    for (response, expected) in [
+        ("", "closed before the response head"),
+        (
+            "HTTP/1.1 200 OK\r\nContent-Type: application/x-ndjson\r\n",
+            "closed during the response head",
+        ),
+        (
+            "HTTP/1.1 200 OK\r\nContent-Type: application/x-ndjson\r\n\r\n",
+            "trace follow stream closed",
+        ),
+    ] {
+        let mut stream =
+            FaultInjectedApiStream::with_reads([ReadStep::Data(response.as_bytes().to_vec())]);
+        let error =
+            api_stream_lines_from(&mut stream, "test-api", "/follow", &mut callback).unwrap_err();
+        assert!(matches!(error, ControlError::Protocol(message) if message.contains(expected)));
+    }
+
+    let mut stream = FaultInjectedApiStream::with_reads([
+        ReadStep::Data(b"HTTP/1.1 200 OK\r\nX-Test: yes\r\n".to_vec()),
+        ReadStep::Error(io::ErrorKind::BrokenPipe),
+    ]);
+    assert_control_io(
+        api_stream_lines_from(&mut stream, "test-api", "/follow", &mut callback).unwrap_err(),
+        "read control response",
+    );
+
+    let mut stream = FaultInjectedApiStream::with_reads([
+        ReadStep::Data(b"HTTP/1.1 503 Unavailable\r\n\r\n".to_vec()),
+        ReadStep::Error(io::ErrorKind::BrokenPipe),
+    ]);
+    assert_control_io(
+        api_stream_lines_from(&mut stream, "test-api", "/follow", &mut callback).unwrap_err(),
+        "read control error response",
+    );
+
+    let mut stream = FaultInjectedApiStream::with_reads([
+        ReadStep::Data(b"HTTP/1.1 200 OK\r\n\r\n".to_vec()),
+        ReadStep::Error(io::ErrorKind::BrokenPipe),
+    ]);
+    assert_control_io(
+        api_stream_lines_from(&mut stream, "test-api", "/follow", &mut callback).unwrap_err(),
+        "read control stream",
+    );
+}
+
+#[test]
+fn buffered_request_reader_classifies_transport_and_protocol_errors() {
+    let mut stream = FaultInjectedApiStream::failing_write();
+    assert_control_io(
+        api_request_stream(&mut stream, "POST", "test-api", "/rules", "body").unwrap_err(),
+        "write control request",
+    );
+
+    let mut stream =
+        FaultInjectedApiStream::with_reads([ReadStep::Error(io::ErrorKind::BrokenPipe)]);
+    assert_control_io(
+        api_request_stream(&mut stream, "GET", "test-api", "/status", "").unwrap_err(),
+        "read control response",
+    );
+
+    for (response, expected) in [
+        ("not-http", "invalid API response"),
+        ("\r\n\r\n", "missing control response status line"),
+        (
+            "HTTP/1.0 200 OK\r\n\r\n",
+            "invalid control response HTTP version",
+        ),
+        (
+            "HTTP/1.1 not-a-status\r\n\r\n",
+            "invalid control response status",
+        ),
+        (
+            "HTTP/1.1 999 Out Of Range\r\n\r\n",
+            "invalid control response status",
+        ),
+    ] {
+        let mut stream = ScriptedApiStream {
+            response: Cursor::new(response.as_bytes().to_vec()),
+            request: Vec::new(),
+        };
+        let error = api_request_stream(&mut stream, "GET", "test-api", "/status", "").unwrap_err();
+        assert!(matches!(error, ControlError::Protocol(message) if message.contains(expected)));
+    }
+}
+
+#[cfg(not(windows))]
+#[test]
+fn unsupported_named_pipe_clients_return_typed_errors() {
+    assert!(matches!(
+        api_request("GET", "pipe:coverage", "/status", ""),
+        Err(ControlError::Unsupported(message)) if message.contains("coverage")
+    ));
+    assert!(matches!(
+        api_stream_lines("npipe:coverage", "/follow", |_| false),
+        Err(ControlError::Unsupported(message)) if message.contains("coverage")
+    ));
+}
+
+#[cfg(unix)]
+#[test]
+fn missing_unix_stream_and_tcp_endpoints_keep_connect_context() {
+    let missing = temp_storage("missing-control-socket");
+    let api = format!("unix:{}", missing.display());
+    let error = api_stream_lines(&api, "/follow", |_| false).unwrap_err();
+    assert!(matches!(
+        error,
+        ControlError::Io { context, .. } if context.contains("connect unix socket")
+    ));
+
+    let error = api_stream_lines("127.0.0.1:0", "/follow", |_| false).unwrap_err();
+    assert!(
+        matches!(error, ControlError::Io { context, .. } if context.contains("connect 127.0.0.1:0"))
+    );
 }

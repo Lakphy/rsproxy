@@ -27,7 +27,7 @@ pub(super) fn ca_cmd(args: CaArgs, json: bool) -> CliResult<()> {
     }
 }
 
-fn ca_init(args: CaInitArgs, ca_directory: &Path) -> CliResult<()> {
+pub(super) fn ca_init(args: CaInitArgs, ca_directory: &Path) -> CliResult<()> {
     let common_name = args
         .name
         .unwrap_or_else(|| "rsproxy local root CA".to_string());
@@ -53,7 +53,7 @@ fn ca_init(args: CaInitArgs, ca_directory: &Path) -> CliResult<()> {
     Ok(())
 }
 
-fn ca_status(args: CaStatusArgs, ca_directory: &Path, json: bool) -> CliResult<()> {
+pub(super) fn ca_status(args: CaStatusArgs, ca_directory: &Path, json: bool) -> CliResult<()> {
     let status = root_ca_status(ca_directory)?;
     let keychain = args.keychain;
     let installed = if let Some(keychain) = &keychain {
@@ -106,7 +106,7 @@ fn ca_status(args: CaStatusArgs, ca_directory: &Path, json: bool) -> CliResult<(
     Ok(())
 }
 
-fn ca_export(args: CaExportArgs, ca_directory: &Path) -> CliResult<()> {
+pub(super) fn ca_export(args: CaExportArgs, ca_directory: &Path) -> CliResult<()> {
     let certificate = read_root_certificate(ca_directory)?;
     if let Some(output) = args.output {
         fs::write(&output, certificate).map_err(|source| {
@@ -122,7 +122,7 @@ fn ca_export(args: CaExportArgs, ca_directory: &Path) -> CliResult<()> {
     Ok(())
 }
 
-fn ca_issue(args: CaIssueArgs, ca_directory: &Path) -> CliResult<()> {
+pub(super) fn ca_issue(args: CaIssueArgs, ca_directory: &Path) -> CliResult<()> {
     validate_leaf_host(&args.host)?;
     if !args.force
         && let Some(cached) = cached_leaf_certificate(ca_directory, &args.host)?
@@ -179,7 +179,7 @@ fn trust_options(args: &CaTrustArgs) -> TrustOptions {
     }
 }
 
-fn print_trust_outcome(json: bool, outcome: &TrustOutcome) -> CliResult<()> {
+pub(super) fn print_trust_outcome(json: bool, outcome: &TrustOutcome) -> CliResult<()> {
     if outcome.dry_run {
         for command in &outcome.commands {
             if json {
@@ -289,7 +289,7 @@ fn print_trust_outcome(json: bool, outcome: &TrustOutcome) -> CliResult<()> {
     Ok(())
 }
 
-fn validate_leaf_host(host: &str) -> CliResult<()> {
+pub(super) fn validate_leaf_host(host: &str) -> CliResult<()> {
     if host.trim().is_empty() || host.contains('/') || host.chars().any(char::is_whitespace) {
         return Err(CliError::Usage(format!(
             "invalid certificate host `{host}`"

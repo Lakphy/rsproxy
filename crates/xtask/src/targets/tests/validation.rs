@@ -3,7 +3,7 @@ use std::path::PathBuf;
 
 use clap::{Parser, Subcommand};
 
-use super::super::{TargetCommand, TargetError, TargetsArgs};
+use super::super::{TargetCheck, TargetCommand, TargetError, TargetOutcome, TargetsArgs};
 use super::support::{ReportFile, coverage_report, criterion_report, run};
 
 #[derive(Debug, Parser)]
@@ -118,4 +118,32 @@ fn successful_outcome_is_ready_for_main_to_print() {
     let rendered = outcome.to_string();
     assert!(rendered.contains("PASS workspace-lines"));
     assert!(rendered.contains("PASS rules-lines"));
+}
+
+#[test]
+fn outcome_accessors_and_rendering_include_checks_and_summary() {
+    let outcome = TargetOutcome::new(
+        vec![
+            TargetCheck::new("first", "1", ">=1"),
+            TargetCheck::new("second", "2", ">=2"),
+        ],
+        Some("all done".to_owned()),
+    );
+    assert_eq!(outcome.summary(), Some("all done"));
+    assert_eq!(
+        outcome.to_string(),
+        "PASS first observed=1 target=>=1\nPASS second observed=2 target=>=2\nall done"
+    );
+}
+
+#[test]
+fn empty_environment_value_uses_the_default_threshold() {
+    let report = ReportFile::new(&coverage_report(8_500.0, 9_500.0));
+    run(
+        TargetCommand::Coverage {
+            report: report.path().to_path_buf(),
+        },
+        &[("RSPROXY_COVERAGE_MIN_WORKSPACE", "")],
+    )
+    .expect("an empty environment override is absent");
 }

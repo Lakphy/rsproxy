@@ -3,7 +3,7 @@ use std::fs;
 use std::net::TcpListener;
 use std::path::Path;
 use std::path::PathBuf;
-use std::process::{Command, Output, Stdio};
+use std::process::{Command, ExitStatus, Output, Stdio};
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
@@ -90,22 +90,45 @@ pub(super) fn status_json(harness: &DaemonHarness) -> Value {
 }
 
 pub(super) fn command_output(command: &mut Command) -> Output {
+    let capture = unique_temp_dir("daemon-command-output");
+    fs::create_dir_all(&capture).expect("command capture directory should be created");
+    let stdout_path = capture.join("stdout");
+    let stderr_path = capture.join("stderr");
+    let stdout_file = fs::File::create(&stdout_path).expect("stdout capture should be created");
+    let stderr_file = fs::File::create(&stderr_path).expect("stderr capture should be created");
     let mut child = command
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
+        .stdout(Stdio::from(stdout_file))
+        .stderr(Stdio::from(stderr_file))
         .spawn()
         .expect("rsproxy command should start");
     let deadline = Instant::now() + Duration::from_secs(15);
-    loop {
-        if child.try_wait().unwrap().is_some() {
-            return child.wait_with_output().unwrap();
+    let status = loop {
+        if let Some(status) = child.try_wait().unwrap() {
+            break status;
         }
         if Instant::now() >= deadline {
             let _ = child.kill();
-            let _ = child.wait();
-            panic!("rsproxy command did not exit within 15 seconds");
+            let status = child.wait().expect("timed-out command should be reaped");
+            let output = captured_output(status, &stdout_path, &stderr_path);
+            let _ = fs::remove_dir_all(&capture);
+            panic!(
+                "rsproxy command did not exit within 15 seconds: stdout={} stderr={}",
+                stdout(&output),
+                stderr(&output)
+            );
         }
         thread::sleep(Duration::from_millis(20));
+    };
+    let output = captured_output(status, &stdout_path, &stderr_path);
+    let _ = fs::remove_dir_all(capture);
+    output
+}
+
+fn captured_output(status: ExitStatus, stdout_path: &Path, stderr_path: &Path) -> Output {
+    Output {
+        status,
+        stdout: fs::read(stdout_path).unwrap_or_default(),
+        stderr: fs::read(stderr_path).unwrap_or_default(),
     }
 }
 

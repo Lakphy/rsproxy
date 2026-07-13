@@ -17,7 +17,7 @@ fn h1_large_header_accepts_200kb_and_rejects_over_limit_with_431() {
 
     let (status, _) = h1_request_with_header(proxy, ALLOWED_HEADER_BYTES);
     assert_eq!(status, 209);
-    let (status, body) = h1_request_with_header(proxy, HEADER_LIMIT + 1024);
+    let (status, body) = h1_request_exceeding_header_limit(proxy, HEADER_LIMIT);
     assert_eq!(status, 431);
     let body = String::from_utf8(body).unwrap();
     assert!(body.contains("header size limit exceeded"));
@@ -82,6 +82,29 @@ fn h1_request_with_header(proxy: std::net::SocketAddr, size: usize) -> (u16, Vec
     )
     .unwrap();
     client.flush().unwrap();
+    let response = http::read_response_head(&mut client, 64 * 1024, 128).unwrap();
+    let body = read_response_body(&mut client, &response.headers)
+        .unwrap()
+        .body;
+    (response.status, body)
+}
+
+fn h1_request_exceeding_header_limit(proxy: std::net::SocketAddr, limit: usize) -> (u16, Vec<u8>) {
+    let mut client = connect_client(proxy);
+    let prefix =
+        b"GET http://headers.matrix.test/ HTTP/1.1\r\nHost: headers.matrix.test\r\nX-Large: ";
+    let suffix = b"\r\nConnection: close\r\n\r\n";
+    assert!(prefix.len() + suffix.len() <= limit);
+
+    // End the complete request on the first byte beyond the limit. That leaves no unread request
+    // data which Windows could turn into a connection reset when the proxy closes after the 431.
+    client.write_all(prefix).unwrap();
+    client
+        .write_all(&vec![b'a'; limit + 1 - prefix.len() - suffix.len()])
+        .unwrap();
+    client.write_all(suffix).unwrap();
+    client.shutdown(Shutdown::Write).unwrap();
+
     let response = http::read_response_head(&mut client, 64 * 1024, 128).unwrap();
     let body = read_response_body(&mut client, &response.headers)
         .unwrap()

@@ -192,6 +192,7 @@ fn display_relative(root: &Path, path: &Path) -> String {
         .unwrap_or(path)
         .display()
         .to_string()
+        .replace(std::path::MAIN_SEPARATOR, "/")
 }
 
 #[cfg(test)]

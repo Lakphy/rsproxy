@@ -109,6 +109,39 @@ fn bless_is_limited_to_api_and_all_checks() {
     assert!(error.to_string().contains("check all"));
 }
 
+#[test]
+fn drift_rendering_handles_ended_and_long_lines() {
+    let fixture = Fixture::new();
+    fixture.write(RELATIVE_SNAPSHOT, "first\nsecond\n");
+    let mut violations = Vec::new();
+    reconcile(&fixture, "first\n", false, &mut violations).unwrap();
+    assert!(violations[0].message.contains("<end of file>"));
+
+    let long_expected = "a".repeat(121);
+    let long_generated = "b".repeat(121);
+    fixture.write(RELATIVE_SNAPSHOT, &long_expected);
+    violations.clear();
+    reconcile(&fixture, &long_generated, false, &mut violations).unwrap();
+    assert!(violations[0].message.contains('…'));
+}
+
+#[test]
+fn snapshot_read_and_bless_write_errors_keep_the_path_and_action() {
+    let fixture = Fixture::new();
+    fixture.write(&format!("{RELATIVE_SNAPSHOT}/child"), "not a snapshot");
+    let mut violations = Vec::new();
+    let error = reconcile(&fixture, "generated\n", false, &mut violations)
+        .expect_err("reading a directory as a snapshot must fail");
+    assert!(matches!(error, CheckError::Io { .. }));
+    assert!(error.to_string().contains("read public API snapshot"));
+
+    let fixture = Fixture::new();
+    let error = reconcile(&fixture, "generated\n", true, &mut Vec::new())
+        .expect_err("blessing without a snapshot parent must fail");
+    assert!(matches!(error, CheckError::Io { .. }));
+    assert!(error.to_string().contains("write public API snapshot"));
+}
+
 fn reconcile(
     fixture: &Fixture,
     generated: &str,

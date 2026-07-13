@@ -11,4 +11,4 @@ pub(super) use timing::{connect_tcp_with_timeouts, duration_millis, read_respons
 #[cfg(test)]
 pub(super) use handshake::tls_handshake_io_error;
 #[cfg(test)]
-pub(super) use timing::tcp_connect_timeout_error;
+pub(super) use timing::{staged_io_error, tcp_connect_timeout_error};

@@ -1,5 +1,5 @@
 mod bench;
-mod groups;
+pub(crate) mod groups;
 pub(super) mod request;
 
 use super::command::{RulesArgs, RulesCommand, RuntimeArgs};
