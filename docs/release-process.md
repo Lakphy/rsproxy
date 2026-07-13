@@ -33,7 +33,9 @@ sync with it. `CHANGELOG.md` follows
 ## Branch and PR workflow(分支与合并流程)
 
 - `main` is the only long-lived branch and must always be releasable.
-- All changes land through pull requests; do not push directly to `main`.
+- Pull requests are the default path for changes. During early development,
+  repository admins may push directly to `main` (`enforce_admins` is off);
+  the PR gate below still applies to everyone else and to any PR.
 - Branch names: `feat/<topic>`, `fix/<topic>`, `docs/<topic>`,
   `chore/<topic>`, or `hotfix/<version>` (see the hotfix section).
 - Commit messages follow the conventional-commit style already used in the
@@ -256,8 +258,9 @@ If `main` has not diverged from the release, skip the branch and release from
   reproducibility):
   - Environment `ci-approval` with the repository owner as a required
     reviewer — this is what holds PR CI runs until approval.
-  - Branch protection on `main` (`enforce_admins` on, force-pushes and
-    deletions blocked) requiring these checks: `Manual CI approval`, the
+  - Branch protection on `main` (force-pushes and deletions blocked;
+    `enforce_admins` intentionally off during early development so admins
+    can push directly) requiring these checks: `Manual CI approval`, the
     three `Workspace (...)` legs, `Minimum Rust 1.88`,
     `Formatting, Clippy, and docs`, `Repository contracts`,
     `Distribution contracts`, `Supply chain policy`, and
