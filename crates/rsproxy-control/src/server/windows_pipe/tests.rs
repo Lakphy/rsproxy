@@ -4,7 +4,7 @@ use std::sync::mpsc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 #[test]
-fn flushed_response_is_read_before_the_server_disconnects() {
+fn flushed_response_is_preserved_and_server_disconnect_is_clean_eof() {
     let (result_tx, result_rx) = mpsc::channel();
     std::thread::spawn(move || {
         let _ = result_tx.send(flushed_round_trip());

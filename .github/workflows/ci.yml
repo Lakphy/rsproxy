@@ -53,12 +53,16 @@ jobs:
         uses: Swatinem/rust-cache@v2
       - name: Install cargo-nextest
         run: cargo install cargo-nextest --version 0.9.140 --locked
-      - name: Check portable repository contracts
-        run: |
-          cargo xtask check lines
-          cargo xtask check layout
-          cargo xtask check typed-errors
-          cargo xtask check workflows
+      # Keep each native command in its own step: PowerShell otherwise reports
+      # only the final command's exit code and can hide an earlier failure.
+      - name: Check repository line limits
+        run: cargo xtask check lines
+      - name: Check repository layout
+        run: cargo xtask check layout
+      - name: Check typed errors
+        run: cargo xtask check typed-errors
+      - name: Check workflows
+        run: cargo xtask check workflows
       - name: Check all targets
         run: cargo check --workspace --all-targets --locked
       - name: Test all targets

@@ -1,7 +1,8 @@
 use std::io::{self, Read, Write};
 use windows_sys::Win32::Foundation::{
-    CloseHandle, ERROR_BROKEN_PIPE, ERROR_PIPE_BUSY, ERROR_PIPE_CONNECTED, GENERIC_READ,
-    GENERIC_WRITE, GetLastError, HANDLE, INVALID_HANDLE_VALUE,
+    CloseHandle, ERROR_BROKEN_PIPE, ERROR_PIPE_BUSY, ERROR_PIPE_CONNECTED,
+    ERROR_PIPE_NOT_CONNECTED, GENERIC_READ, GENERIC_WRITE, GetLastError, HANDLE,
+    INVALID_HANDLE_VALUE,
 };
 use windows_sys::Win32::Storage::FileSystem::{
     CreateFileW, FILE_FLAG_FIRST_PIPE_INSTANCE, FlushFileBuffers, OPEN_EXISTING,
@@ -157,7 +158,11 @@ impl Read for NamedPipeStream {
         // SAFETY: GetLastError has no preconditions and immediately follows the
         // failed ReadFile call on this thread.
         let error = unsafe { GetLastError() };
-        if error == ERROR_BROKEN_PIPE {
+        // A peer that closes its handle produces ERROR_BROKEN_PIPE, while a
+        // server that follows the documented flush/disconnect/close sequence
+        // produces ERROR_PIPE_NOT_CONNECTED on the client's final read. Both
+        // mean clean EOF; any response bytes were returned by earlier reads.
+        if matches!(error, ERROR_BROKEN_PIPE | ERROR_PIPE_NOT_CONNECTED) {
             Ok(0)
         } else {
             Err(io::Error::from_raw_os_error(error as i32))
