@@ -2124,7 +2124,7 @@ dependencies = [
 
 [[package]]
 name = "rsproxy-cli"
-version = "0.2.0"
+version = "0.0.1"
 dependencies = [
  "clap",
  "clap_complete",
@@ -2145,7 +2145,7 @@ dependencies = [
 
 [[package]]
 name = "rsproxy-control"
-version = "0.2.0"
+version = "0.0.1"
 dependencies = [
  "getrandom 0.4.3",
  "rsproxy-engine",
@@ -2161,7 +2161,7 @@ dependencies = [
 
 [[package]]
 name = "rsproxy-engine"
-version = "0.2.0"
+version = "0.0.1"
 dependencies = [
  "arc-swap",
  "bytes",
@@ -2188,7 +2188,7 @@ dependencies = [
 
 [[package]]
 name = "rsproxy-net"
-version = "0.2.0"
+version = "0.0.1"
 dependencies = [
  "bytes",
  "hickory-resolver",
@@ -2203,7 +2203,7 @@ dependencies = [
 
 [[package]]
 name = "rsproxy-platform"
-version = "0.2.0"
+version = "0.0.1"
 dependencies = [
  "base64",
  "libc",
@@ -2216,7 +2216,7 @@ dependencies = [
 
 [[package]]
 name = "rsproxy-rules"
-version = "0.2.0"
+version = "0.0.1"
 dependencies = [
  "aho-corasick",
  "criterion",
@@ -2232,7 +2232,7 @@ dependencies = [
 
 [[package]]
 name = "rsproxy-trace"
-version = "0.2.0"
+version = "0.0.1"
 dependencies = [
  "bytes",
  "criterion",
@@ -3424,7 +3424,7 @@ dependencies = [
 
 [[package]]
 name = "xtask"
-version = "0.2.0"
+version = "0.0.1"
 dependencies = [
  "clap",
  "indexmap",
