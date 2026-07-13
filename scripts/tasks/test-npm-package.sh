@@ -63,12 +63,14 @@ pack_set() {
     "$root/scripts/package-npm.sh" launchers \
         --manager "$manager" --dist "$dist" >/dev/null
 
-    for name in "$native_name" rsproxy-runtime rsproxy-cli rsproxy-bun; do
+    for name in "$native_name" rsproxy-runtime rsproxy-cli; do
         archive="$dist/$name-$version.tgz"
         [ -f "$archive" ] || fail "$manager did not create $(basename "$archive")"
         tar -tzf "$archive" | grep -Fx 'package/package.json' >/dev/null \
             || fail "$archive has no package manifest"
     done
+    [ "$(find "$dist" -maxdepth 1 -type f -name '*.tgz' | wc -l | tr -d ' ')" = 3 ] \
+        || fail "$manager created an unexpected package inventory"
     tar -tzf "$dist/$native_name-$version.tgz" \
         | grep -Fx 'package/bin/rsproxy' >/dev/null \
         || fail "$manager native package has no executable"
@@ -86,11 +88,9 @@ const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
 manifest.optionalDependencies = { [nativePackage]: version };
 fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
 NODE
-mkdir -p "$tmp/npm-fixture" "$tmp/bun-fixture"
+mkdir -p "$tmp/npm-fixture"
 (cd "$runtime_fixture" && npm pack --silent --ignore-scripts \
     --pack-destination "$tmp/npm-fixture" >/dev/null)
-(cd "$runtime_fixture" && bun pm pack --ignore-scripts --quiet \
-    --destination "$tmp/bun-fixture" >/dev/null)
 
 npm_dir="$tmp/npm-install"
 mkdir -p "$npm_dir"
@@ -115,25 +115,25 @@ cat >"$bun_dir/package.json" <<EOF
 {
   "private": true,
   "dependencies": {
-    "@rsproxy/bun": "file:$tmp/bun-packages/rsproxy-bun-$version.tgz",
-    "@rsproxy/runtime": "file:$tmp/bun-fixture/rsproxy-runtime-$version.tgz",
-    "@rsproxy/$native_package": "file:$tmp/bun-packages/$native_name-$version.tgz"
+    "@rsproxy/cli": "file:$tmp/npm-packages/rsproxy-cli-$version.tgz",
+    "@rsproxy/runtime": "file:$tmp/npm-fixture/rsproxy-runtime-$version.tgz",
+    "@rsproxy/$native_package": "file:$tmp/npm-packages/$native_name-$version.tgz"
   },
   "overrides": {
-    "@rsproxy/runtime": "file:$tmp/bun-fixture/rsproxy-runtime-$version.tgz",
-    "@rsproxy/$native_package": "file:$tmp/bun-packages/$native_name-$version.tgz"
+    "@rsproxy/runtime": "file:$tmp/npm-fixture/rsproxy-runtime-$version.tgz",
+    "@rsproxy/$native_package": "file:$tmp/npm-packages/$native_name-$version.tgz"
   }
 }
 EOF
 (cd "$bun_dir" && bun install --offline --ignore-scripts >/dev/null)
-bun_output=$("$bun_dir/node_modules/.bin/rsproxy" --version)
+bun_output=$(bun "$bun_dir/node_modules/.bin/rsproxy" --version)
 [ "$bun_output" = "$expected_output" ] \
-    || fail "Bun launcher returned unexpected output: $bun_output"
+    || fail "shared launcher returned unexpected Bun output: $bun_output"
 if [ "$fixture_mode" = generated ]; then
-    if "$bun_dir/node_modules/.bin/rsproxy" --exit-23; then
-        fail 'Bun launcher did not forward the native exit status'
+    if bun "$bun_dir/node_modules/.bin/rsproxy" --exit-23; then
+        fail 'shared launcher under Bun did not forward the native exit status'
     else
-        [ "$?" -eq 23 ] || fail 'Bun launcher changed the native exit status'
+        [ "$?" -eq 23 ] || fail 'shared launcher under Bun changed the native exit status'
     fi
 fi
 

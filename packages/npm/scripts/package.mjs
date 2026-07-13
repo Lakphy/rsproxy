@@ -223,8 +223,8 @@ function packageNative(options, manager, dist, version) {
   }
 }
 
-function packageLaunchers(manager, dist, version) {
-  for (const directory of ['runtime', 'cli', 'bun']) {
+function packageRuntimeAndLauncher(manager, dist, version) {
+  for (const directory of ['runtime', 'cli']) {
     const packageRoot = join(NPM_ROOT, directory);
     const manifest = readJson(join(packageRoot, 'package.json'));
     assertVersion(manifest, version);
@@ -246,5 +246,5 @@ const version = workspaceVersion();
 if (command === 'native') {
   packageNative(options, manager, dist, version);
 } else {
-  packageLaunchers(manager, dist, version);
+  packageRuntimeAndLauncher(manager, dist, version);
 }

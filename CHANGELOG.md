@@ -19,6 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Unified npm and Bun distribution on the single `@rsproxy/cli` entry package;
+  releases no longer publish the redundant `@rsproxy/bun` launcher.
 - CI now runs once per change: pushes trigger it only on `main`, pull
   requests and merge groups cover branches, and superseded PR runs are
   cancelled through a concurrency group.

@@ -119,7 +119,7 @@ jobs:
           retention-days: 14
 
   publish:
-    name: Publish npm and Bun packages
+    name: Publish npm distribution
     if: startsWith(github.ref, 'refs/tags/')
     needs: native
     runs-on: ubuntu-latest
@@ -149,13 +149,13 @@ jobs:
         shell: bash
         run: |
           version=$(node -p "require('./package.json').version")
-          test "$(find dist/npm -maxdepth 1 -type f -name '*.tgz' | wc -l | tr -d ' ')" = 11
+          test "$(find dist/npm -maxdepth 1 -type f -name '*.tgz' | wc -l | tr -d ' ')" = 10
           for name in \
             rsproxy-darwin-arm64 rsproxy-darwin-x64 \
             rsproxy-linux-arm64-gnu rsproxy-linux-arm64-musl \
             rsproxy-linux-x64-gnu rsproxy-linux-x64-musl \
             rsproxy-win32-arm64-msvc rsproxy-win32-x64-msvc \
-            rsproxy-runtime rsproxy-cli rsproxy-bun
+            rsproxy-runtime rsproxy-cli
           do
             test -f "dist/npm/$name-$version.tgz"
           done
@@ -173,7 +173,7 @@ jobs:
           do
             npm publish "dist/npm/$name-$version.tgz" --access public --provenance
           done
-      - name: Publish runtime and launchers
+      - name: Publish runtime and launcher
         shell: bash
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
@@ -181,7 +181,6 @@ jobs:
           version=$(node -p "require('./package.json').version")
           npm publish "dist/npm/rsproxy-runtime-$version.tgz" --access public --provenance
           npm publish "dist/npm/rsproxy-cli-$version.tgz" --access public --provenance
-          npm publish "dist/npm/rsproxy-bun-$version.tgz" --access public --provenance
 
   github-release:
     name: Publish GitHub release

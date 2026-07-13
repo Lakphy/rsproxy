@@ -326,7 +326,7 @@ those APIs without embedding policy in shell dispatchers.
 - `release/` validates semantic versions, derives the eight native optional
   dependencies from `packages/npm/targets.json`, and transactionally
   synchronizes Cargo lockfiles, the root distribution manifest and the
-  runtime/npm/Bun manifests. `--check` is read-only and is used by tag
+  runtime/shared-CLI npm manifests. `--check` is read-only and is used by tag
   validation. npm packaging obtains the same version from `cargo metadata`, so
   Cargo package metadata is the only version authority; native platform
   manifests remain generated staging files.
@@ -506,10 +506,10 @@ regressions above 10% through typed `cargo xtask targets` report parsing.
 `performance.yml` run on daily schedules plus manual dispatch, decoupled from
 pushes and PRs, and are expected to pass before every release. The npm
 distribution boundary lives under `packages/npm/`: `@rsproxy/runtime` resolves
-one of eight OS/architecture/libc packages, while `@rsproxy/cli` and
-`@rsproxy/bun` provide runtime-specific launchers. `release.yml` builds those
-native packages, publishes to the npm registry with launchers published after
-every native artifact, and then — only after npm publishing succeeds — creates
+one of eight OS/architecture/libc packages, while `@rsproxy/cli` is the shared
+npm/Bun entry package. `release.yml` builds those native packages, publishes to
+the npm registry with the launcher published after every native artifact, and
+then — only after npm publishing succeeds — creates
 a GitHub release with one binary archive per target, a `SHA256SUMS` manifest
 and changelog-derived notes; `contents: write` is granted solely to that final
 job. Other target mappings are structural contracts in this round; current

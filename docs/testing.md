@@ -514,7 +514,7 @@ coverage, the fuzz-target compile check, the dual-package 34-owner protocol
 matrix and the action-effect suite. `performance.yml` owns Criterion
 comparison. `release.yml`
 owns the npm registry pipeline for eight native packages, `@rsproxy/runtime`,
-`@rsproxy/cli`, and `@rsproxy/bun`. The fast package contract runs under both
-Node and Bun and installs only the current-host fixture. The supply-chain job
-runs cargo-deny across advisories, licenses, bans and sources. Clippy runs with
-all default warnings denied and no project-wide lint exception.
+and the shared `@rsproxy/cli` entry package. The fast package contract runs
+under both Node and Bun and installs only the current-host fixture. The
+supply-chain job runs cargo-deny across advisories, licenses, bans and sources.
+Clippy runs with all default warnings denied and no project-wide lint exception.

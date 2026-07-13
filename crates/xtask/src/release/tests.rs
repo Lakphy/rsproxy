@@ -112,20 +112,18 @@ impl Fixture {
                     .collect::<BTreeMap<_, _>>()
             }),
         );
-        for launcher in ["cli", "bun"] {
-            write_json(
-                root,
-                &format!("packages/npm/{launcher}/package.json"),
-                &json!({
-                    "name": format!("@rsproxy/{launcher}"),
-                    "version": "0.1.0",
-                    "dependencies": {
-                        "@rsproxy/runtime": "0.1.0",
-                        "external-package": "1.0.0"
-                    }
-                }),
-            );
-        }
+        write_json(
+            root,
+            "packages/npm/cli/package.json",
+            &json!({
+                "name": "@rsproxy/cli",
+                "version": "0.1.0",
+                "dependencies": {
+                    "@rsproxy/runtime": "0.1.0",
+                    "external-package": "1.0.0"
+                }
+            }),
+        );
         Self { directory }
     }
 
@@ -150,7 +148,7 @@ fn release_updates_every_derived_version_and_is_idempotent() {
     let version = Version::parse("0.2.0-beta.1").expect("valid version");
 
     let outcome = release(fixture.root(), &version, false).expect("apply release");
-    assert_eq!(outcome.changed_files, 7);
+    assert_eq!(outcome.changed_files, 6);
     assert_eq!(cargo_workspace_version(fixture.root()), "0.2.0-beta.1");
     assert_lock_versions(fixture.root(), "Cargo.lock", &version);
     assert_lock_versions(fixture.root(), "fuzz/Cargo.lock", &version);
@@ -168,18 +166,10 @@ fn release_updates_every_derived_version_and_is_idempotent() {
     );
     let version_string = version.to_string();
     assert!(optional.values().all(|value| value == &version_string));
-    for launcher in ["cli", "bun"] {
-        let manifest = read_json(
-            fixture.root(),
-            &format!("packages/npm/{launcher}/package.json"),
-        );
-        assert_eq!(manifest["version"], version.to_string());
-        assert_eq!(
-            manifest["dependencies"]["@rsproxy/runtime"],
-            version.to_string()
-        );
-        assert_eq!(manifest["dependencies"]["external-package"], "1.0.0");
-    }
+    let cli = read_json(fixture.root(), "packages/npm/cli/package.json");
+    assert_eq!(cli["version"], version.to_string());
+    assert_eq!(cli["dependencies"]["@rsproxy/runtime"], version.to_string());
+    assert_eq!(cli["dependencies"]["external-package"], "1.0.0");
     assert!(!fixture.root().join("packages/npm/darwin-arm64").exists());
 
     let snapshot = fixture.snapshot();
@@ -211,7 +201,6 @@ fn check_reports_all_inconsistent_files_without_writing() {
         "package.json",
         "packages/npm/runtime/package.json",
         "packages/npm/cli/package.json",
-        "packages/npm/bun/package.json",
     ] {
         assert!(files.contains(path), "missing {path} from {files}");
     }
@@ -265,7 +254,6 @@ fn fixture_files(root: &Path) -> Vec<PathBuf> {
         PathBuf::from("packages/npm/targets.json"),
         PathBuf::from("packages/npm/runtime/package.json"),
         PathBuf::from("packages/npm/cli/package.json"),
-        PathBuf::from("packages/npm/bun/package.json"),
     ];
     files.extend(
         MEMBERS

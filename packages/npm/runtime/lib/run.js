@@ -19,7 +19,7 @@ function run(argv = process.argv.slice(2), options = {}) {
       `rsproxy could not resolve its native executable: ${detail}\n`
       + 'Reinstall with optional dependencies enabled using either:\n'
       + '  npm install --global @rsproxy/cli\n'
-      + '  bun add --global @rsproxy/bun\n'
+      + '  bun add --global @rsproxy/cli\n'
     );
     return 1;
   }

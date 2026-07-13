@@ -81,10 +81,7 @@ pub(super) fn read_target_inventory(path: &Path) -> Result<TargetInventory, Rele
                 format!("duplicate or invalid npm package `{}`", target.package),
             ));
         }
-        if matches!(
-            target.package.as_str(),
-            "@rsproxy/cli" | "@rsproxy/bun" | RUNTIME_PACKAGE
-        ) {
+        if matches!(target.package.as_str(), "@rsproxy/cli" | RUNTIME_PACKAGE) {
             return Err(invalid(
                 path,
                 format!(
@@ -137,14 +134,13 @@ pub(super) fn plan_runtime_manifest(
     })
 }
 
-pub(super) fn plan_launcher_manifest(
+pub(super) fn plan_cli_manifest(
     path: &Path,
-    launcher: &str,
     version: &Version,
 ) -> Result<Option<FileChange>, ReleaseError> {
     let version = version.to_string();
     mutate_manifest(path, |manifest| {
-        require_name(manifest, &format!("@rsproxy/{launcher}"), path)?;
+        require_name(manifest, "@rsproxy/cli", path)?;
         set_string(manifest, "version", &version, path)?;
         let dependencies = object_field_mut(manifest, "dependencies", path)?;
         if let Some(unexpected) = dependencies

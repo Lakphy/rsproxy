@@ -155,7 +155,6 @@ pub(super) const CONTRACTS: &[WorkflowContract] = &[
             "--access public --provenance",
             "rsproxy-runtime",
             "rsproxy-cli",
-            "rsproxy-bun",
             "persist-credentials: false",
             // Job-scoped release permissions and GitHub release assets.
             "      contents: write",
@@ -172,7 +171,7 @@ pub(super) const CONTRACTS: &[WorkflowContract] = &[
         // Workflow-level write permissions are rejected structurally for every
         // workflow (see `workflow_permission_violations`); the six-space
         // required string above pins the write grant to the job level.
-        rejected: &[],
+        rejected: &["rsproxy-bun"],
     },
 ];
 

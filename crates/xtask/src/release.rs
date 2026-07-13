@@ -134,19 +134,13 @@ pub fn release(
             &inventory,
         )?,
     );
-    for launcher in ["cli", "bun"] {
-        push_change(
-            &mut changes,
-            json_files::plan_launcher_manifest(
-                &workspace_root
-                    .join(NPM_ROOT)
-                    .join(launcher)
-                    .join("package.json"),
-                launcher,
-                version,
-            )?,
-        );
-    }
+    push_change(
+        &mut changes,
+        json_files::plan_cli_manifest(
+            &workspace_root.join(NPM_ROOT).join("cli/package.json"),
+            version,
+        )?,
+    );
 
     if check && !changes.is_empty() {
         let files = changes

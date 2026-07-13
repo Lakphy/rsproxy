@@ -10,10 +10,10 @@ release. English is normative; each section ends with a Chinese summary.
 
 rsproxy ships through two channels, both driven by pushing a `v*` git tag:
 
-1. **npm registry** — eleven `@rsproxy/*` packages: eight native platform
+1. **npm registry** — ten `@rsproxy/*` packages: eight native platform
    packages (`@rsproxy/darwin-arm64`, `@rsproxy/linux-x64-gnu`, …) plus the
-   `@rsproxy/runtime`, `@rsproxy/cli`, and `@rsproxy/bun` launchers, all
-   published with npm provenance.
+   `@rsproxy/runtime` resolver and shared `@rsproxy/cli` launcher, all published
+   with npm provenance.
 2. **GitHub Releases** — one `tar.gz` (or `zip` on Windows) archive per Rust
    target containing the `rsproxy` binary, `LICENSE`, and `README.md`, plus a
    `SHA256SUMS` manifest. Release notes are extracted from `CHANGELOG.md`.
@@ -25,7 +25,7 @@ single source of truth is `version` in the root `Cargo.toml`, and
 sync with it. `CHANGELOG.md` follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-> 中文:发布有两个渠道,均由推送 `v*` 标签触发——npm(11 个 `@rsproxy/*`
+> 中文:发布有两个渠道,均由推送 `v*` 标签触发——npm(10 个 `@rsproxy/*`
 > 包,带 provenance)和 GitHub Release(每个平台一个二进制归档 +
 > SHA256SUMS + 基于 CHANGELOG 的发布说明)。不发布 crates.io。版本号以根
 > `Cargo.toml` 为唯一事实来源,由 `cargo xtask release` 同步到所有清单。
@@ -182,9 +182,9 @@ in-flight release is never cancelled):
    (`cargo xtask release "$version" --check`), builds the `rsproxy` binary,
    packages the npm native `.tgz`, and packages the GitHub archive
    (`rsproxy-vX.Y.Z-<rust-triple>.tar.gz` / `.zip`).
-2. **publish** — downloads all native packages, builds the launcher packages,
-   verifies the 11-package inventory, and runs `npm publish --provenance` for
-   every package.
+2. **publish** — downloads all native packages, builds the runtime and shared
+   launcher packages, verifies the 10-package inventory, and runs
+   `npm publish --provenance` for every package.
 3. **github-release** — runs only after npm publishing succeeds; downloads
    the 8 archives, writes `SHA256SUMS`, extracts the `X.Y.Z` section from
    `CHANGELOG.md`, and creates the GitHub release with `gh release create
@@ -195,7 +195,7 @@ build matrix as a dry run; the version check, archive, publish, and release
 steps are all tag-gated and skipped.
 
 > 中文:在 main 上打 `vX.Y.Z` 标签并推送即触发发布:8 平台构建 → npm 发布
-> (11 包,带 provenance)→ npm 成功后才创建 GitHub Release(归档 +
+> (10 包,带 provenance)→ npm 成功后才创建 GitHub Release(归档 +
 > SHA256SUMS + CHANGELOG 提取的说明)。手动 `workflow_dispatch` 只演练
 > 构建矩阵,不会发布。
 
@@ -205,6 +205,7 @@ steps are all tag-gated and skipped.
 npm view @rsproxy/cli version          # expect X.Y.Z
 gh release view vX.Y.Z                 # 8 archives + SHA256SUMS attached
 npx @rsproxy/cli@X.Y.Z --version       # launcher smoke test
+bunx --bun @rsproxy/cli@X.Y.Z --version # same artifact under Bun
 ```
 
 To verify an archive: download it and `SHA256SUMS`, then

@@ -2,7 +2,7 @@
 
 const assert = require('node:assert/strict');
 const { spawnSync } = require('node:child_process');
-const { readFileSync } = require('node:fs');
+const { existsSync, readFileSync } = require('node:fs');
 const { join, resolve } = require('node:path');
 const test = require('node:test');
 const { PACKAGE_BY_PLATFORM } = require('../runtime/lib/platform');
@@ -98,8 +98,7 @@ test('all publishable package versions and dependencies match Cargo', () => {
   const rootManifest = json(join(root, 'package.json'));
   const runtime = manifest('runtime');
   const cli = manifest('cli');
-  const bun = manifest('bun');
-  for (const packageManifest of [rootManifest, runtime, cli, bun]) {
+  for (const packageManifest of [rootManifest, runtime, cli]) {
     assert.equal(packageManifest.version, version);
     assert.equal(packageManifest.scripts && packageManifest.scripts.postinstall, undefined);
   }
@@ -109,7 +108,6 @@ test('all publishable package versions and dependencies match Cargo', () => {
     Object.fromEntries(targets.map((target) => [target.package, version]))
   );
   assert.deepEqual(cli.dependencies, { '@rsproxy/runtime': version });
-  assert.deepEqual(bun.dependencies, { '@rsproxy/runtime': version });
 });
 
 test('Cargo packages cannot be published through crates.io', () => {
@@ -129,16 +127,14 @@ test('Cargo packages cannot be published through crates.io', () => {
 
 test('launcher licenses are exact copies of the repository license', () => {
   const license = readFileSync(join(root, 'LICENSE'), 'utf8');
-  for (const packageName of ['runtime', 'cli', 'bun']) {
+  for (const packageName of ['runtime', 'cli']) {
     assert.equal(readFileSync(join(npmRoot, packageName, 'LICENSE'), 'utf8'), license);
   }
 });
 
-test('npm and Bun expose only the rsproxy command through dedicated launchers', () => {
+test('npm and Bun share the same rsproxy launcher package', () => {
   const cli = manifest('cli');
-  const bun = manifest('bun');
   assert.deepEqual(cli.bin, { rsproxy: 'bin/rsproxy.js' });
-  assert.deepEqual(bun.bin, { rsproxy: 'bin/rsproxy.js' });
   assert.match(readFileSync(join(npmRoot, 'cli/bin/rsproxy.js'), 'utf8'), /^#!\/usr\/bin\/env node/);
-  assert.match(readFileSync(join(npmRoot, 'bun/bin/rsproxy.js'), 'utf8'), /^#!\/usr\/bin\/env bun/);
+  assert.equal(existsSync(join(npmRoot, 'bun/package.json')), false);
 });

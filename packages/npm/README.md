@@ -5,8 +5,7 @@ This directory is the only public distribution boundary for rsproxy.
 ```text
 targets.json       Rust target to npm package contract
 runtime/           platform/libc resolver and native process forwarding
-cli/               Node launcher published as @rsproxy/cli
-bun/               Bun launcher published as @rsproxy/bun
+cli/               shared npm/Bun entry package published as @rsproxy/cli
 scripts/           deterministic native and launcher package builder
 tests/             mapping, version, manifest, and runtime contracts
 ```
@@ -14,21 +13,25 @@ tests/             mapping, version, manifest, and runtime contracts
 The runtime chooses one of eight optional native packages. Supported targets
 are macOS arm64/x64, Linux arm64/x64 with glibc or musl, and Windows arm64/x64
 with MSVC. Native packages contain no JavaScript launcher and expose no extra
-command; only `@rsproxy/cli` and `@rsproxy/bun` install `rsproxy`.
+command; only `@rsproxy/cli` installs `rsproxy`.
 
-The npm registry is the single artifact registry. npm users install the Node
-launcher, while Bun users install the Bun launcher:
+The npm registry is the single artifact registry. npm and Bun users install the
+same launcher package:
 
 ```sh
 npm install --global @rsproxy/cli
-bun add --global @rsproxy/bun
+# or
+bun add --global @rsproxy/cli
 ```
+
+The installed command keeps the standard Node 18+ shebang. Bun-only users can
+execute the same registry artifact with `bunx --bun @rsproxy/cli`.
 
 There are no lifecycle scripts and no install-time Rust compilation. Release
 automation publishes native packages first, then `@rsproxy/runtime`, and the
-two launchers last. All package versions must exactly match the Cargo workspace
-version. Every Cargo package sets `publish = false`, so crates.io is not a
-fallback channel.
+shared launcher last. All package versions must exactly match the Cargo
+workspace version. Every Cargo package sets `publish = false`, so crates.io is
+not a fallback channel.
 
 Before the first tag release, create or authorize the public `@rsproxy` npm
 scope and add an npm automation token as the repository secret `NPM_TOKEN`.

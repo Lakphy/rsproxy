@@ -13,7 +13,7 @@ crates/
   rsproxy-rules/  rule DSL plus pinned test-only Whistle evidence fixtures
   rsproxy-trace/  session model, in-memory store and spill persistence
   xtask/          release-version synchronization and repository automation
-packages/npm/     npm/Bun launchers, native-target map and package contracts
+packages/npm/     shared npm/Bun launcher, native-target map and package contracts
 docs/             live design docs plus archived qualification evidence
 benches/e2e/      reproducible local proxy benchmark orchestration
 scripts/          process orchestration for coverage, fuzz, packaging and network/resource acceptance
@@ -41,14 +41,17 @@ the engine facade exposes `ProxyConfig`, `SharedState`, `EngineHandle`,
 boundary through `EngineHandle` rather than control code reaching into engine
 state.
 
-Install the CLI through one of the two supported package managers. Both use the
-npm registry; the Bun package has its own Bun shebang and does not require Node
-at runtime.
+Install the same CLI package through either supported package manager. Both use
+the npm registry, so npm and Bun resolve the same `@rsproxy/cli` artifact.
 
 ```sh
 npm install --global @rsproxy/cli
-bun add --global @rsproxy/bun
+# or
+bun add --global @rsproxy/cli
 ```
+
+The installed `rsproxy` command uses the package's Node 18+ shebang. A Bun-only
+environment can execute the same package with `bunx --bun @rsproxy/cli`.
 
 The distribution map covers macOS, Linux and Windows on arm64/x64, including
 both glibc and musl Linux. Only the current Apple M1 Pro macOS ARM64 package is
@@ -98,10 +101,11 @@ checked through `cargo xtask targets`; coverage is collected by
 The Whistle comparison uses the lock under `benches/e2e/whistle-driver/` and
 installs its pinned dependency only into ignored `target/bench-deps/` state.
 
-The release workflow builds eight native packages and publishes to the npm
-registry (`@rsproxy/cli` for npm, `@rsproxy/bun` for Bun) and, after npm
-publishing succeeds, to a GitHub Release carrying one binary archive per Rust
-target plus a `SHA256SUMS` manifest, with notes extracted from `CHANGELOG.md`.
+The release workflow publishes ten packages to the npm registry: eight native
+packages, `@rsproxy/runtime`, and one shared `@rsproxy/cli` entry package. After
+npm publishing succeeds, it creates a GitHub Release carrying one binary
+archive per Rust target plus a `SHA256SUMS` manifest, with notes extracted from
+`CHANGELOG.md`.
 It does not publish Cargo crates, Homebrew formulae, or other installer
 formats. Workspace and npm versions are synchronized by
 `cargo xtask release <VERSION>`; npm packaging reads the authoritative Cargo

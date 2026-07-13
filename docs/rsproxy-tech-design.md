@@ -1028,7 +1028,7 @@ bench/example 后得到 workspace 85.072%、rules 96.263%，均通过目标。
 Ubuntu 另执行 fmt、Clippy、结构/质量合同、覆盖率、fuzz target、34-owner 协议矩阵和
 46-family action 验收。`performance.yml` 执行每日及 PR Criterion 比较；`fuzz.yml`
 执行每日 sanitizer；`release.yml` 对 tag 构建 macOS、Linux、Windows 的 arm64/x64，
-Linux 同时覆盖 glibc/musl，并按“原生包 → runtime → npm/Bun 启动器”的顺序仅发布
+Linux 同时覆盖 glibc/musl，并按“原生包 → runtime → 共享 npm/Bun 启动器”的顺序仅发布
 到 npm registry。所有 workflow 受 YAML 与文本合同约束。跨平台 target 已完成分包
 适配，但本轮只执行当前 macOS ARM64 主机，不把未运行平台描述为已验证。
 
@@ -1146,7 +1146,7 @@ rsproxy/
 ├── benches/e2e/whistle-driver/        # 固定 2.10.5 的隔离 npm lock
 ├── benches/soak/soak.sh               # 参数化 90m 高效稳态驱动
 ├── fuzz/                               # 规则 parse/resolve libFuzzer target 与 seeds
-├── packages/npm/                       # npm/Bun runtime、启动器、target map 与合同
+├── packages/npm/                       # 共享 npm/Bun 启动器、runtime、target map 与合同
 ├── xtask.toml                         # 500 行限制与跨平台扫描排除
 ├── deny.toml                          # advisory/license/ban/source 供应链策略
 ├── scripts/verify.sh                  # actions/matrix/bench/stream/package 等进程编排
@@ -1173,7 +1173,7 @@ socket path 也已完成提取。CLI 在启动边界从 platform 读取 root PEM
 cache。叶证书签发留在 engine 的 `issue_leaf_certificate`，CLI 只负责 clap/config、
 组合与呈现。第八个 workspace member `xtask` 提供
 `cargo xtask release <VERSION> [--check]`：workspace package version 是唯一版本源，
-Cargo/fuzz lock、根分发 manifest、三个 launcher/runtime manifest 统一同步，runtime
+Cargo/fuzz lock、根分发 manifest、两个 launcher/runtime manifest 统一同步，runtime
 的八项 optional dependency 从 `targets.json` 派生；npm 打包通过 `cargo metadata`
 读取版本。需要访问私有实现的测试与模块同目录，公开契约测试
 放在各 crate 的标准 `tests/` 目录；`cargo xtask check` 约束所有 Rust 文件不超过 500 行、禁止
@@ -1197,7 +1197,7 @@ M0-M5 的“发布”均指当前 Apple M1 Pro / macOS ARM64 本机资格；Linu
 | **M2 MITM + 全协议**（~3 周） | CA/叶子证书、TLS MITM、h2、WS、上游 mTLS（client-cert）、代理接入认证、剩余 v1 动作（改写/注入/流控）、values | corpus B 组通过，集成测试矩阵通过，**gRPC 可用（h2 端到端 + trailers 保真）** |
 | **M3 Trace**（~2 周） | 采集管道、环形缓冲、资源预算、磁盘 spill、HAR 导出、`trace ls/get/follow/export/stats` | 资源控制压测通过，1GB 大文件内存平稳 |
 | **M4 CLI 完备**（~2 周） | daemon 化、控制 API 全量、`replay`、`ca install`、`proxy on/off`、TUI | CLI 测试全绿，手册文档 |
-| **M5 打磨发布**（~2 周） | 本机性能专项（§9.3 全指标达标）、fuzz 一轮、长稳、npm/Bun 本机产物、文档 | 历史本机 v0.1.0 发布资格；结构改革后的首次版本为 v0.2.0 |
+| **M5 打磨发布**（~2 周） | 本机性能专项（§9.3 全指标达标）、fuzz 一轮、长稳、npm/Bun 共享包本机产物、文档 | 历史本机 v0.1.0 发布资格；结构改革后的首次版本为 v0.2.0 |
 
 ---
 
@@ -1209,7 +1209,7 @@ M0-M5 的“发布”均指当前 Apple M1 Pro / macOS ARM64 本机资格；Linu
 | 遗留项 | 边界与后续条件 |
 | --- | --- |
 | `rsproxy-engine::proxy` 内部子域化 | `transforms` 与 `forward` 仍共享请求/响应 body、framing 和上下文编排。后续应先用调用图与性能证据识别稳定边界，再考虑内部 facade 或子域重组；不得为了目录整齐扩大公开 API、复制状态，或破坏单一 h1/h2 策略管道 |
-| crates.io 发布可行性 | 当前发布合同仅覆盖 npm/Bun。是否发布 Rust crates 仍需评估 path dependency 的发布顺序、package metadata/readme/license 完整性、公开 API 的 semver 承诺和 `cargo publish --dry-run`；评估完成前不把 workspace crate 描述为 crates.io 可安装产物 |
+| crates.io 发布可行性 | 当前发布合同仅覆盖 npm registry，并由 npm/Bun 客户端验证。是否发布 Rust crates 仍需评估 path dependency 的发布顺序、package metadata/readme/license 完整性、公开 API 的 semver 承诺和 `cargo publish --dry-run`；评估完成前不把 workspace crate 描述为 crates.io 可安装产物 |
 
 `panic = "abort"` 不是遗留项或待优化开关。连接线程依赖 unwind 隔离单连接故障，
 release profile 持续保留 unwinding；这是可靠性决策。

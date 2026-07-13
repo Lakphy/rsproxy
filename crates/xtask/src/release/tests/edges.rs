@@ -204,7 +204,7 @@ fn release_preflight_rejects_invalid_lockfiles_and_json_manifests() {
         "`dependencies` must be an object",
     );
     assert_manifest_invalid(
-        "packages/npm/bun/package.json",
+        "packages/npm/cli/package.json",
         |manifest| {
             manifest.as_object_mut().unwrap().remove("dependencies");
         },
