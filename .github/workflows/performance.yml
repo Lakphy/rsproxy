@@ -62,7 +62,7 @@ jobs:
         if: steps.comparison.outputs.enabled == 'true'
         run: cargo xtask targets regression "$RUNNER_TEMP/criterion-base.json" target/performance/criterion.json 10
       - name: Upload Criterion report
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: criterion-${{ github.run_id }}
           path: target/performance/criterion.json
