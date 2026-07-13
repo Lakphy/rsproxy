@@ -184,6 +184,10 @@ fn oversized_h1_upload_streams_to_h2_origin_with_trailers() {
     let origin = listener.local_addr().unwrap();
     let host = "h1-to-h2-stream.test";
     let state = streaming_state("h1-to-h2-stream", host, origin);
+    let mut completed_sessions = state
+        .trace
+        .follow(0, 0, 1)
+        .expect("trace collector should accept a completion subscription");
     let (origin_started, observation, origin_stage, origin_server) =
         spawn_h2_origin(listener, &state, host);
     let (proxy, proxy_server) = spawn_proxy(state.clone(), 1);
@@ -237,6 +241,9 @@ fn oversized_h1_upload_streams_to_h2_origin_with_trailers() {
     let observation = observation.recv_timeout(Duration::from_secs(3)).unwrap();
     origin_server.join().unwrap();
     proxy_server.join().unwrap();
+    completed_sessions
+        .recv_timeout(Duration::from_secs(3))
+        .expect("the streaming session should complete within the trace deadline");
     assert_stream_result(&state, observation, "h1-done", false);
     let _ = fs::remove_dir_all(&state.config.storage);
 }
@@ -247,6 +254,10 @@ fn oversized_h2_upload_streams_to_h2_origin_with_trailers() {
     let origin = listener.local_addr().unwrap();
     let host = "h2-to-h2-stream.test";
     let state = streaming_state("h2-to-h2-stream", host, origin);
+    let mut completed_sessions = state
+        .trace
+        .follow(0, 0, 1)
+        .expect("trace collector should accept a completion subscription");
     let (origin_started, observation, origin_stage, origin_server) =
         spawn_h2_origin(listener, &state, host);
     let (proxy, proxy_server) = spawn_proxy_allowing_h2_disconnect(state.clone(), 1);
@@ -325,6 +336,9 @@ fn oversized_h2_upload_streams_to_h2_origin_with_trailers() {
     let observation = observation.recv_timeout(Duration::from_secs(3)).unwrap();
     origin_server.join().unwrap();
     proxy_server.join().unwrap();
+    completed_sessions
+        .recv_timeout(Duration::from_secs(3))
+        .expect("the streaming session should complete within the trace deadline");
     assert_stream_result(&state, observation, "h2-done", true);
     let _ = fs::remove_dir_all(&state.config.storage);
 }

@@ -13,6 +13,10 @@ const HEADER_LIMIT: usize = 256 * 1024;
 fn h1_large_header_accepts_200kb_and_rejects_over_limit_with_431() {
     let mut state = isolated_state("protocol-h1-headers", "headers.matrix.test status(209)");
     state.config.max_header_size = HEADER_LIMIT;
+    let mut completed_sessions = state
+        .trace
+        .follow(0, 0, 1)
+        .expect("trace collector should accept a completion subscription");
     let (proxy, proxy_server) = spawn_proxy(state.clone(), 2);
 
     let (status, _) = h1_request_with_header(proxy, ALLOWED_HEADER_BYTES);
@@ -23,6 +27,9 @@ fn h1_large_header_accepts_200kb_and_rejects_over_limit_with_431() {
     assert!(body.contains("header size limit exceeded"));
 
     proxy_server.join().unwrap();
+    completed_sessions
+        .recv_timeout(Duration::from_secs(3))
+        .expect("the traced session should complete within the trace deadline");
     let sessions = state.trace.list(4);
     assert_eq!(sessions.len(), 1);
     assert_eq!(sessions[0].status, Some(209));
@@ -33,6 +40,10 @@ fn h1_large_header_accepts_200kb_and_rejects_over_limit_with_431() {
 fn h2_large_header_accepts_200kb_and_rejects_over_limit_with_431() {
     let mut state = isolated_state("protocol-h2-headers", "headers.matrix.test status(209)");
     state.config.max_header_size = HEADER_LIMIT;
+    let mut completed_sessions = state
+        .trace
+        .follow(0, 0, 1)
+        .expect("trace collector should accept a completion subscription");
     let (proxy, proxy_server) = spawn_proxy_allowing_h2_disconnect(state.clone(), 1);
     let mut client = connect_client(proxy);
     connect_request(&mut client, "headers.matrix.test:443");
@@ -67,6 +78,9 @@ fn h2_large_header_accepts_200kb_and_rejects_over_limit_with_431() {
     });
 
     proxy_server.join().unwrap();
+    completed_sessions
+        .recv_timeout(Duration::from_secs(3))
+        .expect("the traced session should complete within the trace deadline");
     let sessions = state.trace.list(4);
     assert_eq!(sessions.len(), 1);
     assert_eq!(sessions[0].status, Some(209));
