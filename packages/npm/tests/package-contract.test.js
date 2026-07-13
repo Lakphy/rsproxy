@@ -125,6 +125,23 @@ test('Cargo packages cannot be published through crates.io', () => {
   assert.deepEqual(fuzz[0].publish, [], 'rsproxy-rules-fuzz must set publish = false');
 });
 
+test('every published manifest declares the provenance repository', () => {
+  // npm provenance rejects packages whose repository.url does not match the
+  // publishing workflow's repository (E422 at publish time).
+  const expected = {
+    type: 'git',
+    url: 'git+https://github.com/Lakphy/rsproxy.git'
+  };
+  for (const packageName of ['runtime', 'cli']) {
+    assert.deepEqual(manifest(packageName).repository, expected);
+  }
+  const generator = readFileSync(join(npmRoot, 'scripts', 'package.mjs'), 'utf8');
+  assert.ok(
+    generator.includes(expected.url),
+    'native package generator must stamp the provenance repository URL'
+  );
+});
+
 test('launcher licenses are exact copies of the repository license', () => {
   const license = readFileSync(join(root, 'LICENSE'), 'utf8');
   for (const packageName of ['runtime', 'cli']) {

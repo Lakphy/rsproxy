@@ -215,6 +215,9 @@ function packageNative(options, manager, dist, version) {
       version,
       description: `Native rsproxy executable for ${target.rustTarget}`,
       license: 'MIT',
+      // npm provenance requires repository.url to match the publishing
+      // workflow's repository.
+      repository: { type: 'git', url: 'git+https://github.com/Lakphy/rsproxy.git' },
       os: [target.platform],
       cpu: [target.arch],
       files: ['bin', 'README.md', 'LICENSE'],

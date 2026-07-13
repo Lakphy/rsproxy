@@ -3,6 +3,10 @@
   "version": "0.0.1",
   "description": "Platform resolver and native process launcher for rsproxy",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Lakphy/rsproxy.git"
+  },
   "main": "index.js",
   "exports": {
     ".": "./index.js",

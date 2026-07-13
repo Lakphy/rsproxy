@@ -3,6 +3,10 @@
   "version": "0.0.1",
   "description": "Programmable HTTP and HTTPS debugging proxy",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Lakphy/rsproxy.git"
+  },
   "bin": {
     "rsproxy": "bin/rsproxy.js"
   },
