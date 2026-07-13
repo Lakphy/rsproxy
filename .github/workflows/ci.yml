@@ -78,7 +78,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Install minimum supported Rust
-        uses: dtolnay/rust-toolchain@1.88.0
+        uses: dtolnay/rust-toolchain@1.100.0
       - name: Restore Rust cache
         uses: Swatinem/rust-cache@v2
         with:
