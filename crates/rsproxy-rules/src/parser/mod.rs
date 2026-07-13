@@ -18,17 +18,20 @@ use transforms::*;
 
 pub(super) struct ParseRuleError {
     pub(super) code: RuleErrorCode,
-    pub(super) message: String,
+    pub(super) source: RuleModelError,
 }
 
 pub(super) fn parse_rule(group: &str, line: usize, input: &str) -> Result<Rule, ParseRuleError> {
-    let tokens = tokenize(input).map_err(|message| parse_error(RuleErrorCode::Syntax, message))?;
+    let tokens = tokenize(input).map_err(|source| parse_error(RuleErrorCode::Syntax, source))?;
     if tokens.is_empty() {
-        return Err(parse_error(RuleErrorCode::Syntax, "empty rule"));
+        return Err(parse_error(
+            RuleErrorCode::Syntax,
+            RuleModelError::empty("rule", "empty rule"),
+        ));
     }
 
-    let matcher = parse_matcher(&tokens[0])
-        .map_err(|message| parse_error(RuleErrorCode::Matcher, message))?;
+    let matcher =
+        parse_matcher(&tokens[0]).map_err(|source| parse_error(RuleErrorCode::Matcher, source))?;
     let mut actions = Vec::new();
     let mut conditions = Vec::new();
     let mut important = false;
@@ -43,12 +46,15 @@ pub(super) fn parse_rule(group: &str, line: usize, input: &str) -> Result<Rule, 
             let cond = tokens.get(idx).ok_or_else(|| {
                 parse_error(
                     RuleErrorCode::Condition,
-                    "`when` must be followed by a condition",
+                    RuleModelError::missing(
+                        "when property",
+                        "`when` must be followed by a condition",
+                    ),
                 )
             })?;
             conditions.push(
                 parse_condition(cond)
-                    .map_err(|message| parse_error(RuleErrorCode::Condition, message))?,
+                    .map_err(|source| parse_error(RuleErrorCode::Condition, source))?,
             );
         } else if let Some(prop) = token.strip_prefix('@') {
             match prop {
@@ -58,14 +64,16 @@ pub(super) fn parse_rule(group: &str, line: usize, input: &str) -> Result<Rule, 
                 _ => {
                     return Err(parse_error(
                         RuleErrorCode::Property,
-                        format!("unknown property @{prop}"),
+                        RuleModelError::unsupported(
+                            "rule property",
+                            format!("unknown property @{prop}"),
+                        ),
                     ));
                 }
             }
         } else {
             actions.push(
-                parse_action(token)
-                    .map_err(|message| parse_error(RuleErrorCode::Action, message))?,
+                parse_action(token).map_err(|source| parse_error(RuleErrorCode::Action, source))?,
             );
         }
         idx += 1;
@@ -74,7 +82,7 @@ pub(super) fn parse_rule(group: &str, line: usize, input: &str) -> Result<Rule, 
     if actions.is_empty() {
         return Err(parse_error(
             RuleErrorCode::Action,
-            "rule must include at least one action",
+            RuleModelError::missing("rule action", "rule must include at least one action"),
         ));
     }
 
@@ -91,14 +99,11 @@ pub(super) fn parse_rule(group: &str, line: usize, input: &str) -> Result<Rule, 
     })
 }
 
-fn parse_error(code: RuleErrorCode, message: impl Into<String>) -> ParseRuleError {
-    ParseRuleError {
-        code,
-        message: message.into(),
-    }
+fn parse_error(code: RuleErrorCode, source: RuleModelError) -> ParseRuleError {
+    ParseRuleError { code, source }
 }
 
-fn parse_action(input: &str) -> Result<Action, String> {
+fn parse_action(input: &str) -> Result<Action, RuleModelError> {
     match input {
         "direct" => return Ok(Action::Direct),
         "bypass" => return Ok(Action::Bypass),
@@ -115,7 +120,10 @@ fn parse_action(input: &str) -> Result<Action, String> {
         )?)),
         "upstream" => {
             if args.is_empty() {
-                return Err("upstream requires at least one argument".to_string());
+                return Err(RuleModelError::missing(
+                    "upstream action",
+                    "upstream requires at least one argument",
+                ));
             }
             let value = if args.len() == 1 {
                 parse_value(args[0])?
@@ -129,19 +137,28 @@ fn parse_action(input: &str) -> Result<Action, String> {
             require_one(&args, "mock.raw")?,
         )?)),
         "status" => {
-            let code = require_one(&args, "status")?
-                .parse::<u16>()
-                .map_err(|_| "status code must be numeric".to_string())?;
+            let raw = require_one(&args, "status")?;
+            let code = raw.parse::<u16>().map_err(|source| {
+                RuleModelError::integer("status code", raw, "status code must be numeric", source)
+            })?;
             Ok(Action::Status(code))
         }
         "redirect" => {
             if args.is_empty() {
-                return Err("redirect requires URL".to_string());
+                return Err(RuleModelError::missing(
+                    "redirect action",
+                    "redirect requires URL",
+                ));
             }
             let code = if args.len() > 1 {
-                args[1]
-                    .parse::<u16>()
-                    .map_err(|_| "redirect code must be numeric".to_string())?
+                args[1].parse::<u16>().map_err(|source| {
+                    RuleModelError::integer(
+                        "redirect code",
+                        args[1],
+                        "redirect code must be numeric",
+                        source,
+                    )
+                })?
             } else {
                 302
             };
@@ -159,9 +176,15 @@ fn parse_action(input: &str) -> Result<Action, String> {
             "res.header",
         )?)?)),
         "res.status" => {
-            let code = require_one(&args, "res.status")?
-                .parse::<u16>()
-                .map_err(|_| "res.status code must be numeric".to_string())?;
+            let raw = require_one(&args, "res.status")?;
+            let code = raw.parse::<u16>().map_err(|source| {
+                RuleModelError::integer(
+                    "response status code",
+                    raw,
+                    "res.status code must be numeric",
+                    source,
+                )
+            })?;
             Ok(Action::ResStatus(code))
         }
         "req.method" => Ok(Action::ReqMethod(parse_value(require_one(
@@ -221,7 +244,10 @@ fn parse_action(input: &str) -> Result<Action, String> {
         "tls" => Ok(Action::Tls(parse_tls_op(&args)?)),
         "url.rewrite" => {
             if args.len() != 2 {
-                return Err("url.rewrite requires from and to".to_string());
+                return Err(RuleModelError::missing(
+                    "url.rewrite action",
+                    "url.rewrite requires from and to",
+                ));
             }
             Ok(Action::UrlRewrite {
                 from: parse_url_rewrite_pattern(args[0])?,
@@ -265,12 +291,20 @@ fn parse_action(input: &str) -> Result<Action, String> {
         "inject" => Ok(Action::Inject(parse_inject_op(&args)?)),
         "delay" => {
             if args.len() != 2 {
-                return Err("delay requires phase and duration".to_string());
+                return Err(RuleModelError::missing(
+                    "delay action",
+                    "delay requires phase and duration",
+                ));
             }
             let phase = match args[0].trim() {
                 "req" => Phase::Req,
                 "res" => Phase::Res,
-                _ => return Err("delay phase must be req or res".to_string()),
+                _ => {
+                    return Err(RuleModelError::invalid(
+                        "delay phase",
+                        "delay phase must be req or res",
+                    ));
+                }
             };
             Ok(Action::Delay {
                 phase,
@@ -279,12 +313,20 @@ fn parse_action(input: &str) -> Result<Action, String> {
         }
         "throttle" => {
             if args.len() != 2 {
-                return Err("throttle requires phase and speed".to_string());
+                return Err(RuleModelError::missing(
+                    "throttle action",
+                    "throttle requires phase and speed",
+                ));
             }
             let phase = match args[0].trim() {
                 "req" => Phase::Req,
                 "res" => Phase::Res,
-                _ => return Err("throttle phase must be req or res".to_string()),
+                _ => {
+                    return Err(RuleModelError::invalid(
+                        "throttle phase",
+                        "throttle phase must be req or res",
+                    ));
+                }
             };
             Ok(Action::Throttle {
                 phase,
@@ -293,7 +335,10 @@ fn parse_action(input: &str) -> Result<Action, String> {
         }
         "tag" => Ok(Action::Tag(parse_value(require_one(&args, "tag")?)?)),
         "skip" => Ok(Action::Skip(args.iter().map(|s| unquote(s)).collect())),
-        _ => Err(format!("unknown action `{name}`")),
+        _ => Err(RuleModelError::unsupported(
+            "action",
+            format!("unknown action `{name}`"),
+        )),
     }?;
     action.validate_templates()?;
     Ok(action)

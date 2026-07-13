@@ -23,7 +23,7 @@ mod resolve;
 mod template;
 
 pub use action::*;
-pub use error::{RuleError, RuleErrorCode};
+pub use error::{RuleError, RuleErrorCode, RuleModelError};
 pub use matcher::UrlParts;
 pub use model::*;
 pub use redact::redact_secrets;

@@ -1,8 +1,9 @@
 use super::*;
+use crate::RuleModelError;
 use crate::template::transform::validate_template;
 
 impl Action {
-    pub(crate) fn validate_templates(&self) -> Result<(), String> {
+    pub(crate) fn validate_templates(&self) -> Result<(), RuleModelError> {
         match self {
             Self::Host(pool) => validate_values(pool.addresses()),
             Self::Upstream(value)
@@ -63,14 +64,14 @@ impl Action {
     }
 }
 
-fn validate_header(operation: &HeaderOp) -> Result<(), String> {
+fn validate_header(operation: &HeaderOp) -> Result<(), RuleModelError> {
     match operation {
         HeaderOp::Set { value, .. } => validate_value(value),
         HeaderOp::Remove { .. } | HeaderOp::Replace { .. } => Ok(()),
     }
 }
 
-fn validate_cookie(operation: &CookieOp) -> Result<(), String> {
+fn validate_cookie(operation: &CookieOp) -> Result<(), RuleModelError> {
     match operation {
         CookieOp::Set { value, attrs, .. } => {
             validate_value(value)?;
@@ -84,7 +85,7 @@ fn validate_cookie(operation: &CookieOp) -> Result<(), String> {
     }
 }
 
-fn validate_cors(operation: &CorsOp) -> Result<(), String> {
+fn validate_cors(operation: &CorsOp) -> Result<(), RuleModelError> {
     validate_values(
         [
             Some(&operation.origin),
@@ -98,7 +99,7 @@ fn validate_cors(operation: &CorsOp) -> Result<(), String> {
     )
 }
 
-fn validate_body(operation: &BodyOp) -> Result<(), String> {
+fn validate_body(operation: &BodyOp) -> Result<(), RuleModelError> {
     match operation {
         BodyOp::Set(value) | BodyOp::Prepend(value) | BodyOp::Append(value) => {
             validate_value(value)
@@ -107,28 +108,28 @@ fn validate_body(operation: &BodyOp) -> Result<(), String> {
     }
 }
 
-fn validate_value(value: &Value) -> Result<(), String> {
+fn validate_value(value: &Value) -> Result<(), RuleModelError> {
     match value {
         Value::Inline(value) | Value::File(value) => validate_template(value),
         Value::Reference(_) => Ok(()),
     }
 }
 
-fn validate_many<'a>(values: impl IntoIterator<Item = &'a str>) -> Result<(), String> {
+fn validate_many<'a>(values: impl IntoIterator<Item = &'a str>) -> Result<(), RuleModelError> {
     for value in values {
         validate_template(value)?;
     }
     Ok(())
 }
 
-fn validate_values<'a>(values: impl IntoIterator<Item = &'a Value>) -> Result<(), String> {
+fn validate_values<'a>(values: impl IntoIterator<Item = &'a Value>) -> Result<(), RuleModelError> {
     for value in values {
         validate_value(value)?;
     }
     Ok(())
 }
 
-fn validate_regex_replacement_value(value: &Value) -> Result<(), String> {
+fn validate_regex_replacement_value(value: &Value) -> Result<(), RuleModelError> {
     match value {
         Value::Inline(_) | Value::Reference(_) => Ok(()),
         Value::File(path) => validate_template(path),

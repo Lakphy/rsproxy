@@ -42,13 +42,95 @@ function readJson(path) {
 }
 
 function workspaceVersion() {
-  const cargo = readFileSync(join(ROOT, 'Cargo.toml'), 'utf8');
-  const section = cargo.match(/\[workspace\.package\]([\s\S]*?)(?:\n\[|$)/);
-  const version = section && section[1].match(/^version\s*=\s*"([^"]+)"/m);
-  if (!version) {
-    fail('Cargo workspace version is missing');
+  const result = spawnSync(
+    'cargo',
+    ['metadata', '--format-version', '1', '--no-deps'],
+    {
+      cwd: ROOT,
+      encoding: 'utf8',
+      maxBuffer: 16 * 1024 * 1024,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      windowsHide: true
+    }
+  );
+  if (result.error) {
+    fail(`could not run cargo metadata: ${result.error.message}`);
   }
-  return version[1];
+  if (result.status !== 0) {
+    process.stderr.write(result.stdout || '');
+    process.stderr.write(result.stderr || '');
+    fail(`cargo metadata failed with status ${result.status ?? 'unknown'}`);
+  }
+
+  let metadata;
+  try {
+    metadata = JSON.parse(result.stdout);
+  } catch (error) {
+    fail(`cargo metadata returned invalid JSON: ${error.message}`);
+  }
+  if (!metadata || typeof metadata !== 'object') {
+    fail('cargo metadata did not return a JSON object');
+  }
+  if (typeof metadata.workspace_root !== 'string' || resolve(metadata.workspace_root) !== ROOT) {
+    fail(
+      `cargo metadata returned unexpected workspace root ${metadata.workspace_root || '<missing>'}`
+    );
+  }
+  if (!Array.isArray(metadata.packages) || !Array.isArray(metadata.workspace_members)) {
+    fail('cargo metadata did not return a workspace package inventory');
+  }
+  if (metadata.workspace_members.length === 0) {
+    fail('Cargo workspace has no members');
+  }
+  if (new Set(metadata.workspace_members).size !== metadata.workspace_members.length) {
+    fail('cargo metadata returned duplicate workspace members');
+  }
+  if (metadata.packages.some((packageMetadata) => (
+    !packageMetadata
+      || typeof packageMetadata !== 'object'
+      || typeof packageMetadata.id !== 'string'
+      || packageMetadata.id.length === 0
+  ))) {
+    fail('cargo metadata returned a package without an id');
+  }
+
+  const packagesById = new Map(metadata.packages.map((packageMetadata) => [
+    packageMetadata.id,
+    packageMetadata
+  ]));
+  if (packagesById.size !== metadata.packages.length) {
+    fail('cargo metadata returned duplicate package ids');
+  }
+  const members = metadata.workspace_members.map((id) => packagesById.get(id));
+  const missingMembers = metadata.workspace_members.filter((_, index) => !members[index]);
+  if (missingMembers.length > 0) {
+    fail(`cargo metadata omitted workspace members: ${missingMembers.join(', ')}`);
+  }
+
+  const invalidMembers = members.filter((packageMetadata) => (
+    typeof packageMetadata.name !== 'string'
+      || packageMetadata.name.length === 0
+      || typeof packageMetadata.version !== 'string'
+      || packageMetadata.version.length === 0
+  ));
+  if (invalidMembers.length > 0) {
+    fail('cargo metadata returned a workspace member without a name or version');
+  }
+
+  const versions = new Map();
+  for (const packageMetadata of members) {
+    const packageNames = versions.get(packageMetadata.version) || [];
+    packageNames.push(packageMetadata.name);
+    versions.set(packageMetadata.version, packageNames);
+  }
+  if (versions.size !== 1) {
+    const inventory = [...versions]
+      .map(([version, packageNames]) => `${version}: ${packageNames.sort().join(', ')}`)
+      .sort()
+      .join('; ');
+    fail(`Cargo workspace package versions are inconsistent (${inventory})`);
+  }
+  return versions.keys().next().value;
 }
 
 function archiveName(name, version) {

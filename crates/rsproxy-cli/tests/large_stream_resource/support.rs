@@ -145,44 +145,6 @@ impl RssMonitor {
     }
 }
 
-#[cfg(target_os = "macos")]
 pub(super) fn resident_kib(pid: u32) -> Option<u64> {
-    let mut info = std::mem::MaybeUninit::<libc::proc_taskinfo>::zeroed();
-    let size = std::mem::size_of::<libc::proc_taskinfo>();
-    // proc_pidinfo writes exactly one proc_taskinfo for a live process.
-    let written = unsafe {
-        libc::proc_pidinfo(
-            pid as i32,
-            libc::PROC_PIDTASKINFO,
-            0,
-            info.as_mut_ptr().cast(),
-            size as i32,
-        )
-    };
-    if written as usize != size {
-        return None;
-    }
-    // The size check above proves the structure was initialized by the kernel.
-    Some(unsafe { info.assume_init() }.pti_resident_size / 1024)
-}
-
-#[cfg(target_os = "linux")]
-pub(super) fn resident_kib(pid: u32) -> Option<u64> {
-    fs::read_to_string(format!("/proc/{pid}/status"))
-        .ok()?
-        .lines()
-        .find_map(|line| line.strip_prefix("VmRSS:"))?
-        .split_whitespace()
-        .next()?
-        .parse()
-        .ok()
-}
-
-#[cfg(not(any(target_os = "macos", target_os = "linux")))]
-pub(super) fn resident_kib(pid: u32) -> Option<u64> {
-    let output = Command::new("ps")
-        .args(["-o", "rss=", "-p", &pid.to_string()])
-        .output()
-        .ok()?;
-    String::from_utf8(output.stdout).ok()?.trim().parse().ok()
+    rsproxy_platform::process::resident_kib(pid)
 }

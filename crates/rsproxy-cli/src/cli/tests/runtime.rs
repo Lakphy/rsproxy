@@ -1,4 +1,5 @@
-use super::super::*;
+use super::*;
+use crate::cli::command::ClientArgs;
 
 #[test]
 fn trace_resource_options_parse_sizes() {
@@ -195,12 +196,29 @@ fn trace_resource_options_parse_sizes() {
 }
 #[test]
 fn trace_list_limit_accepts_short_and_long_options() {
-    assert_eq!(trace_list_limit(&[]), "20");
-    assert_eq!(trace_list_limit(&["-n".to_string(), "3".to_string()]), "3");
+    assert_eq!(parse_trace_list_limit(&[]).unwrap(), 20);
     assert_eq!(
-        trace_list_limit(&["--limit".to_string(), "5".to_string()]),
-        "5"
+        parse_trace_list_limit(&["-n".to_string(), "3".to_string()]).unwrap(),
+        3
     );
+    assert_eq!(
+        parse_trace_list_limit(&["--limit".to_string(), "5".to_string()]).unwrap(),
+        5
+    );
+}
+
+#[test]
+fn dns_server_append_preserves_order_and_duplicates() {
+    let args = parse_runtime_args(&[
+        "--dns-server".to_string(),
+        "1.1.1.1".to_string(),
+        "--dns-server".to_string(),
+        "9.9.9.9:5353".to_string(),
+        "--dns-server".to_string(),
+        "1.1.1.1".to_string(),
+    ])
+    .unwrap();
+    assert_eq!(args.dns_server, ["1.1.1.1", "9.9.9.9:5353", "1.1.1.1"]);
 }
 
 #[test]
@@ -219,7 +237,7 @@ fn proxy_auth_requires_nonempty_user_and_password() {
         let err =
             runtime_config_without_default(&["--proxy-auth".to_string(), invalid.to_string()])
                 .expect_err("invalid proxy auth should fail");
-        assert!(err.contains("--proxy-auth"));
+        assert!(err.to_string().contains("--proxy-auth"));
     }
 }
 
@@ -257,5 +275,27 @@ fn trace_filter_headers_only_disables_body_capture() {
 
     let err = runtime_config_without_default(&["--trace-filter".to_string(), "images".to_string()])
         .expect_err("unsupported trace filter should fail");
-    assert!(err.contains("--trace-filter supports headers-only, media, or full"));
+    assert!(
+        err.to_string()
+            .contains("--trace-filter supports headers-only, media, or full")
+    );
+}
+
+#[test]
+fn debug_output_redacts_api_tokens() {
+    let secret = "0123456789abcdef0123456789abcdef";
+    let client = ClientArgs {
+        api_token: Some(secret.to_string()),
+        ..ClientArgs::default()
+    };
+    let client_debug = format!("{client:?}");
+    assert!(!client_debug.contains(secret));
+    assert!(client_debug.contains("[REDACTED]"));
+
+    let mut config = AppConfig::default();
+    config.api_token = Some(secret.to_string());
+    config.proxy_auth = Some(format!("user:{secret}"));
+    let config_debug = format!("{config:?}");
+    assert!(!config_debug.contains(secret));
+    assert!(config_debug.contains("[REDACTED]"));
 }

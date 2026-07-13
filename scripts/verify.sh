@@ -12,15 +12,12 @@ run_verify() {
         actions) run_script "$ROOT" test-action-effects.sh "$@" ;;
         matrix) run_script "$ROOT" test-protocol-matrix.sh "$@" ;;
         bench) run_script "$ROOT" test-benchmark.sh "$@" ;;
-        coverage) run_script "$ROOT" test-coverage-contracts.sh "$@" ;;
-        perf) run_script "$ROOT" test-performance-contracts.sh "$@" ;;
-        soak) run_script "$ROOT" test-soak-contracts.sh "$@" ;;
         package) run_script "$ROOT" test-npm-package.sh "$@" ;;
         stream) run_script "$ROOT" test-large-stream-resource.sh "$@" ;;
         coverage-report) run_script "$ROOT" coverage.sh "$@" ;;
         fuzz) run_script "$ROOT" fuzz-rules-smoke.sh "$@" ;;
         *)
-            usage_error 'usage: scripts/verify.sh <actions|matrix|bench|coverage|perf|soak|package|stream|coverage-report|fuzz|all> [args...]'
+            usage_error 'usage: scripts/verify.sh <actions|matrix|bench|package|stream|coverage-report|fuzz|all> [args...]'
             ;;
     esac
 }
@@ -30,7 +27,7 @@ shift $(( $# > 0 ? 1 : 0 ))
 case $command in
     all)
         [ "$#" -eq 0 ] || usage_error 'scripts/verify.sh all does not accept arguments'
-        for verify in actions matrix bench coverage perf soak package stream; do
+        for verify in actions matrix bench package stream; do
             run_verify "$verify"
         done
         ;;

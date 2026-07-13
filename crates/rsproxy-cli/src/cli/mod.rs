@@ -1,92 +1,99 @@
-pub(crate) mod api;
 mod api_auth;
-pub(crate) mod args;
 pub(crate) mod ca;
-mod completions;
+pub(crate) mod command;
 pub(crate) mod config;
 mod daemon;
-mod help;
 mod rules;
 mod system_proxy;
 mod trace;
+mod util;
 
-use api::*;
-use api_auth::*;
-use args::*;
-use ca::*;
-use completions::*;
-use config::*;
-use daemon::*;
-use help::*;
-use rules::*;
-use system_proxy::*;
-use trace::*;
+use crate::tui;
+use crate::{CliError, CliResult, DaemonConflict};
+use clap::{CommandFactory, Parser};
+use command::{Cli, CompletionShell, TopLevelCommand};
+use rsproxy_control::api_request;
+use std::io;
 
-use crate::app::{
-    AppConfig, MitmCertCache, MitmFailureCache, SharedState, api_display, default_storage,
-    unix_api_path,
-};
-use crate::{control, dns, proxy, tui};
-use rsproxy_rules::{RequestMeta, ResponseMeta, RuleSet, UrlParts};
-use std::env;
-use std::fs;
-use std::fs::OpenOptions;
-use std::io::{self, Read, Write};
-use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
-use std::sync::Arc;
-use std::thread;
-use std::time::{Duration, Instant};
+pub use command::Cli as ParsedCli;
 
-pub fn run_cli() -> Result<(), String> {
+pub fn parse_cli() -> Result<ParsedCli, clap::Error> {
+    Cli::try_parse()
+}
+
+pub fn run_cli() -> CliResult<()> {
+    let cli = parse_cli()?;
+    run_parsed(cli)
+}
+
+pub fn run_parsed(cli: ParsedCli) -> CliResult<()> {
+    let Some(command) = cli.command else {
+        let mut command = Cli::command();
+        command
+            .print_help()
+            .map_err(|source| CliError::io("print root help", source))?;
+        println!();
+        return Ok(());
+    };
+
+    let command = match command {
+        TopLevelCommand::Completions(args) => return generate_completions(args.shell),
+        command => command,
+    };
+
     crate::logging::init()?;
-    let mut args: Vec<String> = env::args().skip(1).collect();
-    if args.is_empty() {
-        print_help();
-        return Ok(());
-    }
-    let command = args.remove(0);
-    if matches!(command.as_str(), "--version" | "-V") {
-        println!("rsproxy {}", env!("CARGO_PKG_VERSION"));
-        return Ok(());
-    }
-    if matches!(command.as_str(), "help" | "--help" | "-h") {
-        return print_help_command(&args);
-    }
-    if help_requested(&args) {
-        return print_command_help(&command, &args);
-    }
-    if matches!(
-        command.as_str(),
-        "status" | "rules" | "values" | "trace" | "tui" | "replay"
-    ) {
-        configure_client_api_auth(&args)?;
-    }
-
-    match command.as_str() {
-        "run" => run_server(args),
-        "start" => start_server(args),
-        "stop" => stop_server(args),
-        "restart" => {
-            let stop_args = args.clone();
-            let _ = stop_server(stop_args);
-            start_server(args)
-        }
-        "status" => {
-            let config = runtime_config(&args)?;
+    match command {
+        TopLevelCommand::Run(args) => daemon::run_server(&args),
+        TopLevelCommand::Start(args) => daemon::start_server(&args),
+        TopLevelCommand::Stop(args) => daemon::stop_server(&args),
+        TopLevelCommand::Restart(args) => match daemon::stop_server(&args) {
+            Ok(()) | Err(CliError::DaemonConflict(DaemonConflict::NotRunning { .. })) => {
+                daemon::start_server(&args)
+            }
+            Err(error) => Err(error),
+        },
+        TopLevelCommand::Status(args) => {
+            api_auth::configure_client_api_auth(&args.client)?;
+            let config = config::runtime_config(&args)?;
             println!("{}", api_request("GET", &config.api, "/api/status", "")?);
             Ok(())
         }
-        "rules" => rules_cmd(args),
-        "values" => values_cmd(args),
-        "trace" => trace_cmd(args),
-        "tui" => tui::tui_cmd(args),
-        "replay" => replay_cmd(args),
-        "ca" => ca_cmd(args),
-        "proxy" => system_proxy_cmd(args),
-        "completions" => completions_cmd(args),
-        other => Err(format!("unknown command `{other}`")),
+        TopLevelCommand::Rules(args) => {
+            api_auth::configure_client_api_auth(&args.client)?;
+            rules::rules_cmd(args, cli.json)
+        }
+        TopLevelCommand::Values(args) => {
+            api_auth::configure_client_api_auth(&args.client)?;
+            trace::values_cmd(args, cli.json)
+        }
+        TopLevelCommand::Trace(args) => {
+            api_auth::configure_client_api_auth(&args.client)?;
+            trace::trace_cmd(args, cli.json)
+        }
+        TopLevelCommand::Tui(args) => {
+            api_auth::configure_client_api_auth(&args.client)?;
+            tui::tui_cmd(args, cli.json)
+        }
+        TopLevelCommand::Replay(args) => {
+            api_auth::configure_client_api_auth(&args.client)?;
+            trace::replay_cmd(args)
+        }
+        TopLevelCommand::Ca(args) => ca::ca_cmd(args, cli.json),
+        TopLevelCommand::Proxy(args) => system_proxy::system_proxy_cmd(args, cli.json),
+        TopLevelCommand::Completions(_) => unreachable!("completions returned before logging"),
     }
+}
+
+fn generate_completions(shell: CompletionShell) -> CliResult<()> {
+    let shell = match shell {
+        CompletionShell::Bash => clap_complete::Shell::Bash,
+        CompletionShell::Zsh => clap_complete::Shell::Zsh,
+        CompletionShell::Fish => clap_complete::Shell::Fish,
+        CompletionShell::Powershell => clap_complete::Shell::PowerShell,
+    };
+    let mut command = Cli::command();
+    clap_complete::generate(shell, &mut command, "rsproxy", &mut io::stdout());
+    Ok(())
 }
 
 #[cfg(test)]

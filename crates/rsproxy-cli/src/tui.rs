@@ -1,6 +1,6 @@
-use crate::cli::api::api_request;
-use crate::cli::args::{has_flag, option_value};
+use crate::cli::command::{RuntimeArgs, TuiArgs};
 use crate::cli::config::runtime_config;
+use crate::{CliError, CliResult};
 use crossterm::event::{self, Event, KeyCode};
 use crossterm::execute;
 use crossterm::terminal::{
@@ -8,6 +8,7 @@ use crossterm::terminal::{
 };
 use ratatui::Terminal;
 use ratatui::backend::CrosstermBackend;
+use rsproxy_control::api_request;
 use serde_json::Value as JsonValue;
 use std::io;
 use std::time::{Duration, Instant};
@@ -20,24 +21,20 @@ use format::*;
 use render::render_frame;
 use state::*;
 
-pub fn tui_cmd(args: Vec<String>) -> Result<(), String> {
-    let api = runtime_config(&args)?.api;
-    let limit = option_value(&args, "--limit")
-        .or_else(|| option_value(&args, "-n"))
-        .and_then(|value| value.parse::<usize>().ok())
-        .unwrap_or(20);
-    let filter = option_value(&args, "--filter").unwrap_or_default();
-    let detail_tab = option_value(&args, "--tab")
+pub fn tui_cmd(args: TuiArgs, json: bool) -> CliResult<()> {
+    let api = runtime_config(&RuntimeArgs::from_client(args.client))?.api;
+    let limit = args.limit.unwrap_or(20);
+    let filter = args.filter.unwrap_or_default();
+    let detail_tab = args
+        .tab
         .as_deref()
         .map(DetailTab::parse)
         .transpose()?
         .unwrap_or(DetailTab::Overview);
-    let interval_ms = option_value(&args, "--interval-ms")
-        .and_then(|value| value.parse::<u64>().ok())
-        .unwrap_or(1000);
-    if has_flag(&args, "--once") {
+    let interval_ms = args.interval_ms.unwrap_or(1000);
+    if args.once {
         let snapshot = fetch_snapshot(&api, limit, None, &filter)?;
-        if has_flag(&args, "--json") {
+        if json {
             println!(
                 "{}",
                 serde_json::json!({
@@ -68,10 +65,13 @@ fn fetch_snapshot(
     limit: usize,
     selected_id: Option<u64>,
     filter: &str,
-) -> Result<TuiSnapshot, String> {
+) -> CliResult<TuiSnapshot> {
     let status_body = api_request("GET", api, "/api/status", "")?;
-    let status: JsonValue = serde_json::from_str(&status_body)
-        .map_err(|error| format!("parse status json: {error}"))?;
+    let status: JsonValue =
+        serde_json::from_str(&status_body).map_err(|source| CliError::Json {
+            context: "parse TUI status",
+            source,
+        })?;
     let fetch_limit = limit.saturating_mul(5).max(limit).max(20);
     let sessions_body = api_request(
         "GET",
@@ -79,8 +79,11 @@ fn fetch_snapshot(
         &format!("/api/sessions?limit={fetch_limit}"),
         "",
     )?;
-    let sessions_json: JsonValue = serde_json::from_str(&sessions_body)
-        .map_err(|error| format!("parse sessions json: {error}"))?;
+    let sessions_json: JsonValue =
+        serde_json::from_str(&sessions_body).map_err(|source| CliError::Json {
+            context: "parse TUI sessions",
+            source,
+        })?;
     let mut sessions = sessions_json.as_array().cloned().unwrap_or_default();
     sessions.retain(|session| session_matches_filter(session, filter));
     sessions.truncate(limit);
@@ -103,18 +106,18 @@ fn run_interactive(
     filter: String,
     detail_tab: DetailTab,
     interval: Duration,
-) -> Result<(), String> {
+) -> CliResult<()> {
     let snapshot = fetch_snapshot(api, limit, None, &filter)?;
-    enable_raw_mode().map_err(|error| error.to_string())?;
+    enable_raw_mode().map_err(|source| CliError::io("enable terminal raw mode", source))?;
     let mut stdout = io::stdout();
-    execute!(stdout, EnterAlternateScreen).map_err(|error| {
+    execute!(stdout, EnterAlternateScreen).map_err(|source| {
         let _ = disable_raw_mode();
-        error.to_string()
+        CliError::io("enter alternate terminal screen", source)
     })?;
     let backend = CrosstermBackend::new(stdout);
-    let mut terminal = Terminal::new(backend).map_err(|error| {
+    let mut terminal = Terminal::new(backend).map_err(|source| {
         let _ = disable_raw_mode();
-        error.to_string()
+        CliError::io("initialize terminal renderer", source)
     })?;
 
     let mut app = TuiApp {
@@ -140,14 +143,16 @@ fn run_tui_loop(
     terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
     app: &mut TuiApp,
     interval: Duration,
-) -> Result<(), String> {
+) -> CliResult<()> {
     loop {
         terminal
             .draw(|frame| render_frame(frame, app))
-            .map_err(|error| error.to_string())?;
+            .map_err(|source| CliError::io("draw terminal frame", source))?;
 
-        if event::poll(Duration::from_millis(100)).map_err(|error| error.to_string())? {
-            match event::read().map_err(|error| error.to_string())? {
+        if event::poll(Duration::from_millis(100))
+            .map_err(|source| CliError::io("poll terminal input", source))?
+        {
+            match event::read().map_err(|source| CliError::io("read terminal input", source))? {
                 Event::Key(key) => match key.code {
                     KeyCode::Esc if app.editing_filter => app.editing_filter = false,
                     KeyCode::Char('q') | KeyCode::Esc => return Ok(()),

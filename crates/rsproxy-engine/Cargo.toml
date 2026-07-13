@@ -1,0 +1,45 @@
+[package]
+name = "rsproxy-engine"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+rust-version.workspace = true
+
+[features]
+bench-support = []
+test-support = []
+
+[dependencies]
+arc-swap.workspace = true
+bytes.workspace = true
+http-body.workspace = true
+http-body-util.workspace = true
+hyper.workspace = true
+hyper-util.workspace = true
+notify.workspace = true
+rcgen.workspace = true
+rsproxy-net.workspace = true
+rsproxy-rules.workspace = true
+rsproxy-trace.workspace = true
+rustls.workspace = true
+rustls-native-certs.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+toml.workspace = true
+tracing.workspace = true
+webpki-roots.workspace = true
+
+[dev-dependencies]
+criterion.workspace = true
+rsproxy-net = { workspace = true, features = ["test-support"] }
+
+[lints]
+workspace = true
+
+[[bench]]
+name = "certificates"
+harness = false
+required-features = ["bench-support"]

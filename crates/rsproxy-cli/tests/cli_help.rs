@@ -35,16 +35,39 @@ fn help_command_exposes_the_supported_entry_points() {
 
     assert!(output.status.success());
     let stdout = String::from_utf8(output.stdout).expect("help should be UTF-8");
-    assert!(stdout.contains("rsproxy run|start|stop|restart"));
-    assert!(stdout.contains("--watch"));
-    assert!(stdout.contains("--watch-debounce-ms MS"));
-    assert!(stdout.contains("rsproxy rules"));
-    assert!(stdout.contains("rsproxy rules enable|disable <group>"));
-    assert!(stdout.contains("--response-status CODE"));
-    assert!(stdout.contains("--response-header 'Name: value'"));
-    assert!(stdout.contains("rsproxy trace"));
-    assert!(stdout.contains("rsproxy completions"));
-    assert!(stdout.contains("rsproxy --version"));
+    for command in [
+        "run",
+        "start",
+        "stop",
+        "restart",
+        "status",
+        "rules",
+        "values",
+        "trace",
+        "tui",
+        "replay",
+        "ca",
+        "proxy",
+        "completions",
+    ] {
+        assert!(stdout.contains(command), "root help omitted {command}");
+    }
+    assert!(stdout.contains("Usage: rsproxy"));
+    assert!(stdout.contains("--version"));
+
+    let runtime = command_output(&["run", "--help"]);
+    assert!(runtime.status.success());
+    let runtime = String::from_utf8(runtime.stdout).unwrap();
+    assert!(runtime.contains("--watch"));
+    assert!(runtime.contains("--watch-debounce-ms"));
+}
+
+#[test]
+fn empty_argv_prints_root_help_and_succeeds() {
+    let output = command_output(&[]);
+    assert!(output.status.success());
+    assert!(String::from_utf8_lossy(&output.stdout).contains("Usage: rsproxy"));
+    assert!(output.stderr.is_empty());
 }
 
 #[test]
@@ -91,7 +114,7 @@ fn every_command_help_exits_without_runtime_side_effects() {
         (&["rules", "disable", "--help"], "rules disable"),
         (&["rules", "stats", "--help"], "rules stats"),
         (&["rules", "bench", "--help"], "rules bench"),
-        (&["rules", "test", "--help"], "--response-status CODE"),
+        (&["rules", "test", "--help"], "--response-status"),
         (&["values", "--help"], "rsproxy values"),
         (&["values", "ls", "--help"], "values ls"),
         (&["values", "cat", "--help"], "values cat"),
@@ -100,7 +123,7 @@ fn every_command_help_exits_without_runtime_side_effects() {
         (&["trace", "--help"], "rsproxy trace"),
         (&["trace", "ls", "--help"], "trace ls"),
         (&["trace", "get", "--help"], "trace get"),
-        (&["trace", "follow", "--help"], "--count N"),
+        (&["trace", "follow", "--help"], "--count"),
         (&["trace", "stats", "--help"], "trace stats"),
         (&["trace", "clear", "--help"], "trace clear"),
         (&["trace", "export", "--help"], "trace export"),
@@ -110,13 +133,13 @@ fn every_command_help_exits_without_runtime_side_effects() {
         (&["ca", "init", "--help"], "ca init"),
         (&["ca", "status", "--help"], "ca status"),
         (&["ca", "export", "--help"], "ca export"),
-        (&["ca", "issue", "--help"], "rsproxy ca issue <HOST>"),
+        (&["ca", "issue", "--help"], "<HOST>"),
         (&["ca", "install", "--help"], "ca install"),
         (&["ca", "uninstall", "--help"], "ca uninstall"),
         (&["proxy", "--help"], "rsproxy proxy"),
         (&["proxy", "status", "--help"], "proxy status"),
-        (&["proxy", "on", "--help"], "rsproxy proxy on|off"),
-        (&["proxy", "off", "--help"], "rsproxy proxy on|off"),
+        (&["proxy", "on", "--help"], "proxy on"),
+        (&["proxy", "off", "--help"], "proxy off"),
         (&["completions", "--help"], "rsproxy completions"),
         (&["help", "rules", "test"], "--response-header"),
     ];
@@ -148,5 +171,19 @@ fn help_keeps_unknown_command_errors_explicit() {
         let output = command_output(args);
         assert!(!output.status.success());
         assert!(String::from_utf8_lossy(&output.stderr).contains("unknown"));
+    }
+}
+
+#[test]
+fn clap_rejects_unknown_and_unrelated_options_with_usage_exit_code() {
+    for args in [
+        &["run", "--porrt", "8899"][..],
+        &["values", "ls", "--watch"][..],
+    ] {
+        let output = command_output(args);
+        assert_eq!(output.status.code(), Some(2));
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert!(stderr.contains("unexpected argument"));
+        assert!(stderr.contains("Usage:"));
     }
 }

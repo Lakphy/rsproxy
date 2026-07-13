@@ -144,55 +144,13 @@ pub(super) fn wait_for_exit(pid: u32) {
 
 #[cfg(unix)]
 pub(super) fn expected_default_unix_socket(storage: &Path) -> PathBuf {
-    use sha2::{Digest, Sha256};
-
-    let local = storage.join("run/ctl.sock");
-    if local.to_string_lossy().len() <= 96 {
-        return local;
-    }
-    let digest = Sha256::digest(storage.to_string_lossy().as_bytes());
-    let suffix = digest[..8]
-        .iter()
-        .map(|byte| format!("{byte:02x}"))
-        .collect::<String>();
-    PathBuf::from("/tmp").join(format!("rsproxy-{}-{suffix}.sock", unsafe {
-        libc::geteuid()
-    }))
+    rsproxy_platform::process::unix_control_socket_path(storage)
 }
 
-#[cfg(unix)]
 fn process_exists(pid: u32) -> bool {
-    let result = unsafe { libc::kill(pid as i32, 0) };
-    result == 0 || std::io::Error::last_os_error().raw_os_error() == Some(libc::EPERM)
+    rsproxy_platform::process::process_alive(pid)
 }
 
-#[cfg(windows)]
-fn process_exists(pid: u32) -> bool {
-    Command::new("tasklist")
-        .args(["/FI", &format!("PID eq {pid}"), "/FO", "CSV", "/NH"])
-        .output()
-        .map(|output| String::from_utf8_lossy(&output.stdout).contains(&pid.to_string()))
-        .unwrap_or(false)
-}
-
-#[cfg(all(not(unix), not(windows)))]
-fn process_exists(_pid: u32) -> bool {
-    false
-}
-
-#[cfg(unix)]
 pub(super) fn force_terminate(pid: u32) {
-    unsafe {
-        libc::kill(pid as i32, libc::SIGKILL);
-    }
+    let _ = rsproxy_platform::process::force_terminate_process(pid);
 }
-
-#[cfg(windows)]
-pub(super) fn force_terminate(pid: u32) {
-    let _ = Command::new("taskkill")
-        .args(["/PID", &pid.to_string(), "/F"])
-        .status();
-}
-
-#[cfg(all(not(unix), not(windows)))]
-pub(super) fn force_terminate(_pid: u32) {}

@@ -33,12 +33,32 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
       - name: Restore Rust cache
         uses: Swatinem/rust-cache@v2
+      - name: Check repository contracts
+        run: cargo xtask check all
       - name: Check all targets
         run: cargo check --workspace --all-targets --locked
       - name: Test all targets
         run: cargo test --workspace --all-targets --no-fail-fast --locked
       - name: Build release binaries
         run: cargo build --release --workspace --locked
+
+  msrv:
+    name: Minimum Rust 1.88
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Install minimum supported Rust
+        uses: dtolnay/rust-toolchain@1.88.0
+      - name: Restore Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: msrv-1.88
+      - name: Check workspace at MSRV
+        run: cargo check --workspace --locked
 
   repository-contracts:
     name: Repository contracts
@@ -68,7 +88,7 @@ jobs:
       - name: Run Clippy
         run: cargo clippy --workspace --all-targets --locked -- -D warnings
       - name: Check repository structure
-        run: ./scripts/check.sh all
+        run: cargo xtask check all
       - name: Check shell syntax
         run: find scripts benches -type f -name '*.sh' -exec sh -n {} \;
       - name: Check fuzz target
@@ -77,12 +97,25 @@ jobs:
         run: ./scripts/verify.sh matrix
       - name: Run action contracts
         run: ./scripts/verify.sh actions
-      - name: Run distribution and quality-gate contracts
-        run: |
-          ./scripts/verify.sh package
-          ./scripts/verify.sh coverage
-          ./scripts/verify.sh perf
-          ./scripts/verify.sh soak
+      - name: Run distribution contract
+        run: ./scripts/verify.sh package
+
+  supply-chain:
+    name: Supply chain policy
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Check advisories, licenses, bans, and sources
+        uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          rust-version: "1.88"
+          command: check
+          arguments: --all-features --locked
+          command-arguments: advisories bans licenses sources
 
   coverage:
     name: Production line coverage

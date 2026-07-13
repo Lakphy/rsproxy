@@ -14,7 +14,7 @@ command -v jq >/dev/null 2>&1 || {
     exit 1
 }
 if [ "$SKIP_BUILD" != "1" ]; then
-    cargo build --release -p rsproxy --bin rsproxy --locked --manifest-path "$ROOT/Cargo.toml"
+    cargo build --release -p rsproxy-cli --bin rsproxy --locked --manifest-path "$ROOT/Cargo.toml"
 fi
 
 awk 'BEGIN {

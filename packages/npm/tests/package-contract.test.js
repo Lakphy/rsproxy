@@ -1,6 +1,7 @@
 'use strict';
 
 const assert = require('node:assert/strict');
+const { spawnSync } = require('node:child_process');
 const { readFileSync } = require('node:fs');
 const { join, resolve } = require('node:path');
 const test = require('node:test');
@@ -17,12 +18,56 @@ function manifest(name) {
   return json(join(npmRoot, name, 'package.json'));
 }
 
+function cargoMetadata(manifestPath) {
+  const args = ['metadata', '--format-version', '1', '--no-deps'];
+  if (manifestPath) {
+    args.push('--manifest-path', manifestPath);
+  }
+  const result = spawnSync('cargo', args, {
+    cwd: root,
+    encoding: 'utf8',
+    maxBuffer: 16 * 1024 * 1024,
+    stdio: ['ignore', 'pipe', 'pipe'],
+    windowsHide: true
+  });
+  assert.ifError(result.error);
+  assert.equal(
+    result.status,
+    0,
+    `cargo metadata failed with status ${result.status ?? 'unknown'}:\n${result.stderr || result.stdout}`
+  );
+  return JSON.parse(result.stdout);
+}
+
+function workspacePackages(metadata) {
+  assert.ok(Array.isArray(metadata.packages), 'cargo metadata packages must be an array');
+  assert.ok(
+    Array.isArray(metadata.workspace_members),
+    'cargo metadata workspace_members must be an array'
+  );
+  assert.ok(metadata.workspace_members.length > 0, 'Cargo workspace must have members');
+  const packagesById = new Map(metadata.packages.map((packageMetadata) => [
+    packageMetadata.id,
+    packageMetadata
+  ]));
+  return metadata.workspace_members.map((id) => {
+    const packageMetadata = packagesById.get(id);
+    assert.ok(packageMetadata, `cargo metadata omitted workspace member ${id}`);
+    return packageMetadata;
+  });
+}
+
 function cargoVersion() {
-  const cargo = readFileSync(join(root, 'Cargo.toml'), 'utf8');
-  const section = cargo.match(/\[workspace\.package\]([\s\S]*?)(?:\n\[|$)/);
-  const version = section && section[1].match(/^version\s*=\s*"([^"]+)"/m);
-  assert.ok(version, 'workspace package version must exist');
-  return version[1];
+  const packages = workspacePackages(cargoMetadata());
+  const versions = new Set(packages.map((packageMetadata) => packageMetadata.version));
+  assert.equal(
+    versions.size,
+    1,
+    `Cargo workspace package versions must agree: ${packages
+      .map((packageMetadata) => `${packageMetadata.name}@${packageMetadata.version}`)
+      .join(', ')}`
+  );
+  return versions.values().next().value;
 }
 
 test('target inventory is complete and matches the runtime map', () => {
@@ -68,15 +113,18 @@ test('all publishable package versions and dependencies match Cargo', () => {
 });
 
 test('Cargo packages cannot be published through crates.io', () => {
-  const workspace = readFileSync(join(root, 'Cargo.toml'), 'utf8');
-  const workspacePackage = workspace.match(/\[workspace\.package\]([\s\S]*?)(?:\n\[|$)/);
-  assert.ok(workspacePackage);
-  assert.match(workspacePackage[1], /^publish\s*=\s*false$/m);
-  for (const crate of ['rsproxy-cli', 'rsproxy-rules', 'rsproxy-trace']) {
-    const cargo = readFileSync(join(root, 'crates', crate, 'Cargo.toml'), 'utf8');
-    assert.match(cargo, /^publish\.workspace\s*=\s*true$/m);
+  const workspace = workspacePackages(cargoMetadata());
+  for (const packageMetadata of workspace) {
+    assert.deepEqual(
+      packageMetadata.publish,
+      [],
+      `${packageMetadata.name} must set publish = false`
+    );
   }
-  assert.match(readFileSync(join(root, 'fuzz', 'Cargo.toml'), 'utf8'), /^publish\s*=\s*false$/m);
+  const fuzz = workspacePackages(cargoMetadata(join(root, 'fuzz', 'Cargo.toml')));
+  assert.equal(fuzz.length, 1);
+  assert.equal(fuzz[0].name, 'rsproxy-rules-fuzz');
+  assert.deepEqual(fuzz[0].publish, [], 'rsproxy-rules-fuzz must set publish = false');
 });
 
 test('launcher licenses are exact copies of the repository license', () => {

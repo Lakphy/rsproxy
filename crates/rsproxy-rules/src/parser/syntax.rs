@@ -1,45 +1,63 @@
 use super::*;
 
-pub(crate) fn parse_call(input: &str) -> Result<(&str, Vec<&str>), String> {
+pub(crate) fn parse_call(input: &str) -> Result<(&str, Vec<&str>), RuleModelError> {
     let open = input
         .find('(')
-        .ok_or_else(|| format!("expected call syntax: {input}"))?;
+        .ok_or_else(|| RuleModelError::syntax("call", format!("expected call syntax: {input}")))?;
     if !input.ends_with(')') {
-        return Err(format!("call must end with `)`: {input}"));
+        return Err(RuleModelError::syntax(
+            "call",
+            format!("call must end with `)`: {input}"),
+        ));
     }
     let name = &input[..open];
     if name.is_empty() {
-        return Err("call name is empty".to_string());
+        return Err(RuleModelError::empty("call name", "call name is empty"));
     }
     let args = split_args(&input[open + 1..input.len() - 1]);
     Ok((name, args))
 }
 
-pub(crate) fn require_one<'a>(args: &'a [&'a str], action: &str) -> Result<&'a str, String> {
+pub(crate) fn require_one<'a>(
+    args: &'a [&'a str],
+    action: &str,
+) -> Result<&'a str, RuleModelError> {
     if args.len() == 1 && !args[0].trim().is_empty() {
         Ok(args[0].trim())
     } else {
-        Err(format!("{action} requires exactly one argument"))
+        Err(RuleModelError::missing(
+            "action argument",
+            format!("{action} requires exactly one argument"),
+        ))
     }
 }
 
-pub(crate) fn require_call_body<'a>(input: &'a str, action: &str) -> Result<&'a str, String> {
+pub(crate) fn require_call_body<'a>(
+    input: &'a str,
+    action: &str,
+) -> Result<&'a str, RuleModelError> {
     let open = input
         .find('(')
-        .ok_or_else(|| format!("expected call syntax: {input}"))?;
+        .ok_or_else(|| RuleModelError::syntax("call", format!("expected call syntax: {input}")))?;
     let body = input[open + 1..input.len() - 1].trim();
     if body.is_empty() {
-        Err(format!("{action} requires exactly one argument"))
+        Err(RuleModelError::missing(
+            "action argument",
+            format!("{action} requires exactly one argument"),
+        ))
     } else {
         Ok(body)
     }
 }
 
-pub(crate) fn parse_value(input: &str) -> Result<Value, String> {
+pub(crate) fn parse_value(input: &str) -> Result<Value, RuleModelError> {
     let input = input.trim();
     if let Some(path) = input.strip_prefix('<').and_then(|s| s.strip_suffix('>')) {
         if path.trim().is_empty() {
-            Err("file value path must not be empty".to_string())
+            Err(RuleModelError::empty(
+                "file value path",
+                "file value path must not be empty",
+            ))
         } else {
             Ok(Value::File(path.to_string()))
         }
@@ -47,8 +65,11 @@ pub(crate) fn parse_value(input: &str) -> Result<Value, String> {
         if valid_value_key(key) {
             Ok(Value::Reference(key.to_string()))
         } else {
-            Err(format!(
-                "invalid value key `{key}`; use 1-128 ASCII letters, digits, dot, underscore, or hyphen"
+            Err(RuleModelError::invalid(
+                "value key",
+                format!(
+                    "invalid value key `{key}`; use 1-128 ASCII letters, digits, dot, underscore, or hyphen"
+                ),
             ))
         }
     } else {
@@ -56,23 +77,39 @@ pub(crate) fn parse_value(input: &str) -> Result<Value, String> {
     }
 }
 
-pub(crate) fn parse_duration_ms(input: &str) -> Result<u64, String> {
+pub(crate) fn parse_duration_ms(input: &str) -> Result<u64, RuleModelError> {
     if let Some(ms) = input.strip_suffix("ms") {
-        ms.parse::<u64>()
-            .map_err(|_| format!("invalid duration `{input}`"))
+        ms.parse::<u64>().map_err(|source| {
+            RuleModelError::integer(
+                "duration",
+                input,
+                format!("invalid duration `{input}`"),
+                source,
+            )
+        })
     } else if let Some(sec) = input.strip_suffix('s') {
-        let value = sec
-            .parse::<f64>()
-            .map_err(|_| format!("invalid duration `{input}`"))?;
+        let value = sec.parse::<f64>().map_err(|source| {
+            RuleModelError::float(
+                "duration",
+                input,
+                format!("invalid duration `{input}`"),
+                source,
+            )
+        })?;
         Ok((value * 1000.0).round() as u64)
     } else {
-        input
-            .parse::<u64>()
-            .map_err(|_| format!("invalid duration `{input}`"))
+        input.parse::<u64>().map_err(|source| {
+            RuleModelError::integer(
+                "duration",
+                input,
+                format!("invalid duration `{input}`"),
+                source,
+            )
+        })
     }
 }
 
-pub(crate) fn parse_speed_bps(input: &str) -> Result<u64, String> {
+pub(crate) fn parse_speed_bps(input: &str) -> Result<u64, RuleModelError> {
     let lower = input.to_ascii_lowercase();
     let raw = lower.strip_suffix("/s").unwrap_or(&lower);
     let (number, multiplier) = if let Some(value) = raw.strip_suffix("kb") {
@@ -88,17 +125,20 @@ pub(crate) fn parse_speed_bps(input: &str) -> Result<u64, String> {
     } else {
         (raw, 1.0)
     };
-    let value = number
-        .parse::<f64>()
-        .map_err(|_| format!("invalid speed `{input}`"))?;
+    let value = number.parse::<f64>().map_err(|source| {
+        RuleModelError::float("speed", input, format!("invalid speed `{input}`"), source)
+    })?;
     let bytes = (value * multiplier).round() as u64;
     if bytes == 0 {
-        return Err("speed must be greater than zero".to_string());
+        return Err(RuleModelError::constraint(
+            "speed",
+            "speed must be greater than zero",
+        ));
     }
     Ok(bytes)
 }
 
-pub(crate) fn tokenize(input: &str) -> Result<Vec<String>, String> {
+pub(crate) fn tokenize(input: &str) -> Result<Vec<String>, RuleModelError> {
     let mut tokens = Vec::new();
     let mut current = String::new();
     let mut paren_depth = 0usize;
@@ -134,7 +174,7 @@ pub(crate) fn tokenize(input: &str) -> Result<Vec<String>, String> {
             }
             ')' => {
                 if paren_depth == 0 {
-                    return Err("unmatched `)`".to_string());
+                    return Err(RuleModelError::syntax("rule", "unmatched `)`"));
                 }
                 paren_depth -= 1;
                 current.push(ch);
@@ -149,10 +189,10 @@ pub(crate) fn tokenize(input: &str) -> Result<Vec<String>, String> {
     }
 
     if quote.is_some() {
-        return Err("unterminated quote".to_string());
+        return Err(RuleModelError::syntax("rule", "unterminated quote"));
     }
     if paren_depth != 0 {
-        return Err("unclosed `(`".to_string());
+        return Err(RuleModelError::syntax("rule", "unclosed `(`"));
     }
     if !current.is_empty() {
         tokens.push(current);

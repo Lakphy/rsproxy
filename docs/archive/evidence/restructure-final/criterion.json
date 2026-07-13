@@ -1,0 +1,61 @@
+{
+  "schema": "rsproxy.criterion/v1",
+  "unit": "nanoseconds",
+  "metrics": {
+    "mitm_certificate/cached_tls_handshake": {
+      "mean_ns": 264766.0320306507,
+      "lower_ns": 263885.982233665,
+      "upper_ns": 265942.9599182382
+    },
+    "mitm_certificate/disk_cache_hit": {
+      "mean_ns": 4122.061694501878,
+      "lower_ns": 4090.312533235439,
+      "upper_ns": 4161.800801382305
+    },
+    "mitm_certificate/issue_leaf": {
+      "mean_ns": 62901.088335769644,
+      "lower_ns": 62754.42401610877,
+      "upper_ns": 63094.59717931351
+    },
+    "mitm_certificate/server_config_cache_hit": {
+      "mean_ns": 36.47960912379593,
+      "lower_ns": 36.30775066076793,
+      "upper_ns": 36.69427608273132
+    },
+    "rules_parse/100": {
+      "mean_ns": 462996.48839688563,
+      "lower_ns": 461220.544716804,
+      "upper_ns": 465222.13958870614
+    },
+    "rules_parse/1000": {
+      "mean_ns": 3835107.516780841,
+      "lower_ns": 3815402.328484697,
+      "upper_ns": 3857192.26542505
+    },
+    "rules_parse/10000": {
+      "mean_ns": 42582041.6625,
+      "lower_ns": 42343032.6315625,
+      "upper_ns": 42839266.0646875
+    },
+    "rules_resolve_mixed/100": {
+      "mean_ns": 758.4914782098858,
+      "lower_ns": 755.1424593995201,
+      "upper_ns": 761.9437894028156
+    },
+    "rules_resolve_mixed/1000": {
+      "mean_ns": 820.8324605548436,
+      "lower_ns": 803.5682081912889,
+      "upper_ns": 845.230622859813
+    },
+    "rules_resolve_mixed/10000": {
+      "mean_ns": 1006.429800357193,
+      "lower_ns": 968.7841674593358,
+      "upper_ns": 1049.2990299918808
+    },
+    "trace_enqueue/abort_event": {
+      "mean_ns": 306.74205681116155,
+      "lower_ns": 278.20551271555087,
+      "upper_ns": 335.0667122457016
+    }
+  }
+}

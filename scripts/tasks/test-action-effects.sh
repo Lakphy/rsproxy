@@ -7,4 +7,4 @@ cd "$ROOT"
 cargo test -p rsproxy-rules --test corpus
 cargo test -p rsproxy-rules --test whistle_migration
 cargo test -p rsproxy-rules --test whistle_options
-cargo test -p rsproxy --lib proxy::tests::action_effects::
+cargo test -p rsproxy-engine --lib proxy::tests::action_effects::

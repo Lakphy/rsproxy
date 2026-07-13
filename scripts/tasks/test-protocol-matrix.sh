@@ -5,7 +5,8 @@ ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
 cd "$ROOT"
 
 CARGO=${CARGO:-cargo}
-TEST_LIST=$("$CARGO" test -p rsproxy --lib --locked -- --list)
+ENGINE_TEST_LIST=$("$CARGO" test -p rsproxy-engine --lib --locked -- --list)
+NET_TEST_LIST=$("$CARGO" test -p rsproxy-net --lib --locked -- --list)
 CASE_COUNT=0
 
 fail() {
@@ -13,17 +14,32 @@ fail() {
     exit 1
 }
 
-run_case() {
+run_owned_case() {
     case_id=$1
-    test_name=$2
+    package=$2
+    test_name=$3
 
-    if ! printf '%s\n' "$TEST_LIST" | grep -Fqx "$test_name: test"; then
-        fail "missing test owner for $case_id: $test_name"
+    case $package in
+        rsproxy-engine) test_list=$ENGINE_TEST_LIST ;;
+        rsproxy-net) test_list=$NET_TEST_LIST ;;
+        *) fail "unknown test owner package for $case_id: $package" ;;
+    esac
+
+    if ! printf '%s\n' "$test_list" | grep -Fqx "$test_name: test"; then
+        fail "missing test owner for $case_id in $package: $test_name"
     fi
 
-    printf '\nprotocol_case=%s test=%s\n' "$case_id" "$test_name"
-    "$CARGO" test -p rsproxy --lib --locked "$test_name" -- --exact
+    printf '\nprotocol_case=%s package=%s test=%s\n' "$case_id" "$package" "$test_name"
+    "$CARGO" test -p "$package" --lib --locked "$test_name" -- --exact
     CASE_COUNT=$((CASE_COUNT + 1))
+}
+
+run_case() {
+    run_owned_case "$1" rsproxy-engine "$2"
+}
+
+run_net_case() {
+    run_owned_case "$1" rsproxy-net "$2"
 }
 
 # HTTP/1 admission, persistence, streaming, and authentication.
@@ -61,11 +77,11 @@ run_case trailers.response-actions \
     proxy::tests::response_actions::framing::response_trailer_actions_set_override_and_remove
 
 # Request framing and large-body fallback boundaries.
-run_case framing.reject-cl-te \
+run_net_case framing.reject-cl-te \
     http::tests::request_rejects_content_length_transfer_encoding_ambiguity
-run_case framing.reject-forbidden-trailer \
+run_net_case framing.reject-forbidden-trailer \
     http::tests::chunked_request_rejects_framing_trailers
-run_case framing.limit-trailer-count \
+run_net_case framing.limit-trailer-count \
     http::tests::chunked_request_trailer_count_is_limited
 run_case stream.large-fixed-keepalive \
     proxy::tests::request_streaming::fixed::large_fixed_upload_streams_and_preserves_client_keep_alive
@@ -97,11 +113,11 @@ run_case headers.h1-network-boundary \
     proxy::tests::protocol_matrix::headers::h1_large_header_accepts_200kb_and_rejects_over_limit_with_431
 run_case headers.h2-network-boundary \
     proxy::tests::protocol_matrix::headers::h2_large_header_accepts_200kb_and_rejects_over_limit_with_431
-run_case headers.h1-request-count \
+run_net_case headers.h1-request-count \
     http::tests::request_header_count_limit_is_enforced
-run_case headers.h1-response-count \
+run_net_case headers.h1-response-count \
     http::tests::response_header_count_limit_is_enforced
-run_case headers.h2-response-count \
+run_net_case headers.h2-response-count \
     upstream_h2::tests::message::response_header_count_limit_includes_status_pseudo_header
 
 # Address and authority normalization over real network routes.

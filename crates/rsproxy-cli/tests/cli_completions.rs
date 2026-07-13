@@ -6,15 +6,14 @@ use std::time::{SystemTime, UNIX_EPOCH};
 fn completion_scripts_cover_supported_shells_without_runtime_side_effects() {
     let storage = unique_temp_dir();
     for (shell, marker) in [
-        ("bash", "complete -F _rsproxy rsproxy"),
+        ("bash", "complete -F _rsproxy"),
         ("zsh", "#compdef rsproxy"),
         ("fish", "complete -c rsproxy"),
         ("powershell", "Register-ArgumentCompleter"),
         ("pwsh", "Register-ArgumentCompleter"),
     ] {
         let output = Command::new(env!("CARGO_BIN_EXE_rsproxy"))
-            .args(["completions", shell, "--storage"])
-            .arg(&storage)
+            .args(["completions", shell])
             .output()
             .unwrap();
         assert!(
@@ -38,7 +37,9 @@ fn completion_errors_are_explicit() {
             .output()
             .unwrap();
         assert!(!output.status.success());
-        assert!(String::from_utf8_lossy(&output.stderr).contains("completion"));
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert!(stderr.contains("<SHELL>") || stderr.contains("invalid value"));
+        assert!(stderr.contains("--help"));
     }
 }
 

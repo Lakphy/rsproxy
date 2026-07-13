@@ -27,6 +27,7 @@ fn daemon_lifecycle_recovers_stale_state_and_preserves_rules() {
 
     let duplicate = harness.run("start");
     assert!(!duplicate.status.success());
+    assert_eq!(duplicate.status.code(), Some(3));
     assert!(stderr(&duplicate).contains("already running"));
 
     let status = status_json(&harness);
@@ -82,6 +83,7 @@ fn daemon_mode_rejects_ephemeral_ports_without_leaving_state() {
                 .arg(&storage),
         );
         assert!(!output.status.success());
+        assert_eq!(output.status.code(), Some(2));
         assert!(stderr(&output).contains("non-zero"));
         assert!(!storage.join("run/rsproxy.pid").exists());
     }
@@ -133,6 +135,7 @@ fn stop_refuses_to_terminate_an_unverified_pidfile_process() {
     );
 
     assert!(!output.status.success());
+    assert_eq!(output.status.code(), Some(3));
     assert!(stderr(&output).contains("refusing to terminate"));
     assert!(unrelated.try_wait().unwrap().is_none());
     let _ = unrelated.kill();

@@ -56,5 +56,5 @@ jq '
 
 cat "$OUTPUT"
 if [ "$ENFORCE" = "1" ]; then
-    "$ROOT/scripts/targets.sh coverage" "$OUTPUT"
+    cargo xtask targets coverage "$OUTPUT"
 fi

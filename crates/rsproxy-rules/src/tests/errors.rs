@@ -24,3 +24,34 @@ fn parse_errors_have_stable_stage_codes() {
         assert!(!errors[0].message.is_empty());
     }
 }
+
+#[test]
+fn internal_parser_errors_retain_typed_numeric_and_regex_sources() {
+    let duration = parse_duration_ms("badms").unwrap_err();
+    assert!(matches!(
+        duration,
+        RuleModelError::InvalidInteger {
+            context: "duration",
+            ..
+        }
+    ));
+
+    let speed = parse_speed_bps("bad").unwrap_err();
+    assert!(matches!(
+        speed,
+        RuleModelError::InvalidFloat {
+            context: "speed",
+            ..
+        }
+    ));
+
+    let regex =
+        crate::template::transform::validate_template("${x.replace(/[/, value)}").unwrap_err();
+    assert!(matches!(
+        regex,
+        RuleModelError::InvalidRegex {
+            context: "invalid template replace regex",
+            ..
+        }
+    ));
+}

@@ -1,31 +1,42 @@
-use super::*;
-
+mod dns;
 mod file;
 
+use super::api_auth::validate_api_token;
+use super::command::RuntimeArgs;
+use super::util::{parse_size, parse_trace_spill_compression};
+use crate::app::{AppConfig, default_storage};
+use crate::{CliResult, ConfigError};
 use file::FileConfig;
+use std::fs;
+use std::path::PathBuf;
+use std::time::Duration;
 
 const CONFIG_FILE_NAME: &str = "config.toml";
 
-pub(crate) fn runtime_config(args: &[String]) -> Result<AppConfig, String> {
+pub(crate) fn runtime_config(args: &RuntimeArgs) -> CliResult<AppConfig> {
     runtime_config_with_default_path(args, Some(default_config_path()))
 }
 
 #[cfg(test)]
-pub(super) fn runtime_config_without_default(args: &[String]) -> Result<AppConfig, String> {
+pub(super) fn runtime_config_without_default(args: &RuntimeArgs) -> CliResult<AppConfig> {
     runtime_config_with_default_path(args, None)
 }
 
 pub(super) fn runtime_config_with_default_path(
-    args: &[String],
+    args: &RuntimeArgs,
     default_path: Option<PathBuf>,
-) -> Result<AppConfig, String> {
+) -> CliResult<AppConfig> {
     let mut config = AppConfig::default();
     let mut api_explicit = false;
-    if let Some(path) = selected_config_path(args, default_path)? {
-        let text = fs::read_to_string(&path)
-            .map_err(|error| format!("read config {}: {error}", path.display()))?;
-        let file: FileConfig = toml::from_str(&text)
-            .map_err(|error| format!("parse config {}: {error}", path.display()))?;
+    if let Some(path) = selected_config_path(args, default_path) {
+        let text = fs::read_to_string(&path).map_err(|source| ConfigError::Read {
+            path: path.clone(),
+            source,
+        })?;
+        let file: FileConfig = toml::from_str(&text).map_err(|source| ConfigError::Parse {
+            path: path.clone(),
+            source,
+        })?;
         api_explicit = file.has_explicit_api();
         file.apply(&mut config)?;
         config.config_path = Some(path);
@@ -35,18 +46,11 @@ pub(super) fn runtime_config_with_default_path(
     Ok(config)
 }
 
-fn selected_config_path(
-    args: &[String],
-    default_path: Option<PathBuf>,
-) -> Result<Option<PathBuf>, String> {
-    if let Some(index) = args.iter().position(|arg| arg == "--config") {
-        let value = args
-            .get(index + 1)
-            .filter(|value| !value.trim().is_empty())
-            .ok_or_else(|| "--config requires a file path".to_string())?;
-        return Ok(Some(PathBuf::from(value)));
-    }
-    Ok(default_path.filter(|path| path.is_file()))
+fn selected_config_path(args: &RuntimeArgs, default_path: Option<PathBuf>) -> Option<PathBuf> {
+    args.client
+        .config
+        .clone()
+        .or_else(|| default_path.filter(|path| path.is_file()))
 }
 
 fn default_config_path() -> PathBuf {
@@ -54,183 +58,200 @@ fn default_config_path() -> PathBuf {
 }
 
 fn apply_cli_overrides(
-    args: &[String],
+    args: &RuntimeArgs,
     config: &mut AppConfig,
     file_api_explicit: bool,
-) -> Result<(), String> {
-    if let Some(port) = option_value(args, "--port").or_else(|| option_value(args, "-p")) {
-        config.port = port.parse().map_err(|_| "invalid --port".to_string())?;
+) -> CliResult<()> {
+    if let Some(port) = args.port {
+        config.port = port;
     }
-    if let Some(host) = option_value(args, "--host") {
-        config.host = host;
+    if let Some(host) = &args.host {
+        config.host.clone_from(host);
     }
-    let cli_api = option_value(args, "--api");
-    if let Some(api) = &cli_api {
-        config.api = api.clone();
+    if let Some(api) = &args.client.api {
+        config.api.clone_from(api);
     }
-    if let Some(storage) = option_value(args, "--storage") {
-        config.storage = PathBuf::from(storage);
+    if let Some(storage) = &args.client.storage {
+        config.storage.clone_from(storage);
     }
-    if cli_api.is_none() && !file_api_explicit {
+    if args.client.api.is_none() && !file_api_explicit {
         config.api = crate::app::default_api_for_storage(&config.storage);
     }
-    if has_flag(args, "--watch") {
+    if args.watch {
         config.rules_watch = true;
     }
-    if let Some(value) = option_value(args, "--watch-debounce-ms") {
-        config.rules_watch_debounce = parse_cli_millis(&value, "--watch-debounce-ms")?;
+    if let Some(value) = args.watch_debounce_ms {
+        config.rules_watch_debounce = positive_millis(value, "--watch-debounce-ms")?;
     }
-    if let Some(token) = option_value(args, "--api-token") {
-        config.api_token = Some(validate_api_token(&token)?);
+    if let Some(token) = &args.client.api_token {
+        config.api_token = Some(validate_api_token(token)?);
     }
-    if let Some(auth) = option_value(args, "--proxy-auth") {
-        config.proxy_auth = Some(parse_proxy_auth(&auth)?);
+    if let Some(auth) = &args.proxy_auth {
+        config.proxy_auth = Some(parse_proxy_auth(auth)?);
     }
-    if let Some(limit) = option_value(args, "--max-header-size") {
-        config.max_header_size = parse_size(&limit)?;
+    if let Some(limit) = &args.max_header_size {
+        config.max_header_size = parse_size(limit)?;
     }
-    if let Some(limit) = option_value(args, "--max-header-count") {
-        config.max_header_count = parse_positive_usize(&limit, "--max-header-count")?;
+    if let Some(limit) = args.max_header_count {
+        config.max_header_count = positive_usize(limit, "--max-header-count")?;
     }
-    if let Some(limit) = option_value(args, "--body-buffer-limit") {
-        config.body_buffer_limit = positive_size(parse_size(&limit)?, "--body-buffer-limit")?;
+    if let Some(limit) = &args.body_buffer_limit {
+        config.body_buffer_limit = positive_size(parse_size(limit)?, "--body-buffer-limit")?;
     }
-    if let Some(limit) = option_value(args, "--trace-body-limit") {
-        config.trace_body_limit = parse_size(&limit)?;
+    if let Some(limit) = &args.trace_body_limit {
+        config.trace_body_limit = parse_size(limit)?;
     }
-    if let Some(filter) = option_value(args, "--trace-filter") {
-        apply_trace_filter(config, &filter)?;
+    if let Some(filter) = &args.trace_filter {
+        apply_trace_filter(config, filter)?;
     }
-    if let Some(capacity) = option_value(args, "--trace-queue-capacity") {
-        config.trace_queue_capacity = parse_positive_usize(&capacity, "--trace-queue-capacity")?;
+    if let Some(capacity) = args.trace_queue_capacity {
+        config.trace_queue_capacity = positive_usize(capacity, "--trace-queue-capacity")?;
     }
-    if let Some(budget) = option_value(args, "--trace-mem-budget") {
-        config.trace_memory_budget = positive_size(parse_size(&budget)?, "--trace-mem-budget")?;
+    if let Some(budget) = &args.trace_mem_budget {
+        config.trace_memory_budget = positive_size(parse_size(budget)?, "--trace-mem-budget")?;
     }
-    if let Some(size) = option_value(args, "--trace-segment-size") {
-        config.trace_spill_segment_size =
-            positive_size(parse_size(&size)?, "--trace-segment-size")?;
+    if let Some(size) = &args.trace_segment_size {
+        config.trace_spill_segment_size = positive_size(parse_size(size)?, "--trace-segment-size")?;
     }
-    if let Some(budget) = option_value(args, "--trace-disk-budget") {
-        config.trace_disk_budget = parse_size(&budget)?;
+    if let Some(budget) = &args.trace_disk_budget {
+        config.trace_disk_budget = parse_size(budget)?;
     }
-    if let Some(compression) = option_value(args, "--trace-spill-compression") {
-        config.trace_spill_compression = parse_trace_spill_compression(&compression)?;
+    if let Some(compression) = &args.trace_spill_compression {
+        config.trace_spill_compression = parse_trace_spill_compression(compression)?;
     }
-    if has_flag(args, "--no-mitm") {
+    if args.no_mitm {
         config.no_mitm = true;
     }
-    if has_flag(args, "--strict-mitm") {
+    if args.strict_mitm {
         config.strict_mitm = true;
     }
-    if let Some(capacity) = option_value(args, "--mitm-cert-cache-capacity") {
-        config.mitm_cert_cache_capacity = capacity
-            .parse::<usize>()
-            .map_err(|_| "--mitm-cert-cache-capacity must be numeric".to_string())?;
+    if let Some(capacity) = args.mitm_cert_cache_capacity {
+        config.mitm_cert_cache_capacity = capacity;
     }
-    if let Some(capacity) = option_value(args, "--mitm-failure-cache-capacity") {
-        config.mitm_failure_cache_capacity = capacity
-            .parse::<usize>()
-            .map_err(|_| "--mitm-failure-cache-capacity must be numeric".to_string())?;
+    if let Some(capacity) = args.mitm_failure_cache_capacity {
+        config.mitm_failure_cache_capacity = capacity;
     }
-    if let Some(ttl) = option_value(args, "--mitm-failure-ttl-seconds") {
-        let ttl = ttl
-            .parse::<u64>()
-            .map_err(|_| "--mitm-failure-ttl-seconds must be numeric".to_string())?;
+    if let Some(ttl) = args.mitm_failure_ttl_seconds {
         config.mitm_failure_ttl = positive_seconds(ttl, "--mitm-failure-ttl-seconds")?;
     }
-    if let Some(timeout) = option_value(args, "--connect-probe-timeout-ms") {
-        config.connect_probe_timeout = parse_cli_millis(&timeout, "--connect-probe-timeout-ms")?;
+    if let Some(timeout) = args.connect_probe_timeout_ms {
+        config.connect_probe_timeout = positive_millis(timeout, "--connect-probe-timeout-ms")?;
     }
-    if let Some(limit) = option_value(args, "--h1-pool-max-active-per-key") {
-        config.h1_pool_max_active_per_key =
-            parse_positive_usize(&limit, "--h1-pool-max-active-per-key")?;
+    if let Some(limit) = args.h1_pool_max_active_per_key {
+        config.h1_pool_max_active_per_key = positive_usize(limit, "--h1-pool-max-active-per-key")?;
     }
-    if let Some(timeout) = option_value(args, "--h1-pool-wait-timeout-ms") {
-        config.h1_pool_wait_timeout = parse_cli_millis(&timeout, "--h1-pool-wait-timeout-ms")?;
+    if let Some(timeout) = args.h1_pool_wait_timeout_ms {
+        config.h1_pool_wait_timeout = positive_millis(timeout, "--h1-pool-wait-timeout-ms")?;
     }
-    if let Some(limit) = option_value(args, "--h2-pool-max-active-streams-per-key") {
+    if let Some(limit) = args.h2_pool_max_active_streams_per_key {
         config.h2_pool_max_active_streams_per_key =
-            parse_positive_usize(&limit, "--h2-pool-max-active-streams-per-key")?;
+            positive_usize(limit, "--h2-pool-max-active-streams-per-key")?;
     }
-    if let Some(timeout) = option_value(args, "--h2-pool-wait-timeout-ms") {
-        config.h2_pool_wait_timeout = parse_cli_millis(&timeout, "--h2-pool-wait-timeout-ms")?;
+    if let Some(timeout) = args.h2_pool_wait_timeout_ms {
+        config.h2_pool_wait_timeout = positive_millis(timeout, "--h2-pool-wait-timeout-ms")?;
     }
-    if let Some(timeout) = option_value(args, "--tcp-connect-timeout-ms") {
-        config.tcp_connect_timeout = parse_cli_millis(&timeout, "--tcp-connect-timeout-ms")?;
+    if let Some(timeout) = args.tcp_connect_timeout_ms {
+        config.tcp_connect_timeout = positive_millis(timeout, "--tcp-connect-timeout-ms")?;
     }
-    if let Some(timeout) = option_value(args, "--dns-timeout-ms") {
-        config.dns_timeout = parse_cli_millis(&timeout, "--dns-timeout-ms")?;
+    if let Some(timeout) = args.dns_timeout_ms {
+        config.dns_timeout = positive_millis(timeout, "--dns-timeout-ms")?;
     }
-    if let Some(ttl) = option_value(args, "--dns-cache") {
-        let ttl = ttl
-            .parse::<u64>()
-            .map_err(|_| "--dns-cache must be a number of seconds".to_string())?;
+    if let Some(ttl) = args.dns_cache {
         config.dns_cache_ttl = Duration::from_secs(ttl);
     }
-    let dns_servers = option_values(args, &["--dns-server"]);
-    if !dns_servers.is_empty() {
-        config.dns_servers = dns::parse_dns_servers(&dns_servers)?;
+    if !args.dns_server.is_empty() {
+        config.dns_servers = dns::parse_dns_servers(&args.dns_server)?;
     }
-    if let Some(timeout) = option_value(args, "--client-tls-handshake-timeout-ms") {
+    if let Some(timeout) = args.client_tls_handshake_timeout_ms {
         config.client_tls_handshake_timeout =
-            parse_cli_millis(&timeout, "--client-tls-handshake-timeout-ms")?;
+            positive_millis(timeout, "--client-tls-handshake-timeout-ms")?;
     }
-    if let Some(timeout) = option_value(args, "--upstream-tls-handshake-timeout-ms") {
+    if let Some(timeout) = args.upstream_tls_handshake_timeout_ms {
         config.upstream_tls_handshake_timeout =
-            parse_cli_millis(&timeout, "--upstream-tls-handshake-timeout-ms")?;
+            positive_millis(timeout, "--upstream-tls-handshake-timeout-ms")?;
     }
-    if let Some(timeout) = option_value(args, "--upstream-ttfb-timeout-ms") {
-        config.upstream_ttfb_timeout = parse_cli_millis(&timeout, "--upstream-ttfb-timeout-ms")?;
+    if let Some(timeout) = args.upstream_ttfb_timeout_ms {
+        config.upstream_ttfb_timeout = positive_millis(timeout, "--upstream-ttfb-timeout-ms")?;
     }
-    if let Some(timeout) = option_value(args, "--request-timeout-ms") {
-        config.request_total_timeout = parse_cli_millis(&timeout, "--request-timeout-ms")?;
+    if let Some(timeout) = args.request_timeout_ms {
+        config.request_total_timeout = positive_millis(timeout, "--request-timeout-ms")?;
     }
-    if has_flag(args, "--no-trace-body") {
+    if args.no_trace_body {
         config.trace_body_limit = 0;
     }
     Ok(())
 }
 
-fn parse_cli_millis(input: &str, option: &str) -> Result<Duration, String> {
-    let value = input
-        .parse::<u64>()
-        .map_err(|_| format!("{option} must be numeric"))?;
-    positive_millis(value, option)
+fn positive_millis(value: u64, field: &str) -> Result<Duration, ConfigError> {
+    (value != 0)
+        .then(|| Duration::from_millis(value))
+        .ok_or_else(|| ConfigError::Invalid(format!("{field} must be greater than zero")))
 }
 
-fn positive_millis(value: u64, field: &str) -> Result<Duration, String> {
-    if value == 0 {
-        Err(format!("{field} must be greater than zero"))
-    } else {
-        Ok(Duration::from_millis(value))
-    }
+fn positive_seconds(value: u64, field: &str) -> Result<Duration, ConfigError> {
+    (value != 0)
+        .then(|| Duration::from_secs(value))
+        .ok_or_else(|| ConfigError::Invalid(format!("{field} must be greater than zero")))
 }
 
-fn positive_seconds(value: u64, field: &str) -> Result<Duration, String> {
-    if value == 0 {
-        Err(format!("{field} must be greater than zero"))
-    } else {
-        Ok(Duration::from_secs(value))
-    }
+fn positive_usize(value: usize, field: &str) -> Result<usize, ConfigError> {
+    (value != 0)
+        .then_some(value)
+        .ok_or_else(|| ConfigError::Invalid(format!("{field} must be greater than zero")))
 }
 
-fn validate_mitm_mode(config: &AppConfig) -> Result<(), String> {
+fn positive_size(value: usize, field: &str) -> Result<usize, ConfigError> {
+    positive_usize(value, field)
+}
+
+fn validate_mitm_mode(config: &AppConfig) -> Result<(), ConfigError> {
     if config.no_mitm && config.strict_mitm {
-        Err("--no-mitm and --strict-mitm cannot be used together".to_string())
+        Err(ConfigError::Invalid(
+            "--no-mitm and --strict-mitm cannot be used together".to_string(),
+        ))
     } else {
         Ok(())
     }
 }
 
-fn positive_usize(value: usize, field: &str) -> Result<usize, String> {
-    if value == 0 {
-        Err(format!("{field} must be greater than zero"))
-    } else {
-        Ok(value)
+fn parse_proxy_auth(input: &str) -> Result<String, ConfigError> {
+    let Some((username, password)) = input.split_once(':') else {
+        return Err(ConfigError::Invalid(
+            "--proxy-auth must use user:pass format".to_string(),
+        ));
+    };
+    if username.is_empty() || password.is_empty() {
+        return Err(ConfigError::Invalid(
+            "--proxy-auth username and password must not be empty".to_string(),
+        ));
     }
+    if username.chars().any(char::is_control) || password.chars().any(char::is_control) {
+        return Err(ConfigError::Invalid(
+            "--proxy-auth must not contain control characters".to_string(),
+        ));
+    }
+    Ok(input.to_string())
 }
 
-fn positive_size(value: usize, field: &str) -> Result<usize, String> {
-    positive_usize(value, field)
+fn apply_trace_filter(config: &mut AppConfig, input: &str) -> Result<(), ConfigError> {
+    for raw in input.split(',') {
+        match raw.trim().to_ascii_lowercase().as_str() {
+            "" => {}
+            "headers-only" | "headers_only" | "headers" | "no-body" | "no_body" => {
+                config.trace_body_limit = 0;
+            }
+            "media" | "media-body-off" | "media_body_off" | "no-media-body" | "no_media_body"
+            | "exclude-media" | "exclude_media" => {
+                config.trace_exclude_media_body = true;
+            }
+            "full" | "all" => config.trace_exclude_media_body = false,
+            _ => {
+                return Err(ConfigError::Invalid(
+                    "--trace-filter supports headers-only, media, or full in this build"
+                        .to_string(),
+                ));
+            }
+        }
+    }
+    Ok(())
 }

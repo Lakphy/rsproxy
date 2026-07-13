@@ -16,15 +16,29 @@ directory would either expose internals or lose focused unit coverage.
 
 ```text
 crates/rsproxy-cli/
-  src/cli/help.rs                    分层 usage 与副作用前 help dispatch
+  src/cli/command.rs                 clap derive 命令树、typed 参数与多值等价性
   src/cli/tests/                     CLI 参数、配置与命令适配器白盒测试
-  src/control/tests/server.rs        控制客户端正常断连日志分类
-  src/app/tests/                     运行期缓存容量、LRU 与 TTL 测试
-  src/rule_store/tests.rs            分组迁移、启停、持久化与快照隔离
+  tests/                             executable/public black-box tests
+    cli_help.rs                       所有 command/subcommand 帮助快速退出且无副作用
+    cli_completions.rs                Bash/Zsh/Fish/PowerShell 生成与错误合同
+    cli_daemon_lifecycle.rs           真实 daemon 启停/重启/恢复/bind/PID 身份矩阵
+    cli_json_contracts.rs             查询 JSON shape 与单文档错误 schema
+    cli_product_matrix/               values/CA/proxy/trace/replay/TUI 产品路径
+    cli_logging.rs                    stderr NDJSON 启动/监听事件与端口 0 黑盒合同
+    large_stream_resource.rs         release 代理 1GiB、RSS 与 trace 资源验收（显式运行）
+crates/rsproxy-control/
+  src/client/tests.rs                请求、follow 与 token 发现/持久化客户端合同
+  src/server/tests/                  auth、query、routes、resources 与断连分类
+  src/shapes/tests/mod.rs            JSON/table/HAR shape 与敏感字段清理合同
+  tests/public_api.rs                ControlOptions/ControlState 与 client facade 合同
+crates/rsproxy-platform/
+  src/ca/trust/macos/tests.rs        macOS security 子进程与错误分类
+  src/system_proxy/tests.rs          macOS/Linux/Windows plan、rollback 与输出合同
+  tests/{ca,errors,process}.rs        仅经公开 facade 的 CA/error/PID/path 合同
+  tests/public_api.rs                CA/trust、process、proxy 与 Unix path 的 5 项 facade 合同
+crates/rsproxy-engine/
+  src/state/tests/                   运行期缓存容量、LRU 与 TTL 测试
   src/rule_store/watch/tests.rs      文件事件、debounce、失败恢复与退出
-  src/http/tests/                    HTTP wire-format unit tests
-    buffered_head.rs                 buffered 响应头批读与 body 保留边界
-    tcp_head.rs                      TcpStream peek 快读与 pipeline/body 保留
   src/proxy/tests/                   proxy network and policy unit/integration tests
     action_effects/                  46-family 真实 TCP/TLS 代理网络效果矩阵
     connect_modes.rs                 CONNECT 模式、探测与 pinning 重试生命周期
@@ -45,22 +59,23 @@ crates/rsproxy-cli/
   src/proxy/server/tests/            CONNECT policy/protocol probe unit tests
   src/proxy/h2_bridge/tests/         h2 请求适配与响应 framing 状态机
   src/proxy/tunnel/tests.rs          tunnel 双向字节事件与无 payload preview 合同
-  src/h2/tests/                      h2 wire message/body conversion
-  src/transfer_timing/tests.rs       单调传输计时器的 EOF/drop/冻结语义
-  src/upstream_body/tests.rs          bounded frame collection and continuation
   src/proxy/tests/h1_forward.rs      pooled HTTP/1 framing, reuse and trace behavior
-  src/upstream_h2/tests/             message, request body, streaming, pool and timeout behaviors
-  tests/                             executable/public black-box tests
-    cli_help.rs                       所有 command/subcommand 帮助快速退出且无副作用
-    cli_completions.rs                Bash/Zsh/Fish/PowerShell 生成与错误合同
-    cli_daemon_lifecycle.rs           真实 daemon 启停/重启/恢复/bind/PID 身份矩阵
-    cli_json_contracts.rs             查询 JSON shape 与单文档错误 schema
-    cli_product_matrix/               values/CA/proxy/trace/replay/TUI 产品路径
-    cli_logging.rs                    stderr NDJSON 启动/监听事件与端口 0 黑盒合同
-    large_stream_resource.rs         release 代理 1GiB、RSS 与 trace 资源验收（显式运行）
+  tests/{errors,rule_store}.rs        typed source chain 与公开 RuleStore 生命周期
+  tests/public_api.rs                engine facade 的 handle/状态/规则/serve 公开合同
+  benches/certificates.rs            MITM 证书签发/磁盘缓存/内存配置缓存基准
   examples/
     bench_origin.rs                  固定 1KiB keep-alive 本地 origin
     bench_client.rs                  并发持久连接、CL/chunked 响应 benchmark client
+crates/rsproxy-net/
+  src/http/tests/mod.rs              私有/test-support request/body/trailer/writer 边界
+  src/downstream_h2/tests/mod.rs     下游 h2 message/body/server 与 handler 边界
+  src/transfer_timing/tests.rs       单调传输计时器的 EOF/drop/冻结语义
+  src/upstream_body/tests.rs         bounded frame collection and continuation
+  src/upstream_h2/tests/             message, request body, streaming, pool and timeout behaviors
+  tests/{dns,errors}.rs              公开 resolver/cache 与 typed error 合同
+  tests/http_{buffered,tcp}_head.rs  公开 HTTP head 快/缓冲路径与 framing 边界
+  tests/request_deadline.rs          公开总 deadline 与 stage budget 归因
+  tests/public_api.rs                net facade 的公开黑盒编译与行为合同
 crates/rsproxy-rules/
   src/tests/                          private parser/resolver unit tests
     body_planning.rs                  candidate body-dependency planning
@@ -86,6 +101,12 @@ crates/rsproxy-trace/
   src/tests/spill_read.rs             collector 外读取、append/clear/eviction 快照竞态
   src/tests/mod.rs                    spill 轮转、恢复、压缩与损坏记录
   tests/                              public TraceStore API tests
+crates/xtask/
+  src/check/tests/                  lines/layout/Whistle/typed-error/workflow 正反合同
+  src/release/tests.rs                版本同步、targets 派生、只读 check 与事务前置校验
+  src/targets/tests/                coverage/criterion/e2e/soak/regression 阈值合同
+  src/tests.rs                        非 semver CLI 输入退出码合同
+  tests/public_api.rs                 release/check/targets typed facade 编译合同
 fuzz/
   fuzz_targets/parse_resolve.rs       parse/resolve nightly sanitizer target
   corpus/parse_resolve/               valid/invalid 可审阅 seeds
@@ -94,29 +115,52 @@ benches/e2e/performance.sh            oha 吞吐、延迟、RSS 版本化报告
 benches/e2e/whistle.sh                同机 Whistle pureProxy 严格对比
 benches/e2e/whistle-driver/           固定 2.10.5 的独立 npm lock
 benches/soak/soak.sh                  参数化 90m/QPS/规则/trace 稳态驱动
-benches/criterion/                    rules/trace/certificate 微基准与报告收集
+benches/criterion/                    rules/trace/engine certificate 基准编排与报告收集
 packages/npm/tests/                   npm/Bun 平台映射、版本和 manifest 合同
 scripts/verify.sh package             本机 npm/Bun pack/install/launcher 黑盒
 scripts/verify.sh coverage-report                   llvm-cov 生产代码覆盖率门禁
 scripts/verify.sh actions        action corpus、迁移和网络效果统一验收
-scripts/verify.sh matrix       34 项精确协议 owner 与防漂移验收
+scripts/verify.sh matrix    engine/net 双 package 的 34 项精确协议 owner 与防漂移验收
 scripts/verify.sh bench             benchmark JSON 合同验收
 .github/workflows/ci.yml              Ubuntu/macOS/Windows workspace 与 Ubuntu 合同门禁
 .github/workflows/fuzz.yml            Ubuntu nightly 每日 sanitizer fuzz
 .github/workflows/performance.yml     同 runner base/current Criterion 回归
 .github/workflows/release.yml         八个原生 npm 包与两种启动器 tag 发布
-scripts/check.sh workflows            workflow inventory、语法和必跑命令静态合同
+cargo xtask check workflows           workflow inventory、语法和必跑命令静态合同
 ```
+
+Phase 6 moved 10 public-only suites (35 tests) from module-private locations
+into the net, engine and platform crate-level integration targets shown above,
+without widening a facade. Across net, control, rules, engine, platform, trace
+and xtask, the seven `tests/public_api.rs` targets contain 27 tests
+(7 + 3 + 2 + 5 + 5 + 3 + 2). The CLI is covered through executable black-box
+targets instead of a separate facade snapshot.
 
 The larger suites are grouped by behavior rather than by implementation function:
 
-- `rsproxy-cli/src/cli/tests/`: API auth, CA, runtime options, rule request
+- `rsproxy-cli/src/cli/tests/`: token precedence adapters, CA, runtime options, rule request
   construction, TOML precedence/error handling and system-proxy command plans.
-- `rsproxy-cli/src/control/tests/`: control authentication, query decoding and
-  resource-route contracts, including ordered rule-group lifecycle.
-- `rsproxy-cli/src/rule_store/watch/tests.rs`: atomic disk reload, bounded event
+- `rsproxy-control/src/{client,server,shapes,error}/tests/`: 34 unit tests for control
+  authentication, token persistence/discovery, request/follow clients, query
+  decoding, JSON/HAR shapes and resource routes, including ordered rule-group
+  lifecycle and typed status/rules/replay calls through `EngineHandle`. The
+  control protocol keeps its small blocking HTTP/1 wire local and does not
+  depend on `rsproxy-net`.
+- `rsproxy-control/tests/public_api.rs`: three black-box contracts compose
+  `ControlOptions`/`ControlState` with an engine handle and exercise the stable
+  client-auth and Unix/Windows endpoint vocabulary.
+- `rsproxy-platform/src/{ca,system_proxy}/**/tests.rs`: eight private/native unit
+  tests cover trust command handling and cross-platform system-proxy typed
+  plan/outcome and rollback behavior. Ten public-only CA/error/process tests
+  live under `rsproxy-platform/tests/`.
+- `rsproxy-platform/tests/public_api.rs`: five black-box contracts exercise the
+  typed error, CA/trust, process, system-proxy plan/execution and Unix
+  socket-path facade without importing CLI or engine implementation types.
+- `rsproxy-engine/src/rule_store/watch/tests.rs`: atomic disk reload, bounded event
   queue, debounce, invalid-edit rollback, recovery and worker shutdown.
-- `rsproxy-cli/src/proxy/tests/`: connection/auth, routing, TLS policy, WebSocket,
+- `rsproxy-engine/src/state/tests/`: bounded MITM certificate/failure cache
+  capacity, LRU recency and TTL behavior.
+- `rsproxy-engine/src/proxy/tests/`: connection/auth, routing, TLS policy, WebSocket,
   response actions, bounded request/response streaming, fixed and chunked upload
   fidelity, body-rule overflow behavior, HTTP/2 and TLS, staged timeouts, mock
   and trace behavior. `value_actions.rs` additionally drives references/files
@@ -128,33 +172,49 @@ The larger suites are grouped by behavior rather than by implementation function
   sockets, including routing, control flow, streaming and TLS ClientHello paths.
   `connect_modes.rs` drives real local sockets through global no-MITM,
   plaintext-HTTP detection, failed MITM memory, retry passthrough and strict mode.
-- `rsproxy-cli/src/proxy/h2_bridge/tests/`: bounded request-channel adaptation,
+- `rsproxy-engine/src/proxy/h2_bridge/tests/`: bounded request-channel adaptation,
   incremental response framing/trailers, incomplete bodies, and body-forbidden
   HEAD/204 behavior.
-- `rsproxy-cli/src/proxy/tests/h2_downstream_streaming.rs`: one real TLS+h2
+- `rsproxy-engine/src/proxy/tests/h2_downstream_streaming.rs`: one real TLS+h2
   client connection proves that an oversized upload reaches the origin before
   the client finishes sending and that response head/DATA arrive before the
   origin completes, while preserving both request and response trailers.
-- `rsproxy-cli/src/proxy/tests/origin_h2_streaming.rs`: real h1 and h2 clients
+- `rsproxy-engine/src/proxy/tests/origin_h2_streaming.rs`: real h1 and h2 clients
   prove that oversized uploads reach a TLS/ALPN h2 origin before client
   completion, with body-rule degradation, trace prefixes, exact byte counts and
   request trailers preserved.
-- `rsproxy-cli/src/proxy/server/tests/`: deterministic policy precedence and
+- `rsproxy-engine/src/proxy/server/tests/`: deterministic policy precedence and
   non-consuming TLS/HTTP/unknown/timeout protocol detection.
-- `rsproxy-cli/src/proxy/tests/connect_modes.rs` additionally verifies that a
+- `rsproxy-engine/src/proxy/tests/connect_modes.rs` additionally verifies that a
   passthrough tunnel remains pending while copy is open, completes exact duplex
   byte totals, handles refusal and MITM timeout without orphan events, and never
   starts a trace for `hide`.
-- `rsproxy-cli/src/proxy/tunnel/tests.rs`: verifies direction-aware byte events
+- `rsproxy-engine/src/proxy/tunnel/tests.rs`: verifies direction-aware byte events
   aggregate without retaining opaque tunnel payloads.
-- `rsproxy-cli/src/proxy/tests/h1_forward.rs`: pooled HTTP/1 connection reuse,
+- `rsproxy-engine/src/proxy/tests/h1_forward.rs`: pooled HTTP/1 connection reuse,
   framing errors, SSE, close-delimited bodies and trace fidelity.
-- `rsproxy-cli/src/upstream_h2/tests/`: wire conversion, real pooled gRPC
+- `rsproxy-net/src/http/tests/mod.rs`: private/test-support HTTP/1 request body,
+  framing, trailer, writer and header-limit behavior. Public buffered and TCP
+  head-reader behavior lives in
+  `rsproxy-net/tests/{http_buffered_head,http_tcp_head}.rs`.
+- `rsproxy-net/tests/dns.rs`: resolver configuration, cache behavior,
+  literal-address bypass and DNS statistics through the public facade.
+- `rsproxy-net/src/downstream_h2/tests/mod.rs`: downstream H2 wire conversion,
+  bounded request/response frames, validation and generic handler service
+  behavior. Engine-side `proxy/h2_bridge/tests/` owns policy-pipeline adaptation
+  above this transport seam.
+- `rsproxy-net/src/upstream_h2/tests/`: wire conversion, real pooled gRPC
   transport, bounded request-body error/deadline behavior, cold and pool-hit
   streaming uploads, connector/stream admission and timeout scopes.
-- `rsproxy-cli/src/transfer_timing/tests.rs` and the h1/h2 proxy tests verify
+- `rsproxy-net/src/transfer_timing/tests.rs` and the engine h1/h2 proxy tests verify
   one-shot timer freezing, EOF/drop behavior, independent slow upload/response
   intervals, and known-versus-unknown timing boundaries on transfer failures.
+- `rsproxy-net/tests/public_api.rs`: compiles representative public HTTP, DNS,
+  async IO, deadline, keyed-pool, upstream-body, typed upstream-H2 dispatch and
+  injected downstream-H2 handler usage without private module access.
+- `rsproxy-engine/tests/public_api.rs`: constructs public `ProxyConfig` and
+  `SharedState`, reaches `EngineHandle` and the engine-owned `RuleStore`, and
+  type-checks the listener `serve` entry point without private module access.
 - `rsproxy-rules/src/tests/`: actions grouped by behavior, body-dependency
   planning, conditions, indexing and regular expressions.
 - `rsproxy-rules/tests/corpus.rs`: runs 86 public cases and requires all 37
@@ -240,22 +300,37 @@ cargo test -p rsproxy-rules --test value_matrix
 cargo test -p rsproxy-rules --test value_sources
 cargo test -p rsproxy-rules --test whistle_migration
 cargo test -p rsproxy-rules --test whistle_options
-cargo test -p rsproxy --lib control::tests::
-cargo test -p rsproxy --lib proxy::tests::request_streaming::
-cargo test -p rsproxy --lib proxy::tests::connect_modes::
-cargo test -p rsproxy --lib proxy::tunnel::tests::
-cargo test -p rsproxy --lib proxy::h2_bridge::tests::
-cargo test -p rsproxy --lib proxy::tests::h2_downstream_streaming::
-cargo test -p rsproxy --lib proxy::tests::origin_h2_streaming::
-cargo test -p rsproxy --lib upstream_h2::tests::streaming::
-cargo test -p rsproxy --lib transfer_timing::tests::
-cargo test -p rsproxy --lib proxy::server::probe::
-cargo test -p rsproxy --lib proxy::tests::timeouts::
-cargo test -p rsproxy --lib proxy::tests::value_actions::
-cargo test -p rsproxy --lib proxy::tests::value_runtime_matrix::
-cargo test -p rsproxy --lib proxy::tests::action_effects::
-cargo test -p rsproxy --lib proxy::request_util::tests::
+cargo test -p rsproxy-rules --test public_api
+cargo test -p rsproxy-net --lib http::tests::
+cargo test -p rsproxy-net --lib downstream_h2::tests::
+cargo test -p rsproxy-net --lib upstream_h2::tests::
+cargo test -p rsproxy-net --lib transfer_timing::tests::
+cargo test -p rsproxy-net --test dns --test errors
+cargo test -p rsproxy-net --test http_buffered_head --test http_tcp_head
+cargo test -p rsproxy-net --test request_deadline
+cargo test -p rsproxy-net --test public_api
+cargo test -p rsproxy-control --lib
+cargo test -p rsproxy-control --test public_api
+cargo test -p rsproxy-platform --lib
+cargo test -p rsproxy-platform --test ca --test errors --test process
+cargo test -p rsproxy-platform --test public_api
+cargo test -p rsproxy-engine --lib rule_store::watch::tests::
+cargo test -p rsproxy-engine --lib proxy::tests::request_streaming::
+cargo test -p rsproxy-engine --lib proxy::tests::connect_modes::
+cargo test -p rsproxy-engine --lib proxy::tunnel::tests::
+cargo test -p rsproxy-engine --lib proxy::h2_bridge::tests::
+cargo test -p rsproxy-engine --lib proxy::tests::h2_downstream_streaming::
+cargo test -p rsproxy-engine --lib proxy::tests::origin_h2_streaming::
+cargo test -p rsproxy-engine --lib proxy::server::probe::
+cargo test -p rsproxy-engine --lib proxy::tests::timeouts::
+cargo test -p rsproxy-engine --lib proxy::tests::value_actions::
+cargo test -p rsproxy-engine --lib proxy::tests::value_runtime_matrix::
+cargo test -p rsproxy-engine --lib proxy::tests::action_effects::
+cargo test -p rsproxy-engine --lib proxy::request_util::tests::
+cargo test -p rsproxy-engine --test errors --test rule_store
+cargo test -p rsproxy-engine --test public_api
 cargo test -p rsproxy-trace --all-targets
+cargo test -p xtask --all-targets
 ```
 
 Run the complete M1 action contract through one entry point:
@@ -273,12 +348,16 @@ Run the protocol owner matrix through one entry point:
 ./scripts/verify.sh matrix
 ```
 
-The script inventories 34 exact owners before running them, so a renamed or
-deleted test fails instead of reporting a successful zero-test filter. It
-covers h1 persistence/pipeline/Expect/auth, CONNECT MITM/passthrough/probing,
-h2 bridge directions and bounded duplex flow, request/response trailers,
-framing and body limits, gRPC, SSE, WebSocket frame behavior, TLS/mTLS policy,
-and h1/h2 header-limit parsers. Dedicated real-network owners additionally
+The script loads the exact test inventory from both `rsproxy-engine` and
+`rsproxy-net`, then runs each of the 34 recorded owners in its declared package;
+a renamed, deleted or package-mismatched test fails instead of reporting a
+successful zero-test filter. Engine owns end-to-end proxy/policy crossings,
+while net owns HTTP framing/header-limit and upstream-H2 message boundaries. Together
+they cover h1 persistence/pipeline/Expect/auth, CONNECT
+MITM/passthrough/probing, h2 bridge directions and bounded duplex flow,
+request/response trailers, framing and body limits, gRPC, SSE, WebSocket frame
+behavior, TLS/mTLS policy, and h1/h2 header-limit parsers. Dedicated
+real-network owners additionally
 exercise server-first WebSocket plus bidirectional frames and trace, required
 upstream mTLS success/failure, 200KB and over-limit h1/h2 requests with explicit
 431 responses, and IPv6 literal plus punycode host routing.
@@ -306,8 +385,8 @@ a 1KiB curl smoke through the proxy, then emits one `rsproxy-benchmark/v1` JSON
 object. `RSPROXY_BENCH_REQUESTS`, `RSPROXY_BENCH_CONCURRENCY`, and
 `RSPROXY_BENCH_SKIP_BUILD=1` control local runs. The contract test defaults to
 128 requests at concurrency 8 and requires exact bytes with zero status or IO
-errors. It proves the M0 script is runnable; it is not the pending criterion/oha
-M5 performance threshold.
+errors. It proves the M0 script is runnable; it does not replace the
+Criterion/oha M5 performance thresholds.
 
 Run the complete workspace suite:
 
@@ -315,8 +394,8 @@ Run the complete workspace suite:
 cargo test --workspace --all-targets --no-fail-fast --locked
 ```
 
-The 2026-07-12 baseline is 445 regular passing tests plus the explicit 1GiB
-resource test ignored by default. The latest explicit run transferred
+The pre-restructure 2026-07-12 M5 baseline was 445 regular passing tests plus
+the explicit 1GiB resource test ignored by default. The latest explicit run transferred
 1,073,741,824 bytes in 679ms with 3,008KiB RSS growth and exact trace bytes.
 
 The v1 qualification host is the current Apple M1 Pro macOS ARM64 machine. Its
@@ -338,7 +417,7 @@ Run the production coverage, benchmark and stability gates explicitly:
 ```sh
 ./scripts/verify.sh coverage-report
 ./benches/criterion/run.sh target/performance/criterion.json
-./scripts/targets.sh criterion target/performance/criterion.json
+cargo xtask targets criterion target/performance/criterion.json
 ./benches/e2e/performance.sh
 ./benches/e2e/whistle.sh
 ./benches/soak/soak.sh
@@ -388,7 +467,7 @@ sanitizer run completed 121,726 executions with no crash or artifact.
 The repository keeps Rust source files at 500 lines or fewer. Check that invariant with:
 
 ```sh
-./scripts/check.sh lines
+cargo xtask check lines
 ```
 
 Test placement is also a repository invariant. This rejects inline test modules,
@@ -396,22 +475,31 @@ test functions outside dedicated test paths, and crates without a public
 integration-test directory:
 
 ```sh
-./scripts/check.sh layout
+cargo xtask check layout
+```
+
+Typed errors are a repository invariant. This AST check scans both workspace and
+fuzz sources and has no exemption list:
+
+```sh
+cargo xtask check typed-errors
 ```
 
 Workflow files are also a repository contract. This checks their exact inventory,
-YAML syntax when Ruby is available, least-privilege token policy, released action
-majors, triggers, matrix platforms and required commands:
+YAML syntax without an external interpreter, least-privilege token policy, stable
+action references, triggers, matrix platforms and required commands:
 
 ```sh
-./scripts/check.sh workflows
+cargo xtask check workflows
 ```
 
 `ci.yml` runs locked check/test/release builds on Ubuntu, macOS and Windows. Its
 Ubuntu jobs additionally run formatting, Clippy, source/test/workflow guards,
-coverage, the fuzz-target compile check, the 34-owner protocol matrix and the
-action-effect suite. `performance.yml` owns Criterion comparison. `release.yml`
+coverage, the fuzz-target compile check, the dual-package 34-owner protocol
+matrix and the action-effect suite. `performance.yml` owns Criterion
+comparison. `release.yml`
 owns the npm registry pipeline for eight native packages, `@rsproxy/runtime`,
 `@rsproxy/cli`, and `@rsproxy/bun`. The fast package contract runs under both
-Node and Bun and installs only the current-host fixture. Clippy runs with all
-default warnings denied and no project-wide lint exception.
+Node and Bun and installs only the current-host fixture. The supply-chain job
+runs cargo-deny across advisories, licenses, bans and sources. Clippy runs with
+all default warnings denied and no project-wide lint exception.

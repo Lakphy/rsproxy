@@ -65,10 +65,10 @@ jobs:
       - name: Benchmark current commit
         run: benches/criterion/run.sh target/performance/criterion.json
       - name: Enforce absolute Criterion targets
-        run: scripts/targets.sh criterion target/performance/criterion.json
+        run: cargo xtask targets criterion target/performance/criterion.json
       - name: Block regressions above ten percent
         if: steps.comparison.outputs.enabled == 'true'
-        run: scripts/targets.sh regression "$RUNNER_TEMP/criterion-base.json" target/performance/criterion.json 10
+        run: cargo xtask targets regression "$RUNNER_TEMP/criterion-base.json" target/performance/criterion.json 10
       - name: Upload Criterion report
         uses: actions/upload-artifact@v6
         with:

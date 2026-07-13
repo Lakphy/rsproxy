@@ -1,6 +1,15 @@
 # Architecture
 
-## Workspace boundaries
+## Workspace governance
+
+Workspace package metadata, third-party dependency versions, Rust and Clippy
+lints, and release optimization policy are defined once in the root
+`Cargo.toml`. Every member inherits Rust 1.88 as the minimum supported version
+and the workspace lint policy. Release binaries use thin LTO, one codegen unit,
+and stripped symbols; unwinding remains enabled because connection threads use
+panic isolation as a reliability boundary.
+
+## rsproxy-rules
 
 `rsproxy-rules` owns the rule language. Its public facade re-exports stable rule,
 action, matcher and result types. Parsing is split into matcher, condition,
@@ -26,6 +35,8 @@ round-robin selection, `replace_pattern.rs` owns compiled replacements, and
 constructs structured values; it does not leave `@key` or `<path>` encoded in
 plain strings.
 
+## rsproxy-trace
+
 `rsproxy-trace` owns captured session data and persistence. `model` contains the
 public completed-session records and `event` defines the incremental producer
 contract. `store` is a thin cloneable facade around atomic IDs and a bounded
@@ -42,140 +53,284 @@ synchronization barriers. `spill` owns segment lifecycle, and
 `spill/{path,codec}` isolate naming/index and encoding/CRC logic. Serialization
 is independent of storage policy.
 
-`rsproxy-cli` is the executable crate and composition root:
+## rsproxy-net
 
-- `cli/`: command parsing and command adapters. `cli/help.rs` owns root and
-  subcommand usage, intercepted before config/auth/process side effects;
-  `cli/completions.rs` owns shell script generation. It may call application
-  services but does not implement proxy protocol behavior.
-- `cli/config.rs` selects configuration sources and applies CLI overrides;
-  `cli/config/file.rs` owns the strongly typed TOML schema and file-value
-  application.
-- `logging.rs` is the process-observability boundary. It owns filter/format
-  environment parsing and one stderr-only `tracing-subscriber`; request Trace
-  storage remains entirely inside `rsproxy-trace`.
-- `cli/rules/`: rule-command routing and storage fallback stay in the facade;
-  group CRUD/edit/list, request metadata/API-query construction, and local
-  benchmark execution live in separate `groups`, `request`, and `bench` modules.
-- `rule_store/`: ordered group metadata and atomic file replacement are isolated
-  from snapshot coordination. A single ArcSwap snapshot contains group text,
-  enable state, order, and the compiled `RuleSet`; each request retains one
+`rsproxy-net` is the protocol-and-IO leaf crate. It owns transport mechanisms
+used by `rsproxy-engine`, but it does not own rule evaluation, trace storage,
+control resources, CLI configuration or proxy policy. Its manifest has no
+dependency on another rsproxy crate.
+
+The `rsproxy-net` public facade is deliberately explicit and grouped as follows:
+
+- readiness and async adaptation: `ReadyIo`, `AsyncIo`;
+- DNS: `DnsConfig`, `DnsResolver`, `DnsStatsSnapshot`;
+- HTTP/1 parsing, framing and writing: `RawRequest`, `RawResponseHead`,
+  `RequestHead`, `RequestBodyFraming`, `RequestBodyReader`, `RequestBodyRead`,
+  `BoundedRequestBody`, `read_request`, `read_request_head`,
+  `read_request_head_tcp`, `read_request_body_bounded`, `read_response_head`,
+  `read_response_head_buffered`, `validate_request_trailers`, `header`,
+  `set_header`, `remove_header`, `reason_phrase`, `write_response`,
+  `write_response_head`, `write_response_head_with_connection`, and
+  `write_response_with_version_and_connection`;
+- absolute request deadlines and the shared H2 runtime: `RequestDeadline`,
+  `TimeoutBudget`, `is_request_total_timeout`, `h2_runtime`;
+- bounded upstream response bodies and keyed admission: `UpstreamBody`,
+  `UpstreamBodyFrame`, `CollectedBody`, `BoundedBody`, `ActivityStore`,
+  `KeyedActivity`, `PoolWaitSpec`, `acquire_slot`;
+- upstream H2 dispatch: `UpstreamH2Request`, `UpstreamH2Response`, `H2Body`,
+  `H2Config`, `H2DispatchRequest`, `H2Outcome`, `H2Connector`, `H2Connected`,
+  `StreamingH2Request`, `dispatch`;
+- downstream H2 service adaptation: `DownstreamH2Config`,
+  `DownstreamH2Request`, `DownstreamH2RequestFrame`, `DownstreamH2Response`,
+  `DownstreamH2ResponseHead`, `DownstreamH2ResponseFrame`, and
+  `serve_downstream_h2`.
+
+The `test-support` feature additionally exports `read_request_body_all`,
+`TestReceiveTimer` and `test_timed_upstream_body_channel`, and enables the
+test-only `UpstreamBody::{channel,from_collected,collect}` helpers; none is part
+of the normal production surface. The integration contract in
+`rsproxy-net/tests/public_api.rs` compiles representative HTTP, DNS, deadline,
+pool, async-adapter, upstream-body, typed upstream-H2-dispatch and injected
+downstream-H2-handler uses against this facade.
+
+The implementation remains private behind that facade:
+
+- `http/{request,response}` separates request and response wire behavior;
+  `request/{head,body}` separates head parsing from stateful body consumption,
+  and `body/{collect,trailers}` owns bounded collection and trailer validation.
+- `dns.rs` owns resolver construction, literal-address bypass, positive/negative
+  cache policy and counters. `async_io.rs` adapts blocking-ready streams to
+  Tokio IO, while `runtime.rs` owns the shared H2 runtime.
+- `request_deadline.rs` owns absolute and stage budgets;
+  `transfer_timing.rs` owns the internal one-shot Hyper body timer. The timer is
+  intentionally not a facade type: body and H2 results expose the measurements.
+- `upstream_body.rs` owns the bounded DATA/trailer channel and lossless overflow
+  continuation; `upstream_pool.rs` owns protocol-neutral keyed capacity waits.
+- `upstream_h2/{message,request_body,connection,pool,streaming}` separates wire
+  conversion, request production, connection/send lifecycle, H2 session state,
+  and buffered/streaming dispatch. Callers see outcomes and an opaque connector,
+  not pool internals.
+- `downstream_h2/{message,body,server}` separates wire validation/conversion,
+  response-body frames and Hyper server admission. `serve_downstream_h2`
+  accepts a cloneable generic async handler from its caller; the handler maps a
+  `DownstreamH2Request` to a future `DownstreamH2Response`.
+  `rsproxy-engine::proxy::h2_bridge` injects the policy/data-plane pipeline
+  through that seam, so the leaf crate does not import engine or CLI state.
+
+## rsproxy-engine
+
+`rsproxy-engine` is the policy and proxy data-plane library. Its public facade
+exports `ProxyConfig`, `SharedState`, `EngineHandle`, typed status/replay
+snapshots, `RuleStore` and `serve`; callers construct runtime-owned state from a
+data-plane-only configuration and pass a bound `TcpListener` to the listener
+entry point. CLI arguments, control resources and presentation formats do not
+enter this crate.
+
+- `state.rs` owns `ProxyConfig`, `SharedState`, the DNS/trace/rule runtime
+  assembly, upstream trust roots, the MITM certificate LRU, and the bounded
+  TTL-aware automatic-MITM failure cache.
+- `rule_store/` owns ordered group metadata, atomic file replacement, watching
+  and ArcSwap snapshot publication. A single snapshot contains group text,
+  enable state, order and the compiled `RuleSet`; each request retains one
   snapshot through request planning and response-period evaluation.
-- `cli/ca/`: certificate construction/fingerprints, CA filesystem state, and
-  platform trust-store operations are isolated from CA command orchestration.
-  `ca/trust/{linux,windows}.rs` separates p11-kit and current-user Root-store
-  commands from the macOS security/keychain implementation.
-- `cli/system_proxy/`: macOS networksetup, Linux gsettings and Windows
-  registry/WinINet backends own their platform plans and execution. Linux and
-  Windows preserve prior values and roll back partial mutation failures.
-- `cli/daemon.rs`: synchronously binds both listeners before publishing
-  readiness, supervises listener threads, and owns pidfile identity checks and
-  cross-platform process termination. A failed start cleans up both child and
-  pidfile.
-- `app.rs`: runtime configuration and shared state. `app/mitm_failures.rs` owns
-  the bounded, TTL-aware host memory used only by automatic MITM fallback.
-- `proxy/`: downstream protocol handling, routing, transformations, TLS and
-  forwarding. `proxy.rs` is the private module facade.
-- `proxy/transforms/values.rs`: the single runtime boundary for inline,
-  storage-value, and file-backed bytes/text. Text actions require UTF-8; byte
-  actions preserve binary input. Request, response, URL, routing, and trace
-  policy reuse this resolver. Mock references/raw payloads also use it; mock
-  file candidate/directory lookup stays in `mock.rs` and feeds the shared text
-  or binary renderer.
-- `rsproxy-rules/action/delete.rs` owns the typed pathname and body-path model;
-  `rsproxy-rules/parser/delete.rs` compiles Whistle-style property strings and
-  escape/index syntax into that model. `proxy/transforms/delete.rs` orchestrates
-  URL, request, response, and trailer phases, while
-  `proxy/transforms/delete/body.rs` owns MIME-gated JSON/form/JSONP mutation.
-  The data plane never reparses property names, and whole/nested body variants
-  participate in the same bounded-body degradation policy.
-- `http/`: HTTP/1 wire primitives. Request-head framing validation and
-  request-body/trailer decoding are separate stateful modules. The body reader
-  supports bounded collection with lossless overflow continuation; reader state,
-  collection policy, and chunk-line/trailer validation live in separate
-  `body`, `body/collect`, and `body/trailers` modules. Response parsing and
-  writing stay independent.
-- `proxy/server/`: listener admission and the plain HTTP/1 client loop. CONNECT
-  orchestration, policy precedence, non-consuming protocol detection, reusable
-  tunneled HTTP/1 handling, MITM TLS and request-input errors are isolated in
-  `connect`, `connect_policy`, `probe`, `inner_http`, `mitm` and `request`.
-- `proxy/http_flow/`: request orchestration with separate session setup,
-  pending-body planning, and upstream completion/error attribution modules.
-- `proxy/h2_bridge/`: bounded downstream HTTP/2 adaptation. `request` exposes
-  DATA/trailers to the existing request-body planner without collecting the
-  complete stream; `response` incrementally decodes the shared HTTP/1-shaped
-  response output into an early head plus backpressured DATA/trailer frames.
-- `proxy/request_stream.rs`: deadline-aware h1/h2 upload relay, bounded trace
-  tee capture, byte accounting, h1 chunk re-encoding and h2 DATA/trailer
-  forwarding.
-- `proxy/request_util.rs`: shared `ThrottlePacer` keeps one monotonic pacing
-  cursor across buffered writes and streaming frames. Request/response writers
-  reuse it for the lifetime of one transfer; deadline-aware paths cannot sleep
-  beyond the absolute request budget, and programmatic zero rates are normalized.
-- `proxy/trace_helpers.rs`: shared trace lifecycle guards, lazy visible-session
-  start, and the bounded request/response body-event emitter. HTTP/2 reuses
-  `Bytes` slices; byte-slice transports copy only the configured preview prefix.
-- `proxy/tunnel.rs`: plain/TLS bidirectional copy and tunnel byte observation.
-  Passthrough payloads are never retained as previews; each direction emits only
-  observed byte counts, and final snapshots correct any dropped queue events.
-- `proxy/websocket/` and `proxy/websocket_frame.rs`: upgrade policy remains in
-  the facade; nonblocking TLS/MITM forwarding, concurrent plain-TCP forwarding,
-  frame decoding and trace projection are separate state machines.
-- `proxy/connect_tls/`: upstream TLS handshake IO, TLS trace records and
-  DNS/TCP/TTFB timing budgets. These modules share no state machine.
-- `proxy/routing/`: selected routes own only the transport dial endpoint and
-  proxy-hop shape. The parsed URL remains the origin identity for authority,
-  TLS SNI and certificate verification. In particular, `host(...)` may route a
-  named HTTPS origin to a literal address without changing the hostname passed
-  to the upstream TLS handshake. Shared authority formatting brackets IPv6
-  literals for request URLs, Host headers, dial addresses and route labels.
-- `proxy/tls/`: rule-derived TLS policy, rustls/trust-root configuration and
-  leaf-certificate file lifecycle.
-- `proxy/upstream_response/`: protocol-neutral response policy with separate
-  buffered and streaming downstream writers.
-- `proxy/h1_forward/`: the single synchronous HTTP/1 implementation. Its pooled
-  direct fast path and unpooled compatibility fallback share one ownership
-  boundary; WebSocket upgrade completion lives separately in
-  `proxy/websocket_forward.rs`.
-- `upstream_h2/` and `upstream_message.rs`: Hyper HTTP/2 request conversion,
-  keyed stream admission, connection/send/response lifecycle, bounded request
-  frames and streaming dispatch. Callers use one `dispatch` outcome and an
-  opaque connector; a stream lease remains active until request upload and
-  response body have both ended.
-- `transfer_timing.rs`: shared monotonic one-shot transfer timers and a Hyper
-  `Body` wrapper. Request timers freeze when the body reaches EOF or is dropped;
-  response timers are shared with the bounded pump and freeze at body/trailer
-  completion or error.
-- `upstream_body.rs`: bounded `Bytes` frame transport shared by both upstream
-  protocols; timed channels expose response-receive duration without moving
-  ownership out of the producer, and pool leases remain owned until completion.
-- `control/`: TCP/Unix/Windows-named-pipe transport, authentication, request
-  routing and resource handlers. `windows_pipe.rs` owns Win32 handles and the
-  shared blocking `Read + Write` server/client adapter; named pipes retain token
-  authentication and reject remote clients. Resource routes live under
-  `control/routes/`; expected streaming client disconnects are debug events,
-  while real request failures remain WARN.
-- `http.rs`, `h2.rs`, `dns.rs`, `async_io.rs`: protocol and IO primitives shared
-  by the data plane.
-- `h2/`: downstream HTTP/2 admission, channel-backed response bodies,
-  wire-message conversion, and shared Tokio/rustls runtime adaptation live in
-  separate `server`, `body`, `message`, and `runtime` modules behind the thin
-  `h2.rs` facade. The transport header-list setting is bounded to the configured
-  application limit plus a fixed 64KiB diagnostic margin; service validation
-  still enforces the exact limit and can therefore return an explanatory 431.
-- `json/` and `tui/`: presentation adapters. TUI state, rendering and text/JSON
-  formatting are independent modules.
-- `examples/bench_origin.rs` and `examples/bench_client.rs` are standalone M0
-  acceptance drivers, not production protocol modules. `benches/e2e/benchmark.sh`
-  composes them with the release binary and a curl preflight; its versioned JSON
-  output is the input boundary for later M5 performance gates.
+- `handle.rs` is the typed control boundary. `EngineHandle` exposes rules,
+  immutable status snapshots and replay without revealing `SharedState` fields;
+  replay execution remains engine-owned because it reuses data-plane request
+  parsing and response limits.
+- `proxy/` owns all downstream protocol handling, routing, transformations,
+  TLS/MITM, forwarding, WebSocket, tunnel, mock and Trace integration.
+  `proxy.rs` is its private module facade and `proxy/server.rs` supplies the
+  public `serve` entry point.
+- `proxy/transforms/values.rs` is the runtime boundary for inline,
+  storage-value and file-backed bytes/text. Text actions require UTF-8; byte
+  actions preserve binary input. Request, response, URL, routing, mock and Trace
+  policy reuse this resolver.
+- `proxy/transforms/delete.rs` orchestrates typed URL, request, response and
+  trailer deletion, while `proxy/transforms/delete/body.rs` owns MIME-gated
+  JSON/form/JSONP mutation. The data plane never reparses property names.
+- `proxy/server/` separates plain HTTP/1 admission, CONNECT orchestration,
+  policy precedence, non-consuming protocol detection, reusable tunneled HTTP,
+  MITM TLS and request-input errors.
+- `proxy/http_flow/` separates session setup, pending-body planning and upstream
+  completion/error attribution. `proxy/h2_bridge/` adapts bounded downstream H2
+  frames to the same policy pipeline and emits incremental response head,
+  backpressured DATA and trailers.
+- `proxy/request_stream.rs`, `proxy/request_util.rs` and
+  `proxy/trace_helpers.rs` own deadline-aware h1/h2 relay, shared transfer
+  pacing, byte accounting, bounded Trace capture and lifecycle guards.
+- `proxy/tunnel.rs`, `proxy/websocket/` and `proxy/websocket_frame.rs` own
+  direction-aware tunnel counts, plain/TLS duplex forwarding, frame decoding
+  and Trace projection without retaining opaque passthrough payloads.
+- `proxy/connect_tls/`, `proxy/routing/` and `proxy/tls/` keep dial routing,
+  origin identity/SNI, handshake timing, policy, trust roots and leaf
+  certificate lifecycle separate. `host(...)` may change a dial endpoint
+  without changing the origin hostname used for TLS verification.
+- `proxy/h1_forward/` is the single synchronous HTTP/1 implementation;
+  `proxy/upstream_response/` owns protocol-neutral buffered/streaming response
+  completion, and `proxy/websocket_forward.rs` owns upgrade completion.
+- White-box rule-store, state and complete proxy data-plane tests live beside
+  these modules. `tests/public_api.rs` compiles the engine facade from outside
+  the crate. `benches/certificates.rs`, enabled by `bench-support`, measures the
+  engine-owned MITM certificate issue, disk-cache and server-config-cache paths.
+- `examples/bench_origin.rs` and `examples/bench_client.rs` are engine-owned M0
+  acceptance drivers. `benches/e2e/benchmark.sh` composes them with the release
+  binary and a curl preflight.
+
+## rsproxy-control
+
+`rsproxy-control` owns the complete control-plane protocol boundary. Its public
+facade exposes the control client/auth vocabulary plus `ControlOptions`,
+`ControlState`, `ControlListener`, `bind` and `serve`:
+
+- `server.rs` owns listener selection and lifecycle. `ControlOptions` contains
+  control endpoint and display metadata, while `ControlState` composes those
+  options with an `EngineHandle` and the engine's `TraceStore` handle; it does
+  not receive `SharedState` or CLI `AppConfig`.
+- `server/{router,routes,query,values}.rs` owns authenticated HTTP/1 control
+  dispatch, resource handlers and query/value parsing. Status, rules and replay
+  call the typed `EngineHandle::{status_snapshot,rules,replay}` boundary;
+  sessions and follow use the cloned Trace handle. Its small blocking HTTP/1
+  request/response wire is intentionally local to the control protocol and the
+  crate does not depend on `rsproxy-net`.
+- `client.rs` owns request/NDJSON-follow transport, while `client/auth.rs` and
+  `server/auth.rs` own token files, generation, validation and constant-work
+  bearer/header authentication. The CLI retains only configuration-source
+  precedence and passes the resolved token to this client facade.
+- `server/windows_pipe.rs` owns the Windows named-pipe listener/stream adapter;
+  Unix-domain sockets and TCP listeners share the same router. The Windows pipe
+  and TCP transports require token authentication, while a private 0600 Unix
+  socket uses local peer/file permissions.
+- `shapes.rs` and `shapes/har.rs` own stable JSON, table and HAR projection used
+  by the API. The 34 unit tests remain beside the error/server/client/shape
+  modules, and `tests/public_api.rs` contains three black-box facade contracts.
+
+## rsproxy-platform
+
+`rsproxy-platform` is the operating-system integration leaf. Its manifest has
+only third-party dependencies and its public surface is grouped by capability:
+
+- `ca` owns root-CA generation and fingerprinting, typed root/leaf storage
+  paths and status, PEM reads, persisted leaf material, and macOS/Linux/Windows
+  trust-store install/uninstall outcomes. `TrustOptions` selects dry-run and
+  keychain inputs without introducing CLI presentation types.
+- `process` owns typed PID parsing, daemon detachment, liveness and termination,
+  plus `unix_control_socket_path`, including the deterministic short-path
+  fallback for long storage directories. Listener/readiness orchestration stays
+  in the CLI.
+- `system_proxy` owns `ProxyPlatform`, `ProxyAction`, `ProxyTarget`,
+  `ProxyOptions`, the render-neutral `ProxyPlan`/`ProxyOutcome`, and the paired
+  `plan_system_proxy`/`execute_system_proxy` entrypoints. The CLI renders a dry
+  run from the typed plan; normal execution applies the same platform-specific
+  plan with rollback where supported and returns typed status/change data.
+
+Root-CA lifecycle and storage therefore do not enter the data plane. The
+cryptographic MITM hot path remains in `rsproxy-engine`:
+the CLI composition root reads initialized root PEM through the platform
+facade and injects a redacted `CaMaterial` value into `ProxyConfig` once at
+startup. The engine neither knows the root file names nor reads root material
+from `storage`; it uses the injected in-memory material for MITM signing and
+upstream trust, while `storage` is only the leaf-certificate cache location.
+`issue_leaf_certificate` also signs an explicitly requested leaf from supplied
+PEM. Neither leaf crate imports the other. The workspace-level unsafe deny
+remains in force elsewhere; `rsproxy-platform` has a documented crate-level
+allowance only for narrowly localized Unix/Windows process calls and Windows
+WinINet notification calls in `process.rs` and `system_proxy/windows.rs`.
+
+Eight white-box unit tests cover native trust and system-proxy behavior. Ten
+public-only CA/error/process tests live in the crate-level integration targets,
+and five `tests/public_api.rs` contracts compile typed errors, root
+lifecycle/trust, process operations, system-proxy plan/execution and Unix
+socket-path assembly without CLI or engine types.
+
+## rsproxy-cli
+
+`rsproxy-cli` is the executable package and only composition root. Its
+user-facing `[[bin]]` remains named `rsproxy`, while Rust code imports the
+library as `rsproxy_cli`:
+
+- `app.rs` wraps engine `ProxyConfig` in CLI-owned `AppConfig`, retaining only
+  listener/control metadata and configuration-precedence state. It projects a
+  `ControlOptions` value for the control crate and explicitly injects platform
+  root-CA PEM into the engine configuration; `ControlState` itself is owned and
+  assembled by `rsproxy-control` from an `EngineHandle`.
+- `cli/command.rs` owns the typed `clap` derive tree: the root command, shared
+  client/runtime argument groups and completion shells stay in the facade, while
+  `command/{rules,trace,ca,proxy}.rs` hold the per-family subcommand structs
+  mirroring their handler modules. Clap renders help/version before config,
+  authentication or process side effects, and `clap_complete` generates the
+  four shell completion formats from that same tree. `cli/config.rs` and `cli/config/file.rs` merge
+  typed CLI overrides over TOML and defaults. Commands call
+  engine/control/platform services but do not implement proxy protocol or
+  operating-system behavior.
+- `cli/rules/` retains command routing, API-query construction and offline
+  storage fallback, using the engine-owned `RuleStore` facade.
+- `logging.rs` is the process-observability boundary: it owns filter/format
+  parsing and the stderr-only `tracing-subscriber`; request Trace storage stays
+  in the engine through `rsproxy-trace`.
+- `tui/` remains a CLI presentation adapter over the public control client.
+  Control routing, JSON/HAR shapes, token-auth mechanics and Windows named-pipe
+  transport no longer live in the CLI.
+- `cli/ca.rs` and `cli/system_proxy.rs` are argument/config/result adapters over
+  the typed platform API. The CA adapter calls engine-owned
+  `issue_leaf_certificate` only for explicit leaf issuance and delegates root
+  lifecycle, persistence and trust to platform.
+- `cli/daemon.rs` retains daemon/listener/readiness orchestration, but delegates
+  PID parsing, detachment, liveness, termination and Unix control-socket path
+  assembly to `rsproxy-platform::process`.
+
+Each library boundary exposes a domain result instead of a string error
+channel: `NetError`, `EngineError`, `ControlError`, `PlatformError`, and
+`RuleModelError`. Cross-crate variants retain their source with `#[from]` or an
+explicit source field; contextual I/O variants likewise preserve the original
+`io::Error`. The CLI aggregates these as `CliError`. `main.rs` is the only
+rendering boundary: after successful clap parsing it uses the typed global
+`json` field, maps runtime failures to stable additive
+`rsproxy.cli.error/v1` codes, and exits with 1. Usage failures are rendered by
+clap and exit with 2; daemon state conflicts exit with 3. Raw argv inspection
+is confined to clap's parse-failure path, where no typed command exists yet and
+`--json` still determines the error representation.
+
+## xtask
+
+`xtask` is the eighth workspace member and the typed repository-automation
+boundary. Its public facade exposes typed release, check and report-validation
+entry points; its binary maps `cargo xtask release`, `check` and `targets` onto
+those APIs without embedding policy in shell dispatchers.
+
+- `release/` validates semantic versions, derives the eight native optional
+  dependencies from `packages/npm/targets.json`, and transactionally
+  synchronizes Cargo lockfiles, the root distribution manifest and the
+  runtime/npm/Bun manifests. `--check` is read-only and is used by tag
+  validation. npm packaging obtains the same version from `cargo metadata`, so
+  Cargo package metadata is the only version authority; native platform
+  manifests remain generated staging files.
+- `check/` owns the Rust-line, test-layout, Whistle-fixture, typed-error and
+  workflow contracts. `targets/` uses typed serde reports for coverage,
+  Criterion, e2e, soak and regression thresholds.
+- Shell remains responsible only for process orchestration such as local
+  network fixtures, resource sampling, packaging and fuzz driver setup.
+  `tests/public_api.rs` compiles the typed release/check/targets facade from
+  outside the crate.
 
 ## Dependency rules
 
-Keep domain logic in the library crate that owns it. CLI and control handlers
-translate inputs and outputs; they should not duplicate rule evaluation or trace
-storage behavior. Protocol-specific pools must remain isolated so h1 and h2
-admission, reuse and timeout semantics cannot accidentally share state.
+The current internal dependency graph is
+`rsproxy-cli -> {rsproxy-control, rsproxy-engine, rsproxy-platform,
+rsproxy-rules, rsproxy-trace}`,
+`rsproxy-control -> {rsproxy-engine, rsproxy-rules, rsproxy-trace}`,
+`rsproxy-engine -> {rsproxy-net, rsproxy-rules, rsproxy-trace}`, and
+`rsproxy-trace -> rsproxy-rules`. `rsproxy-net`, `rsproxy-platform` and
+`rsproxy-rules` have no internal dependency and must remain leaves.
+`rsproxy-net` receives downstream H2 behavior through handler injection rather
+than reaching upward into the engine or composition root; platform operations
+are selected and rendered only by the CLI composition root.
+
+Keep domain logic in the library crate that owns it. `rsproxy-engine` may depend
+on protocol mechanisms, rule types and Trace storage, but it must not know CLI
+arguments, control routes or presentation formats. CLI and control handlers
+translate inputs and outputs; they should not duplicate rule evaluation or
+Trace storage behavior. Protocol-specific pools must remain isolated so h1 and
+h2 admission, reuse and timeout semantics cannot accidentally share state.
 
 Prefer a thin module facade with explicit re-exports. Use `pub(crate)` or a
 scoped visibility such as `pub(in crate::proxy)` for internal collaboration;
@@ -196,7 +351,7 @@ Every Rust source file must remain at or below 500 lines. The invariant covers
 production and test code under `crates/` and is enforced by:
 
 ```sh
-./scripts/check.sh lines
+cargo xtask check lines
 ```
 
 Treat 500 as a hard ceiling, not a target. Split by responsibility before a file
@@ -213,18 +368,19 @@ White-box unit tests live next to the implementation under
 `routing/{single_hop,chains}.rs`,
 `request_streaming/{fixed,rules,chunked}.rs`, and
 `action_effects/{request,response,local_routing,control_flow,tls}.rs`,
-`proxy/h2_bridge/tests/{request,response}.rs`,
-`proxy/tunnel/tests.rs`,
-`transfer_timing/tests.rs`,
-`proxy/tests/h1_forward.rs` and
-`upstream_h2/tests/{message,connection,pool,request_body,streaming,timeouts}.rs`.
+`rsproxy-engine/src/proxy/h2_bridge/tests/{request,response}.rs`,
+`rsproxy-engine/src/proxy/tunnel/tests.rs`,
+`rsproxy-engine/src/proxy/tests/h1_forward.rs` and
+`rsproxy-net/src/{http,downstream_h2}/tests/`,
+`rsproxy-net/src/transfer_timing/tests.rs`, and
+`rsproxy-net/src/upstream_h2/tests/{message,connection,pool,request_body,streaming,timeouts}.rs`.
 Real TLS protocol crossings additionally live in
-`proxy/tests/{h2_downstream_streaming,origin_h2_streaming}.rs`. See
+`rsproxy-engine/src/proxy/tests/{h2_downstream_streaming,origin_h2_streaming}.rs`. See
 [Testing](testing.md) for the complete map and commands.
 Cross-protocol acceptance edges live under
-`proxy/tests/protocol_matrix/{websocket,mtls,headers,names}.rs`; each starts real
-listeners and drives the proxy path rather than calling codecs or transforms in
-isolation.
+`rsproxy-engine/src/proxy/tests/protocol_matrix/{websocket,mtls,headers,names}.rs`;
+each starts real listeners and drives the proxy path rather than calling codecs
+or transforms in isolation.
 
 Executable product contracts are also split by responsibility:
 `tests/cli_daemon_lifecycle.rs` owns process recovery and identity safety,
@@ -238,6 +394,30 @@ concurrent producers, out-of-order metadata, drop correction and body budgets.
 `src/tests/spill_read.rs` owns append/clear/eviction races for collector-independent
 spill snapshots.
 The public event/follow contract remains in `rsproxy-trace/tests/`.
+The `rsproxy-net/tests/public_api.rs` black-box contract covers only the public
+facade, including generic downstream-H2 handler injection.
+The `rsproxy-engine/tests/public_api.rs` contract constructs `ProxyConfig` and
+`SharedState`, reaches `EngineHandle`/`RuleStore` through the facade, and
+type-checks `serve`. The three `rsproxy-control/tests/public_api.rs` contracts
+compose a control state from `ControlOptions` plus `EngineHandle` and compile
+the client authentication/endpoint vocabulary without private module access;
+34 control unit tests cover typed errors, the server, client, local wire and
+shape internals.
+The five `rsproxy-platform/tests/public_api.rs` contracts cover the typed error,
+CA/trust, process, system-proxy and Unix socket-path facade; eight platform unit
+tests remain beside private native implementations.
+Phase 6 applied the public-only D-15 test criterion without widening any API:
+35 tests moved into crate integration targets across
+`rsproxy-net/tests/{dns,errors,http_buffered_head,http_tcp_head,request_deadline}.rs`,
+`rsproxy-engine/tests/{errors,rule_store}.rs`, and
+`rsproxy-platform/tests/{ca,errors,process}.rs`. Protocol/H2/body/timing,
+watcher, system-proxy and native trust suites still need private or
+`test-support` constructors and deliberately remain white-box tests.
+Across `rsproxy-net`, `rsproxy-control`, `rsproxy-rules`, `rsproxy-engine`,
+`rsproxy-platform`, `rsproxy-trace` and `xtask`, the seven
+`tests/public_api.rs` targets contain 27 facade-contract tests
+(7 + 3 + 2 + 5 + 5 + 3 + 2). The CLI has executable black-box contracts
+instead of a library facade snapshot.
 Loop 96 additionally exercised live follow, HTTP/tunnel timing, zstd spill
 snapshots, JSON/HAR export, TUI and replay through a release daemon, CLI and curl.
 Release-process resource acceptance lives in
@@ -248,16 +428,19 @@ The local proxy macrobenchmark is likewise explicit: `scripts/verify.sh bench`
 validates the `rsproxy-benchmark/v1` result without turning every `cargo test`
 run into a nested release build.
 The cross-protocol owner matrix is explicit for the same reason:
-`scripts/verify.sh matrix` first verifies that all 34 exact test names
-still exist, then runs each owner. This prevents a renamed or removed test from
-turning an exact filter into a successful zero-test invocation.
+`scripts/verify.sh matrix` loads the inventories of both `rsproxy-engine` and
+`rsproxy-net`, first verifies that all 34 exact test names exist in their
+declared packages, then runs each owner. This prevents a renamed, moved or
+removed test from turning an exact filter into a successful zero-test
+invocation.
 
-Cross-layer value behavior lives in `proxy/tests/value_actions.rs`; the
-seven-form field resolver matrix is split into `value_runtime_matrix.rs` and
+Cross-layer value behavior lives in
+`rsproxy-engine/src/proxy/tests/value_actions.rs`; the seven-form field resolver
+matrix is split into `value_runtime_matrix.rs` and
 `value_runtime_matrix/cases.rs`. The 17-test action-effect harness runs the real
-`handle_client` path with local TCP/TLS fixtures and enforces an exact one-owner
-partition of all 46 public families; `scripts/verify.sh actions` combines
-it with the parser and migration contracts. Public DSL source classification, parse matrix,
+engine listener path with local TCP/TLS fixtures and enforces an exact one-owner
+partition of all 46 public families; `scripts/verify.sh actions` combines it
+with the parser and migration contracts. Public DSL source classification, parse matrix,
 Whistle migration contract, and bounded-complexity gate live in
 `rsproxy-rules/tests/{value_sources,value_matrix,whistle_migration,complexity}.rs`;
 these are deliberately separate from private parser unit tests.
@@ -268,17 +451,24 @@ runners validate source drift against the immutable 2.10.5 evidence snapshot
 under `tests/fixtures/` and execute every recipe declared implemented. The full
 upstream Node repository is neither a workspace input nor a test dependency.
 
-The layout is enforced by `scripts/check.sh layout`: inline `mod tests {}`
+The layout is enforced by `cargo xtask check layout`: inline `mod tests {}`
 blocks are rejected, test functions must live under `tests/` or `tests.rs`, and
-every crate must retain its public integration-test directory.
+every crate must retain its public integration-test directory. The same check
+verifies the pinned Whistle snapshot, file inventory, SHA-256 hashes and driver
+version. `cargo xtask check typed-errors` parses Rust with `syn` and rejects
+`Result<_, String>` and `Result<_, &'static str>` throughout `crates/` and
+`fuzz/`, without source exemptions.
 
 ## Automation boundaries
 
 `.github/workflows/ci.yml` keeps portable Rust check/test/release-build work in
-an Ubuntu/macOS/Windows matrix. POSIX repository checks, formatting, Clippy,
-fuzz-target compilation, quality-gate contracts and coverage run in dedicated
-Ubuntu jobs. `.github/workflows/performance.yml` compares Criterion results for
-the base and current commits on one runner and blocks regressions above 10%.
+an Ubuntu/macOS/Windows matrix, runs `cargo xtask check all` on every matrix OS,
+and checks the workspace separately on the declared Rust 1.88 MSRV. Formatting,
+Clippy, fuzz-target compilation, quality-gate contracts and coverage run in
+dedicated Ubuntu jobs. A cargo-deny job enforces advisory, license, ban and
+registry-source policy. `.github/workflows/performance.yml` compares Criterion
+results for the base and current commits on one runner and blocks regressions
+above 10% through typed `cargo xtask targets` report parsing.
 `.github/workflows/fuzz.yml` owns the daily nightly/libFuzzer run. The npm
 distribution boundary lives under `packages/npm/`: `@rsproxy/runtime` resolves
 one of eight OS/architecture/libc packages, while `@rsproxy/cli` and
@@ -287,7 +477,10 @@ native packages and publishes only to the npm registry, with launchers published
 after every native artifact. Other target mappings are structural contracts in
 this round; current executable qualification remains local macOS ARM64.
 
-`scripts/check.sh workflows` constrains workflow inventory, syntax, permissions,
-action majors, triggers, platforms and commands. Clippy denies all default
-warnings without a project-wide lint exception; request, response, connection
-and timeout state cross module boundaries through named context structures.
+`cargo xtask check workflows` constrains workflow inventory, YAML syntax,
+permissions, stable action references, triggers, platforms and commands.
+`scripts/` retains only process orchestration for coverage, fuzzing, packaging,
+network/resource tests and benchmarks; repository policy and JSON threshold
+logic live in tested Rust. Clippy denies all default warnings without a
+project-wide lint exception; request, response, connection and timeout state
+cross module boundaries through named context structures.

@@ -127,7 +127,8 @@ require_positive_integer RSPROXY_SOAK_SAMPLE_INTERVAL_SECONDS "$SAMPLE_INTERVAL"
 
 cd "$ROOT"
 if [ "$SKIP_BUILD" != "1" ]; then
-    cargo build --release -p rsproxy --bin rsproxy --example bench_origin --locked
+    cargo build --release -p rsproxy-cli --bin rsproxy --locked
+    cargo build --release -p rsproxy-engine --example bench_origin --locked
 fi
 
 PROXY_BIN="$ROOT/target/release/rsproxy"
@@ -171,7 +172,7 @@ done
 
 HOME="$TMP_ROOT/home" \
 RSPROXY_HOME="$TMP_ROOT/home" \
-RSPROXY_LOG="rsproxy=info" \
+RSPROXY_LOG="rsproxy_cli=info" \
 RSPROXY_LOG_FORMAT=json \
 "$PROXY_BIN" run \
     --host 127.0.0.1 \
@@ -362,4 +363,4 @@ jq -n \
 ' >"$OUTPUT"
 
 cat "$OUTPUT"
-"$ROOT/scripts/check-soak-targets.sh" "$OUTPUT"
+cargo xtask targets soak "$OUTPUT"

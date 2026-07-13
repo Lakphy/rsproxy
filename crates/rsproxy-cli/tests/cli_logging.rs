@@ -35,7 +35,7 @@ fn run_emits_machine_readable_listener_and_startup_events() {
                 "--trace-disk-budget",
                 "0",
             ])
-            .env("RSPROXY_LOG", "rsproxy=info")
+            .env("RSPROXY_LOG", "rsproxy_cli=info")
             .env("RUST_LOG", "off")
             .env("RSPROXY_LOG_FORMAT", "json")
             .stdout(Stdio::null())

@@ -1,6 +1,6 @@
 use super::*;
 
-pub(super) fn parse_condition(input: &str) -> Result<Condition, String> {
+pub(super) fn parse_condition(input: &str) -> Result<Condition, RuleModelError> {
     if let Some(rest) = input.strip_prefix('!') {
         return Ok(Condition::Not(Box::new(parse_condition(rest)?)));
     }
@@ -23,11 +23,14 @@ pub(super) fn parse_condition(input: &str) -> Result<Condition, String> {
         "status" => parse_status_condition(&args).map(Condition::Status),
         "chance" => {
             let raw = require_one(&args, "chance")?;
-            let value = raw
-                .parse::<f64>()
-                .map_err(|_| "chance must be 0.0..1.0".to_string())?;
+            let value = raw.parse::<f64>().map_err(|source| {
+                RuleModelError::float("chance condition", raw, "chance must be 0.0..1.0", source)
+            })?;
             if !(0.0..=1.0).contains(&value) {
-                return Err("chance must be 0.0..1.0".to_string());
+                return Err(RuleModelError::constraint(
+                    "chance condition",
+                    "chance must be 0.0..1.0",
+                ));
             }
             Ok(Condition::ChancePermille((value * 1000.0).round() as u16))
         }
@@ -48,27 +51,39 @@ pub(super) fn parse_condition(input: &str) -> Result<Condition, String> {
         }
         "any" => {
             if args.is_empty() {
-                return Err("any requires at least one condition".to_string());
+                return Err(RuleModelError::missing(
+                    "any condition",
+                    "any requires at least one condition",
+                ));
             }
             args.iter()
                 .map(|arg| parse_condition(arg.trim()))
                 .collect::<Result<Vec<_>, _>>()
                 .map(Condition::Any)
         }
-        _ => Err(format!("unknown condition `{name}`")),
+        _ => Err(RuleModelError::unsupported(
+            "condition",
+            format!("unknown condition `{name}`"),
+        )),
     }
 }
 
-fn parse_method_condition(args: &[&str]) -> Result<Vec<String>, String> {
+fn parse_method_condition(args: &[&str]) -> Result<Vec<String>, RuleModelError> {
     if args.is_empty() {
-        return Err("method requires at least one method".to_string());
+        return Err(RuleModelError::missing(
+            "method condition",
+            "method requires at least one method",
+        ));
     }
     args.iter()
         .map(|value| {
             let value = unquote(value);
             let value = value.trim();
             if value.is_empty() || !value.bytes().all(is_http_token_byte) {
-                Err(format!("invalid method condition `{value}`"))
+                Err(RuleModelError::invalid(
+                    "method condition",
+                    format!("invalid method condition `{value}`"),
+                ))
             } else {
                 Ok(value.to_ascii_uppercase())
             }
@@ -76,16 +91,22 @@ fn parse_method_condition(args: &[&str]) -> Result<Vec<String>, String> {
         .collect()
 }
 
-fn parse_ip_patterns(args: &[&str], name: &str) -> Result<Vec<String>, String> {
+fn parse_ip_patterns(args: &[&str], name: &str) -> Result<Vec<String>, RuleModelError> {
     if args.is_empty() {
-        return Err(format!("{name} requires at least one pattern"));
+        return Err(RuleModelError::missing(
+            "IP condition",
+            format!("{name} requires at least one pattern"),
+        ));
     }
     args.iter()
         .map(|value| {
             let value = unquote(value);
             let value = value.trim();
             if value.is_empty() || value.chars().any(char::is_control) {
-                Err(format!("{name} patterns must be non-empty"))
+                Err(RuleModelError::empty(
+                    "IP condition pattern",
+                    format!("{name} patterns must be non-empty"),
+                ))
             } else {
                 Ok(value.to_string())
             }
@@ -93,12 +114,15 @@ fn parse_ip_patterns(args: &[&str], name: &str) -> Result<Vec<String>, String> {
         .collect()
 }
 
-fn parse_header_condition(input: &str, response: bool) -> Result<Condition, String> {
+fn parse_header_condition(input: &str, response: bool) -> Result<Condition, RuleModelError> {
     if let Some((name, value)) = input.split_once('~') {
         let name = validate_header_name(name)?;
         let value = unquote(value.trim());
         if value.is_empty() {
-            return Err("header contains condition value is empty".to_string());
+            return Err(RuleModelError::empty(
+                "header contains condition",
+                "header contains condition value is empty",
+            ));
         }
         if response {
             Ok(Condition::ResHeaderContains { name, value })
@@ -115,37 +139,53 @@ fn parse_header_condition(input: &str, response: bool) -> Result<Condition, Stri
     }
 }
 
-fn parse_status_condition(args: &[&str]) -> Result<Vec<u16>, String> {
+fn parse_status_condition(args: &[&str]) -> Result<Vec<u16>, RuleModelError> {
     if args.is_empty() {
-        return Err("status requires at least one code".to_string());
+        return Err(RuleModelError::missing(
+            "status condition",
+            "status requires at least one code",
+        ));
     }
     args.iter()
         .map(|value| {
-            let status = value
-                .trim()
-                .parse::<u16>()
-                .map_err(|_| format!("invalid status condition `{value}`"))?;
+            let status = value.trim().parse::<u16>().map_err(|source| {
+                RuleModelError::integer(
+                    "status condition",
+                    value.trim(),
+                    format!("invalid status condition `{value}`"),
+                    source,
+                )
+            })?;
             if (100..=999).contains(&status) {
                 Ok(status)
             } else {
-                Err(format!("invalid status condition `{value}`"))
+                Err(RuleModelError::constraint(
+                    "status condition",
+                    format!("invalid status condition `{value}`"),
+                ))
             }
         })
         .collect()
 }
 
-fn validate_header_name(input: &str) -> Result<String, String> {
+fn validate_header_name(input: &str) -> Result<String, RuleModelError> {
     let name = input.trim();
     if name.is_empty() || !name.bytes().all(is_http_token_byte) {
-        Err(format!("invalid header condition name `{name}`"))
+        Err(RuleModelError::invalid(
+            "header condition name",
+            format!("invalid header condition name `{name}`"),
+        ))
     } else {
         Ok(name.to_ascii_lowercase())
     }
 }
 
-fn validate_env_name(name: &str) -> Result<(), String> {
+fn validate_env_name(name: &str) -> Result<(), RuleModelError> {
     if name.is_empty() || name.chars().any(char::is_control) {
-        Err("env condition name is empty or contains control characters".to_string())
+        Err(RuleModelError::invalid(
+            "environment condition name",
+            "env condition name is empty or contains control characters",
+        ))
     } else {
         Ok(())
     }
@@ -172,7 +212,7 @@ fn is_http_token_byte(byte: u8) -> bool {
         )
 }
 
-fn parse_url_condition(input: &str) -> Result<UrlCondition, String> {
+fn parse_url_condition(input: &str) -> Result<UrlCondition, RuleModelError> {
     let input = input.trim();
     if input.starts_with('/') && regex_literal_end(input).is_some() {
         parse_regex_matcher(input).map(UrlCondition::Regex)
@@ -181,14 +221,17 @@ fn parse_url_condition(input: &str) -> Result<UrlCondition, String> {
     }
 }
 
-fn parse_body_condition(input: &str) -> Result<Condition, String> {
+fn parse_body_condition(input: &str) -> Result<Condition, RuleModelError> {
     let input = input.trim();
     if input.starts_with('/') && regex_literal_end(input).is_some() {
         parse_regex_matcher(input).map(Condition::BodyRegex)
     } else {
         let text = input.strip_prefix('~').unwrap_or(input).trim();
         if text.is_empty() {
-            return Err("body condition requires text or regex".to_string());
+            return Err(RuleModelError::missing(
+                "body condition",
+                "body condition requires text or regex",
+            ));
         }
         Ok(Condition::BodyContains(unquote(text)))
     }

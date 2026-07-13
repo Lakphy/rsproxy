@@ -1,0 +1,18 @@
+{
+  "schema": "rsproxy-benchmark/v1",
+  "driver": "rsproxy-rust-h1",
+  "proxy": "127.0.0.1:57309",
+  "target": "http://127.0.0.1:57308/benchmark",
+  "requests": 10000,
+  "completed_requests": 10000,
+  "concurrency": 32,
+  "elapsed_ms": 271,
+  "requests_per_second": 36891.384386090474,
+  "p50_us": 725,
+  "p99_us": 2691,
+  "max_us": 18117,
+  "response_bytes": 10240000,
+  "status_errors": 0,
+  "io_errors": 0,
+  "first_io_error": null
+}

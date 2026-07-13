@@ -10,23 +10,23 @@ pub struct UrlParts {
 }
 
 impl UrlParts {
-    pub fn parse(input: &str) -> Result<Self, String> {
-        let (scheme, rest) = input
-            .split_once("://")
-            .ok_or_else(|| format!("url must include scheme: {input}"))?;
+    pub fn parse(input: &str) -> Result<Self, RuleModelError> {
+        let (scheme, rest) = input.split_once("://").ok_or_else(|| {
+            RuleModelError::syntax("URL", format!("url must include scheme: {input}"))
+        })?;
         let scheme = scheme.to_ascii_lowercase();
         let (authority, path_and_query) = match rest.find(['/', '?']) {
             Some(idx) => (&rest[..idx], &rest[idx..]),
             None => (rest, "/"),
         };
         if authority.is_empty() {
-            return Err("url host is empty".to_string());
+            return Err(RuleModelError::empty("URL host", "url host is empty"));
         }
 
         let (host, port) = split_host_port(authority);
         let host = host.trim_matches(['[', ']']).to_ascii_lowercase();
         if host.is_empty() {
-            return Err("url host is empty".to_string());
+            return Err(RuleModelError::empty("URL host", "url host is empty"));
         }
 
         let (path, query) = if let Some((path, query)) = path_and_query.split_once('?') {

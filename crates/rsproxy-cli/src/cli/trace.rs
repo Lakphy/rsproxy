@@ -1,108 +1,91 @@
-use super::*;
+use super::command::{ReplayArgs, RuntimeArgs, TraceArgs, TraceCommand, ValuesArgs, ValuesCommand};
+use super::config::runtime_config;
+use super::util::{percent_encode, read_stdin};
+use crate::{CliError, CliResult};
+use rsproxy_control::{api_request, api_stream_lines};
+use std::fs;
 
-pub(super) fn trace_cmd(mut args: Vec<String>) -> Result<(), String> {
-    if args.is_empty() {
-        return Err("trace command required".to_string());
-    }
-    let sub = args.remove(0);
-    let api = runtime_config(&args)?.api;
-    match sub.as_str() {
-        "ls" => {
-            let limit = trace_list_limit(&args);
-            let endpoint = if has_flag(&args, "--json") {
+pub(super) fn trace_cmd(args: TraceArgs, json: bool) -> CliResult<()> {
+    let config = runtime_config(&RuntimeArgs::from_client(args.client))?;
+    let api = config.api.clone();
+    match args.command {
+        TraceCommand::List(args) => {
+            let endpoint = if json {
                 "/api/sessions"
             } else {
                 "/api/sessions.txt"
             };
             println!(
                 "{}",
-                api_request("GET", &api, &format!("{endpoint}?limit={limit}"), "")?
+                api_request("GET", &api, &format!("{endpoint}?limit={}", args.limit), "",)?
             );
             Ok(())
         }
-        "get" => {
-            let id = client_positional(&args).ok_or_else(|| "trace get requires id".to_string())?;
+        TraceCommand::Get(args) => {
             println!(
                 "{}",
-                api_request("GET", &api, &format!("/api/sessions/{id}"), "")?
+                api_request("GET", &api, &format!("/api/sessions/{}", args.id), "")?
             );
             Ok(())
         }
-        "stats" => {
+        TraceCommand::Stats(_) => {
             println!("{}", api_request("GET", &api, "/api/trace/stats", "")?);
             Ok(())
         }
-        "clear" => {
+        TraceCommand::Clear(_) => {
             println!("{}", api_request("POST", &api, "/api/trace/clear", "")?);
             Ok(())
         }
-        "follow" => trace_follow(args, &api),
-        "export" => {
-            let har = has_flag(&args, "--har");
-            let endpoint = if har {
+        TraceCommand::Follow(args) => {
+            let count = args.count.unwrap_or(usize::MAX);
+            let poll_ms = args.poll_ms.unwrap_or(500);
+            if count == 0 {
+                return Ok(());
+            }
+            let mut seen = 0usize;
+            api_stream_lines(
+                &api,
+                &format!(
+                    "/api/sessions/follow?after=0&limit=100&heartbeat_ms={}",
+                    poll_ms.clamp(100, 30_000)
+                ),
+                |line| {
+                    println!("{line}");
+                    seen += 1;
+                    seen < count
+                },
+            )?;
+            Ok(())
+        }
+        TraceCommand::Export(args) => {
+            let endpoint = if args.har {
                 "/api/sessions/export.har"
             } else {
                 "/api/sessions/export.json"
             };
             let body = api_request("GET", &api, endpoint, "")?;
-            if let Some(file) =
-                option_value(&args, "-o").or_else(|| option_value(&args, "--output"))
-            {
-                fs::write(&file, body).map_err(|e| e.to_string())?;
-                println!("wrote {file}");
+            if let Some(file) = args.output {
+                fs::write(&file, body).map_err(|source| {
+                    CliError::io(format!("write trace export {}", file.display()), source)
+                })?;
+                println!("wrote {}", file.display());
             } else {
                 println!("{body}");
             }
             Ok(())
         }
-        _ => Err(format!("unknown trace command `{sub}`")),
     }
 }
 
-pub(super) fn trace_list_limit(args: &[String]) -> String {
-    option_value(args, "-n")
-        .or_else(|| option_value(args, "--limit"))
-        .unwrap_or_else(|| "20".to_string())
-}
-
-pub(super) fn trace_follow(args: Vec<String>, api: &str) -> Result<(), String> {
-    let count = option_value(&args, "--count")
-        .and_then(|value| value.parse::<usize>().ok())
-        .unwrap_or(usize::MAX);
-    let poll_ms = option_value(&args, "--poll-ms")
-        .and_then(|value| value.parse::<u64>().ok())
-        .unwrap_or(500);
-    if count == 0 {
-        return Ok(());
-    }
-    let mut seen = 0usize;
-    api_stream_lines(
-        api,
-        &format!(
-            "/api/sessions/follow?after=0&limit=100&heartbeat_ms={}",
-            poll_ms.clamp(100, 30_000)
-        ),
-        |line| {
-            println!("{line}");
-            seen += 1;
-            Ok(seen < count)
-        },
-    )
-}
-
-pub(super) fn values_cmd(mut args: Vec<String>) -> Result<(), String> {
-    if args.is_empty() {
-        return Err("values command required".to_string());
-    }
-    let sub = args.remove(0);
-    let config = runtime_config(&args)?;
-    let api = config.api;
-    let storage = config.storage;
-    match sub.as_str() {
-        "ls" => match api_request(
+pub(super) fn values_cmd(args: ValuesArgs, json: bool) -> CliResult<()> {
+    let config = runtime_config(&RuntimeArgs::from_client(args.client))?;
+    let api = config.api.clone();
+    let storage = config.storage.clone();
+    match args.command {
+        ValuesCommand::List(_) => match api_request(
             "GET",
             &api,
-            if has_flag(&args, "--json") {
+            if json {
                 "/api/values"
             } else {
                 "/api/values.txt"
@@ -124,10 +107,13 @@ pub(super) fn values_cmd(mut args: Vec<String>) -> Result<(), String> {
                     }
                 }
                 names.sort();
-                if has_flag(&args, "--json") {
+                if json {
                     println!(
                         "{}",
-                        serde_json::to_string(&names).map_err(|error| error.to_string())?
+                        serde_json::to_string(&names).map_err(|source| CliError::Json {
+                            context: "serialize value names",
+                            source,
+                        })?
                     );
                 } else {
                     for name in names {
@@ -137,91 +123,79 @@ pub(super) fn values_cmd(mut args: Vec<String>) -> Result<(), String> {
                 Ok(())
             }
         },
-        "cat" => {
-            let key =
-                client_positional(&args).ok_or_else(|| "values cat requires key".to_string())?;
+        ValuesCommand::Cat(args) => {
             let value = match api_request(
                 "GET",
                 &api,
-                &format!("/api/values/{}", percent_encode(&key)),
+                &format!("/api/values/{}", percent_encode(&args.key)),
                 "",
             ) {
                 Ok(body) => body,
-                Err(_) => fs::read_to_string(storage.join("values").join(&key))
-                    .map_err(|e| e.to_string())?,
+                Err(_) => {
+                    let path = storage.join("values").join(&args.key);
+                    fs::read_to_string(&path).map_err(|source| {
+                        CliError::io(format!("read value file {}", path.display()), source)
+                    })?
+                }
             };
-            if has_flag(&args, "--json") {
-                println!("{}", serde_json::json!({"key": key, "value": value}));
+            if json {
+                println!("{}", serde_json::json!({"key": args.key, "value": value}));
             } else {
                 print!("{value}");
             }
             Ok(())
         }
-        "set" => {
-            let key =
-                client_positional(&args).ok_or_else(|| "values set requires key".to_string())?;
-            let body = if let Some(file) = option_value(&args, "--file") {
-                fs::read_to_string(file).map_err(|e| e.to_string())?
+        ValuesCommand::Set(args) => {
+            let body = if let Some(file) = args.file {
+                fs::read_to_string(&file).map_err(|source| {
+                    CliError::io(format!("read value input {}", file.display()), source)
+                })?
             } else {
                 read_stdin()?
             };
-            fs::create_dir_all(storage.join("values")).map_err(|e| e.to_string())?;
-            fs::write(storage.join("values").join(&key), &body).map_err(|e| e.to_string())?;
+            let values_dir = storage.join("values");
+            fs::create_dir_all(&values_dir).map_err(|source| {
+                CliError::io(
+                    format!("create values directory {}", values_dir.display()),
+                    source,
+                )
+            })?;
+            let value_path = values_dir.join(&args.key);
+            fs::write(&value_path, &body).map_err(|source| {
+                CliError::io(format!("write value file {}", value_path.display()), source)
+            })?;
             match api_request(
                 "PUT",
                 &api,
-                &format!("/api/values/{}", percent_encode(&key)),
+                &format!("/api/values/{}", percent_encode(&args.key)),
                 &body,
             ) {
-                Ok(resp) => println!("{resp}"),
-                Err(_) => println!("saved value {key} to {}", storage.display()),
+                Ok(response) => println!("{response}"),
+                Err(_) => println!("saved value {} to {}", args.key, storage.display()),
             }
             Ok(())
         }
-        "rm" => {
-            let key =
-                client_positional(&args).ok_or_else(|| "values rm requires key".to_string())?;
-            let _ = fs::remove_file(storage.join("values").join(&key));
+        ValuesCommand::Remove(args) => {
+            let _ = fs::remove_file(storage.join("values").join(&args.key));
             match api_request(
                 "DELETE",
                 &api,
-                &format!("/api/values/{}", percent_encode(&key)),
+                &format!("/api/values/{}", percent_encode(&args.key)),
                 "",
             ) {
-                Ok(resp) => println!("{resp}"),
-                Err(_) => println!("removed value {key} from {}", storage.display()),
+                Ok(response) => println!("{response}"),
+                Err(_) => println!("removed value {} from {}", args.key, storage.display()),
             }
             Ok(())
         }
-        _ => Err(format!("unknown values command `{sub}`")),
     }
 }
 
-pub(super) fn replay_cmd(args: Vec<String>) -> Result<(), String> {
-    let api = runtime_config(&args)?.api;
-    let id = client_positional(&args).ok_or_else(|| "replay requires session id".to_string())?;
+pub(super) fn replay_cmd(args: ReplayArgs) -> CliResult<()> {
+    let api = runtime_config(&RuntimeArgs::from_client(args.client))?.api;
     println!(
         "{}",
-        api_request("POST", &api, &format!("/api/replay/{id}"), "")?
+        api_request("POST", &api, &format!("/api/replay/{}", args.id), "")?
     );
     Ok(())
-}
-
-fn client_positional(args: &[String]) -> Option<String> {
-    positional_skipping_values(
-        args,
-        &[
-            "--api",
-            "--api-token",
-            "--config",
-            "--storage",
-            "--file",
-            "-o",
-            "--output",
-            "-n",
-            "--limit",
-            "--count",
-            "--poll-ms",
-        ],
-    )
 }

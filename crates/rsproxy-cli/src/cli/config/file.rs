@@ -54,10 +54,10 @@ enum SizeValue {
 }
 
 impl SizeValue {
-    fn parse(self, field: &str) -> Result<usize, String> {
+    fn parse(self, _field: &str) -> Result<usize, ConfigError> {
         match self {
             Self::Bytes(bytes) => Ok(bytes),
-            Self::Text(value) => parse_size(&value).map_err(|error| format!("{field}: {error}")),
+            Self::Text(value) => parse_size(&value),
         }
     }
 }
@@ -67,7 +67,7 @@ impl FileConfig {
         self.api.is_some()
     }
 
-    pub(super) fn apply(self, config: &mut AppConfig) -> Result<(), String> {
+    pub(super) fn apply(self, config: &mut AppConfig) -> CliResult<()> {
         if let Some(host) = self.host {
             config.host = host;
         }

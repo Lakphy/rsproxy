@@ -1,0 +1,27 @@
+[package]
+name = "rsproxy-control"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+getrandom.workspace = true
+rsproxy-engine.workspace = true
+rsproxy-rules.workspace = true
+rsproxy-trace.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+time.workspace = true
+tracing.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+windows-sys.workspace = true
+
+[dev-dependencies]
+rsproxy-engine = { workspace = true, features = ["test-support"] }
+
+[lints]
+workspace = true

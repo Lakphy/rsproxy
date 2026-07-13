@@ -1,6 +1,7 @@
 use super::fetch_snapshot;
 use super::format::json_u64;
-use crate::cli::api::api_request;
+use crate::{CliError, CliResult};
+use rsproxy_control::api_request;
 use serde_json::Value as JsonValue;
 use std::time::Instant;
 
@@ -37,7 +38,7 @@ impl TuiApp {
                 status: JsonValue::Null,
                 sessions: Vec::new(),
                 selected_detail: None,
-                error: Some(error),
+                error: Some(error.to_string()),
             },
         };
         if self.selected >= self.snapshot.sessions.len() {
@@ -79,13 +80,15 @@ pub(super) enum DetailTab {
 }
 
 impl DetailTab {
-    pub(super) fn parse(value: &str) -> Result<Self, String> {
+    pub(super) fn parse(value: &str) -> CliResult<Self> {
         match value.trim().to_ascii_lowercase().as_str() {
             "overview" | "meta" => Ok(Self::Overview),
             "headers" | "header" => Ok(Self::Headers),
             "body" => Ok(Self::Body),
             "rules" | "rule" => Ok(Self::Rules),
-            _ => Err("--tab must be overview, headers, body, or rules".to_string()),
+            _ => Err(CliError::Usage(
+                "--tab must be overview, headers, body, or rules".to_string(),
+            )),
         }
     }
 

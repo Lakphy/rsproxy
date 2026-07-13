@@ -115,7 +115,10 @@ fn execute_configuration(root: &Path, item: &OptionClassification) {
         "{} process configuration is empty",
         item.protocol
     );
-    let help = fs::read_to_string(root.join("crates/rsproxy-cli/src/cli/help.rs")).unwrap();
+    let help = ["command.rs", "daemon.rs"]
+        .into_iter()
+        .map(|file| fs::read_to_string(root.join("crates/rsproxy-cli/src/cli").join(file)).unwrap())
+        .collect::<String>();
     let mut seen = BTreeSet::new();
     for option in &item.configuration {
         assert!(

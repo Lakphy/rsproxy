@@ -32,12 +32,13 @@ that emit JSON or NDJSON on stdout keep a clean machine-readable stream. Logging
 is configured through environment variables rather than the runtime TOML file:
 
 ```sh
-RSPROXY_LOG=rsproxy=debug RSPROXY_LOG_FORMAT=text rsproxy run
-RSPROXY_LOG=rsproxy=info RSPROXY_LOG_FORMAT=json rsproxy run
+RSPROXY_LOG=rsproxy_cli=debug RSPROXY_LOG_FORMAT=text rsproxy run
+RSPROXY_LOG=rsproxy_cli=info RSPROXY_LOG_FORMAT=json rsproxy run
 ```
 
 `RSPROXY_LOG` takes precedence over `RUST_LOG`; a blank value falls through to
-the next source, and the default is `rsproxy=info`. The supported formats are
+the next source. The default enables `info` for the current rsproxy workspace
+crate targets. The supported formats are
 `text` (also accepted as `compact`) and `json`. Stable events include
 `daemon_started`, `proxy_listener_bound`, `control_listener_bound`, trust-root
 loading, listener/connection failures, and session completion/failure. API and

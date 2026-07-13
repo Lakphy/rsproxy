@@ -1,0 +1,21 @@
+[package]
+name = "rsproxy-platform"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+base64.workspace = true
+libc.workspace = true
+rcgen.workspace = true
+sha2.workspace = true
+thiserror.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+sha1.workspace = true
+windows-sys.workspace = true
+
+[lints]
+workspace = true

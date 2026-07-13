@@ -91,7 +91,8 @@ WHISTLE_ACTUAL_VERSION=$(jq -r '.version // empty' "$WHISTLE_DIR/package.json")
 
 cd "$ROOT"
 if [ "$SKIP_BUILD" != "1" ]; then
-    cargo build --release -p rsproxy --bin rsproxy --example bench_origin --locked
+    cargo build --release -p rsproxy-cli --bin rsproxy --locked
+    cargo build --release -p rsproxy-engine --example bench_origin --locked
 fi
 ORIGIN_BIN="$ROOT/target/release/examples/bench_origin"
 [ -x "$ORIGIN_BIN" ] || fail 'release bench_origin binary is missing'
@@ -186,5 +187,5 @@ RSPROXY_PERF_OUTPUT="$OUTPUT" \
 cat "$WHISTLE_OUTPUT"
 if [ "$ENFORCE" = "1" ]; then
     RSPROXY_PERF_REQUIRE_WHISTLE=1 \
-        "$ROOT/scripts/check-e2e-performance-targets.sh" "$OUTPUT"
+        cargo xtask targets e2e "$OUTPUT"
 fi

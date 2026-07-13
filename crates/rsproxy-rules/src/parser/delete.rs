@@ -1,22 +1,31 @@
 use super::*;
 
-pub(super) fn parse_delete_ops(args: &[&str]) -> Result<Vec<DeleteOp>, String> {
+pub(super) fn parse_delete_ops(args: &[&str]) -> Result<Vec<DeleteOp>, RuleModelError> {
     if args.is_empty() {
-        return Err("delete requires at least one property".to_string());
+        return Err(RuleModelError::missing(
+            "delete action",
+            "delete requires at least one property",
+        ));
     }
 
     let mut operations = Vec::new();
     for raw in args {
         let property = unquote(raw.trim());
         if property.is_empty() {
-            return Err("delete properties must not be empty".to_string());
+            return Err(RuleModelError::empty(
+                "delete property",
+                "delete properties must not be empty",
+            ));
         }
         parse_delete_property(&property, &mut operations)?;
     }
     Ok(operations)
 }
 
-fn parse_delete_property(property: &str, operations: &mut Vec<DeleteOp>) -> Result<(), String> {
+fn parse_delete_property(
+    property: &str,
+    operations: &mut Vec<DeleteOp>,
+) -> Result<(), RuleModelError> {
     if property.eq_ignore_ascii_case("pathname") {
         operations.push(DeleteOp::Pathname);
         return Ok(());
@@ -25,11 +34,14 @@ fn parse_delete_property(property: &str, operations: &mut Vec<DeleteOp>) -> Resu
         let segment = match segment.to_ascii_lowercase().as_str() {
             "first" => DeletePathSegment::Index(0),
             "last" => DeletePathSegment::Last,
-            _ => DeletePathSegment::Index(
-                segment
-                    .parse::<i32>()
-                    .map_err(|_| format!("invalid pathname segment `{segment}`"))?,
-            ),
+            _ => DeletePathSegment::Index(segment.parse::<i32>().map_err(|source| {
+                RuleModelError::integer(
+                    "pathname segment",
+                    segment,
+                    format!("invalid pathname segment `{segment}`"),
+                    source,
+                )
+            })?),
         };
         operations.push(DeleteOp::PathSegment(segment));
         return Ok(());
@@ -173,7 +185,10 @@ fn parse_delete_property(property: &str, operations: &mut Vec<DeleteOp>) -> Resu
         return Ok(());
     }
 
-    Err(format!("unknown delete property `{property}`"))
+    Err(RuleModelError::unsupported(
+        "delete property",
+        format!("unknown delete property `{property}`"),
+    ))
 }
 
 fn matches_name(input: &str, names: &[&str]) -> bool {
@@ -189,11 +204,12 @@ fn suffix<'a>(input: &'a str, prefix: &str) -> Option<&'a str> {
     head.eq_ignore_ascii_case(prefix).then_some(tail)
 }
 
-fn valid_name(kind: &str, value: &str) -> Result<String, String> {
+fn valid_name(kind: &str, value: &str) -> Result<String, RuleModelError> {
     let value = value.trim();
     if value.is_empty() || value.chars().any(|ch| ch.is_control()) {
-        Err(format!(
-            "{kind} name must be non-empty and contain no control characters"
+        Err(RuleModelError::invalid(
+            "delete property name",
+            format!("{kind} name must be non-empty and contain no control characters"),
         ))
     } else {
         Ok(value.to_string())
@@ -203,13 +219,17 @@ fn valid_name(kind: &str, value: &str) -> Result<String, String> {
 const MAX_BODY_PATH_BYTES: usize = 16 * 1024;
 const MAX_BODY_PATH_SEGMENTS: usize = 128;
 
-fn parse_body_path(input: &str) -> Result<DeleteBodyPath, String> {
+fn parse_body_path(input: &str) -> Result<DeleteBodyPath, RuleModelError> {
     if input.is_empty() {
-        return Err("delete body path must not be empty".to_string());
+        return Err(RuleModelError::empty(
+            "delete body path",
+            "delete body path must not be empty",
+        ));
     }
     if input.len() > MAX_BODY_PATH_BYTES {
-        return Err(format!(
-            "delete body path exceeds {MAX_BODY_PATH_BYTES} bytes"
+        return Err(RuleModelError::limit(
+            "delete body path",
+            format!("delete body path exceeds {MAX_BODY_PATH_BYTES} bytes"),
         ));
     }
 
@@ -218,24 +238,28 @@ fn parse_body_path(input: &str) -> Result<DeleteBodyPath, String> {
     for component in components {
         parse_body_path_component(&component, &mut segments)?;
         if segments.len() > MAX_BODY_PATH_SEGMENTS {
-            return Err(format!(
-                "delete body path exceeds {MAX_BODY_PATH_SEGMENTS} segments"
+            return Err(RuleModelError::limit(
+                "delete body path",
+                format!("delete body path exceeds {MAX_BODY_PATH_SEGMENTS} segments"),
             ));
         }
     }
-    DeleteBodyPath::new(segments).map_err(str::to_string)
+    DeleteBodyPath::new(segments)
 }
 
-fn split_body_path(input: &str) -> Result<Vec<String>, String> {
+fn split_body_path(input: &str) -> Result<Vec<String>, RuleModelError> {
     let mut components = Vec::new();
     let mut current = String::new();
     let mut chars = input.chars();
     while let Some(ch) = chars.next() {
         match ch {
             '\\' => {
-                let escaped = chars
-                    .next()
-                    .ok_or_else(|| "delete body path ends with an escape".to_string())?;
+                let escaped = chars.next().ok_or_else(|| {
+                    RuleModelError::syntax(
+                        "delete body path",
+                        "delete body path ends with an escape",
+                    )
+                })?;
                 current.push('\\');
                 current.push(escaped);
             }
@@ -250,7 +274,7 @@ fn split_body_path(input: &str) -> Result<Vec<String>, String> {
 fn parse_body_path_component(
     input: &str,
     segments: &mut Vec<DeleteBodyPathSegment>,
-) -> Result<(), String> {
+) -> Result<(), RuleModelError> {
     let chars = decode_body_path_component(input)?;
     let mut end = chars.len();
     let mut indexes = Vec::new();
@@ -278,7 +302,7 @@ fn parse_body_path_component(
     Ok(())
 }
 
-fn decode_body_path_component(input: &str) -> Result<Vec<(char, bool)>, String> {
+fn decode_body_path_component(input: &str) -> Result<Vec<(char, bool)>, RuleModelError> {
     let mut decoded = Vec::new();
     let mut chars = input.chars();
     while let Some(ch) = chars.next() {
@@ -286,9 +310,9 @@ fn decode_body_path_component(input: &str) -> Result<Vec<(char, bool)>, String> 
             decoded.push((ch, false));
             continue;
         }
-        let escaped = chars
-            .next()
-            .ok_or_else(|| "delete body path ends with an escape".to_string())?;
+        let escaped = chars.next().ok_or_else(|| {
+            RuleModelError::syntax("delete body path", "delete body path ends with an escape")
+        })?;
         let escaped = match escaped {
             'n' => '\n',
             'r' => '\r',
@@ -302,7 +326,7 @@ fn decode_body_path_component(input: &str) -> Result<Vec<(char, bool)>, String> 
     Ok(decoded)
 }
 
-fn body_array_index(chars: &[(char, bool)]) -> Result<Option<usize>, String> {
+fn body_array_index(chars: &[(char, bool)]) -> Result<Option<usize>, RuleModelError> {
     if chars.is_empty()
         || chars
             .iter()
@@ -312,8 +336,12 @@ fn body_array_index(chars: &[(char, bool)]) -> Result<Option<usize>, String> {
         return Ok(None);
     }
     let value = chars.iter().map(|(ch, _)| *ch).collect::<String>();
-    value
-        .parse::<usize>()
-        .map(Some)
-        .map_err(|_| format!("delete body array index is out of range: `{value}`"))
+    value.parse::<usize>().map(Some).map_err(|source| {
+        RuleModelError::integer(
+            "delete body array index",
+            &value,
+            format!("delete body array index is out of range: `{value}`"),
+            source,
+        )
+    })
 }

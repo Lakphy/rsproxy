@@ -1,4 +1,5 @@
 use super::Value;
+use crate::RuleModelError;
 use std::fmt;
 use std::sync::Arc;
 use std::sync::OnceLock;
@@ -11,16 +12,22 @@ pub struct HostPool {
 }
 
 impl HostPool {
-    pub fn new(addresses: Vec<Value>) -> Result<Self, String> {
+    pub fn new(addresses: Vec<Value>) -> Result<Self, RuleModelError> {
         if addresses.is_empty() {
-            return Err("host requires at least one address".to_string());
+            return Err(RuleModelError::empty(
+                "host addresses",
+                "host requires at least one address",
+            ));
         }
         if addresses.iter().any(|address| match address {
             Value::Inline(value) | Value::File(value) | Value::Reference(value) => {
                 value.trim().is_empty()
             }
         }) {
-            return Err("host addresses cannot be empty".to_string());
+            return Err(RuleModelError::empty(
+                "host address",
+                "host addresses cannot be empty",
+            ));
         }
         Ok(Self {
             addresses: addresses.into(),

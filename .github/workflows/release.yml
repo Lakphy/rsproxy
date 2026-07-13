@@ -70,12 +70,10 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         shell: bash
         run: |
-          version=$(node -p "require('./package.json').version")
-          cargo_version=$(awk '/^\[workspace.package\]$/{found=1;next} /^\[/{found=0} found && /^version = /{gsub(/"/, "", $3); print $3; exit}' Cargo.toml)
-          test "$version" = "$cargo_version"
-          test "$GITHUB_REF_NAME" = "v$version"
+          version=${GITHUB_REF_NAME#v}
+          cargo xtask release "$version" --check
       - name: Build native executable
-        run: cargo build --release -p rsproxy --bin rsproxy --target ${{ matrix.target }} --locked
+        run: cargo build --release -p rsproxy-cli --bin rsproxy --target ${{ matrix.target }} --locked
       - name: Verify native executable
         shell: bash
         run: |

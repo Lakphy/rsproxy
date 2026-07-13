@@ -1,18 +1,21 @@
 use super::*;
 
-pub(super) fn parse_header_op(input: &str) -> Result<HeaderOp, String> {
+pub(super) fn parse_header_op(input: &str) -> Result<HeaderOp, RuleModelError> {
     let input = input.trim();
     if let Some(name) = input.strip_prefix('-') {
         let name = name.trim().to_ascii_lowercase();
         if name.is_empty() {
-            return Err("header remove op needs a name".to_string());
+            return Err(RuleModelError::missing(
+                "header remove operation",
+                "header remove op needs a name",
+            ));
         }
         return Ok(HeaderOp::Remove { name });
     }
     if let Some((name, expression)) = header_replace_parts(input) {
         let name = name.trim().to_ascii_lowercase();
         if name.is_empty() {
-            return Err("header name is empty".to_string());
+            return Err(RuleModelError::empty("header name", "header name is empty"));
         }
         let (pattern, replacement) = parse_header_replacement(expression)?;
         return Ok(HeaderOp::Replace {
@@ -22,11 +25,14 @@ pub(super) fn parse_header_op(input: &str) -> Result<HeaderOp, String> {
         });
     }
     let (name, value) = input.split_once(':').ok_or_else(|| {
-        "header op must be `name: value`, `-name`, or `name ~ /regex/replacement`".to_string()
+        RuleModelError::syntax(
+            "header operation",
+            "header op must be `name: value`, `-name`, or `name ~ /regex/replacement`",
+        )
     })?;
     let name = name.trim().to_ascii_lowercase();
     if name.is_empty() {
-        return Err("header name is empty".to_string());
+        return Err(RuleModelError::empty("header name", "header name is empty"));
     }
     Ok(HeaderOp::Set {
         name,
@@ -42,17 +48,30 @@ fn header_replace_parts(input: &str) -> Option<(&str, &str)> {
     Some((&input[..tilde], &input[tilde + 1..]))
 }
 
-fn parse_header_replacement(expression: &str) -> Result<(RegexReplacePattern, String), String> {
+fn parse_header_replacement(
+    expression: &str,
+) -> Result<(RegexReplacePattern, String), RuleModelError> {
     let expression = expression.trim();
     if !expression.starts_with('/') {
-        return Err("header replacement must use `/regex/replacement`".to_string());
+        return Err(RuleModelError::syntax(
+            "header replacement",
+            "header replacement must use `/regex/replacement`",
+        ));
     }
-    let separator = first_unescaped_slash(expression, 1)
-        .ok_or_else(|| "header replacement must use `/regex/replacement`".to_string())?;
+    let separator = first_unescaped_slash(expression, 1).ok_or_else(|| {
+        RuleModelError::syntax(
+            "header replacement",
+            "header replacement must use `/regex/replacement`",
+        )
+    })?;
     let pattern = unescape_slashes(&expression[1..separator]);
     let replacement = unescape_slashes(&expression[separator + 1..]);
-    let pattern = RegexReplacePattern::new(pattern, false)
-        .map_err(|error| format!("invalid header replacement regex: {error}"))?;
+    let pattern = RegexReplacePattern::new(pattern, false).map_err(|source| {
+        RuleModelError::InvalidRegex {
+            context: "invalid header replacement regex",
+            source: Box::new(source),
+        }
+    })?;
     Ok((pattern, replacement))
 }
 
@@ -84,12 +103,15 @@ fn unescape_slashes(input: &str) -> String {
     output
 }
 
-pub(super) fn parse_cookie_op(input: &str) -> Result<CookieOp, String> {
+pub(super) fn parse_cookie_op(input: &str) -> Result<CookieOp, RuleModelError> {
     let input = input.trim();
     if let Some(name) = input.strip_prefix('-') {
         let name = name.trim().to_string();
         if name.is_empty() {
-            return Err("cookie remove op needs a name".to_string());
+            return Err(RuleModelError::missing(
+                "cookie remove operation",
+                "cookie remove op needs a name",
+            ));
         }
         return Ok(CookieOp::Remove { name });
     }
@@ -98,13 +120,21 @@ pub(super) fn parse_cookie_op(input: &str) -> Result<CookieOp, String> {
         .next()
         .map(str::trim)
         .filter(|part| !part.is_empty())
-        .ok_or_else(|| "cookie op must be `name=value` or `-name`".to_string())?;
-    let (name, value) = first
-        .split_once('=')
-        .ok_or_else(|| "cookie op must be `name=value` or `-name`".to_string())?;
+        .ok_or_else(|| {
+            RuleModelError::syntax(
+                "cookie operation",
+                "cookie op must be `name=value` or `-name`",
+            )
+        })?;
+    let (name, value) = first.split_once('=').ok_or_else(|| {
+        RuleModelError::syntax(
+            "cookie operation",
+            "cookie op must be `name=value` or `-name`",
+        )
+    })?;
     let name = name.trim().to_string();
     if name.is_empty() {
-        return Err("cookie name is empty".to_string());
+        return Err(RuleModelError::empty("cookie name", "cookie name is empty"));
     }
     let mut attrs = Vec::new();
     for part in parts {
@@ -118,7 +148,10 @@ pub(super) fn parse_cookie_op(input: &str) -> Result<CookieOp, String> {
         };
         let attr_name = canonical_cookie_attr_name(attr_name.trim());
         if attr_name.is_empty() {
-            return Err("cookie attribute name is empty".to_string());
+            return Err(RuleModelError::empty(
+                "cookie attribute name",
+                "cookie attribute name is empty",
+            ));
         }
         attrs.push(CookieAttr {
             name: attr_name,
@@ -157,9 +190,12 @@ fn canonical_cookie_attr_name(name: &str) -> String {
     }
 }
 
-pub(super) fn parse_cors_op(args: &[&str]) -> Result<CorsOp, String> {
+pub(super) fn parse_cors_op(args: &[&str]) -> Result<CorsOp, RuleModelError> {
     if args.is_empty() {
-        return Err("res.cors requires at least an origin".to_string());
+        return Err(RuleModelError::missing(
+            "res.cors action",
+            "res.cors requires at least an origin",
+        ));
     }
     let mut origin = None;
     let mut methods = None;
@@ -177,9 +213,12 @@ pub(super) fn parse_cors_op(args: &[&str]) -> Result<CorsOp, String> {
             origin = Some(parse_value(arg)?);
             continue;
         }
-        let (key, value) = arg
-            .split_once('=')
-            .ok_or_else(|| "res.cors detailed arguments must be key=value".to_string())?;
+        let (key, value) = arg.split_once('=').ok_or_else(|| {
+            RuleModelError::syntax(
+                "res.cors argument",
+                "res.cors detailed arguments must be key=value",
+            )
+        })?;
         let key = key.trim().to_ascii_lowercase();
         match key.as_str() {
             "origin" | "allow-origin" => origin = Some(parse_value(value.trim())?),
@@ -190,11 +229,17 @@ pub(super) fn parse_cors_op(args: &[&str]) -> Result<CorsOp, String> {
             }
             "expose" | "expose-headers" => expose = Some(parse_value(value.trim())?),
             "max-age" | "max_age" => max_age = Some(parse_value(value.trim())?),
-            _ => return Err(format!("unknown res.cors argument `{key}`")),
+            _ => {
+                return Err(RuleModelError::unsupported(
+                    "res.cors argument",
+                    format!("unknown res.cors argument `{key}`"),
+                ));
+            }
         }
     }
 
-    let origin = origin.ok_or_else(|| "res.cors requires an origin".to_string())?;
+    let origin = origin
+        .ok_or_else(|| RuleModelError::missing("res.cors origin", "res.cors requires an origin"))?;
     Ok(CorsOp {
         origin,
         methods,
@@ -205,17 +250,23 @@ pub(super) fn parse_cors_op(args: &[&str]) -> Result<CorsOp, String> {
     })
 }
 
-fn parse_bool(input: &str, field: &str) -> Result<bool, String> {
+fn parse_bool(input: &str, field: &str) -> Result<bool, RuleModelError> {
     match input.trim().to_ascii_lowercase().as_str() {
         "true" | "yes" | "1" | "on" => Ok(true),
         "false" | "no" | "0" | "off" => Ok(false),
-        _ => Err(format!("{field} must be true or false")),
+        _ => Err(RuleModelError::invalid(
+            "boolean option",
+            format!("{field} must be true or false"),
+        )),
     }
 }
 
-pub(super) fn parse_cache_op(args: &[&str]) -> Result<CacheOp, String> {
+pub(super) fn parse_cache_op(args: &[&str]) -> Result<CacheOp, RuleModelError> {
     if args.is_empty() {
-        return Err("cache requires at least one directive".to_string());
+        return Err(RuleModelError::missing(
+            "cache action",
+            "cache requires at least one directive",
+        ));
     }
     if args.len() == 1 && args[0].trim().eq_ignore_ascii_case("off") {
         return Ok(CacheOp::Off);
@@ -240,13 +291,19 @@ pub(super) fn parse_cache_op(args: &[&str]) -> Result<CacheOp, String> {
         };
         let name = canonical_cache_directive_name(name);
         if name.is_empty() {
-            return Err("cache directive name is empty".to_string());
+            return Err(RuleModelError::empty(
+                "cache directive name",
+                "cache directive name is empty",
+            ));
         }
         directives.push(CacheDirective { name, value });
     }
 
     if directives.is_empty() {
-        return Err("cache requires at least one directive".to_string());
+        return Err(RuleModelError::missing(
+            "cache action",
+            "cache requires at least one directive",
+        ));
     }
     Ok(CacheOp::Directives(directives))
 }

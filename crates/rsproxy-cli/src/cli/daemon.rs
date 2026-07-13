@@ -1,95 +1,56 @@
-use super::*;
+use super::api_auth::{api_token_path, configure_client_api_auth, prepare_server_api_auth};
+use super::command::RuntimeArgs;
+use super::config::runtime_config;
+use crate::app::{AppConfig, api_display, unix_api_path};
+use crate::{CliError, CliResult, DaemonConflict};
+use rsproxy_control::{self as control, ControlState, api_request, set_api_token};
+use rsproxy_platform::process::{detach_daemon, parse_pid, process_alive, terminate_process};
+use std::env;
+use std::fs::{self, OpenOptions};
+use std::net::TcpListener;
+use std::path::{Path, PathBuf};
+use std::process::{Command, Stdio};
+use std::thread;
+use std::time::Duration;
 
-mod process;
-
-use process::*;
-
-pub(super) fn run_server(args: Vec<String>) -> Result<(), String> {
-    let mut config = runtime_config(&args)?;
+pub(super) fn run_server(args: &RuntimeArgs) -> CliResult<()> {
+    let mut config = runtime_config(args)?;
     prepare_server_api_auth(&mut config)?;
     set_api_token(config.api_token.clone());
 
-    let rules =
-        crate::rule_store::RuleStore::load(&config.storage).map_err(|error| error.to_string())?;
-    let dns_resolver = Arc::new(dns::DnsResolver::new(&config).map_err(|err| err.to_string())?);
     let proxy_addr = format!("{}:{}", config.host, config.port);
-    let proxy_listener = proxy::bind(&proxy_addr)
-        .map_err(|error| format!("bind proxy listener {proxy_addr}: {error}"))?;
+    let proxy_listener = TcpListener::bind(&proxy_addr)
+        .map_err(|source| CliError::io(format!("bind proxy listener {proxy_addr}"), source))?;
     config.port = proxy_listener
         .local_addr()
-        .map_err(|error| format!("read proxy listener address: {error}"))?
+        .map_err(|source| CliError::io("read proxy listener address", source))?
         .port();
-    let control_listener = control::bind(&config.api)
-        .map_err(|error| format!("bind control listener {}: {error}", config.api))?;
-    config.api = control_listener
-        .endpoint()
-        .map_err(|error| format!("read control listener address: {error}"))?;
+    let control_listener = control::bind(&config.api)?;
+    config.api = control_listener.endpoint()?;
 
-    let trace_spill = if config.trace_disk_budget == 0 {
-        None
-    } else {
-        Some(
-            rsproxy_trace::TraceSpillConfig::new(
-                config.storage.join("trace"),
-                config.trace_spill_segment_size as u64,
-                config.trace_disk_budget as u64,
-            )
-            .with_compression(config.trace_spill_compression),
-        )
-    };
-    let state = SharedState {
-        config: config.clone(),
-        rules,
-        trace: rsproxy_trace::TraceStore::new_with_config(rsproxy_trace::TraceStoreConfig {
-            max_sessions: 4096,
-            queue_capacity: config.trace_queue_capacity,
-            memory_budget_bytes: config.trace_memory_budget,
-            queue_memory_budget_bytes: None,
-            body_limit: config.trace_body_limit,
-            spill: trace_spill,
-        }),
-        mitm_cert_cache: Arc::new(std::sync::Mutex::new(MitmCertCache::new(
-            config.mitm_cert_cache_capacity,
-        ))),
-        mitm_failures: Arc::new(std::sync::Mutex::new(MitmFailureCache::new(
-            config.mitm_failure_cache_capacity,
-            config.mitm_failure_ttl,
-        ))),
-        upstream_roots: Arc::new(std::sync::OnceLock::new()),
-        dns_resolver,
-        started_ms: rsproxy_trace::now_millis(),
-    };
-    let _rule_watch = if config.rules_watch {
-        Some(
-            state
-                .rules
-                .watch(config.rules_watch_debounce)
-                .map_err(|error| error.to_string())?,
-        )
-    } else {
-        None
-    };
-    proxy::initialize_upstream_roots(&state);
+    let state = rsproxy_engine::SharedState::new(config.proxy_config_with_ca_material()?)?;
+    let control_state = ControlState::new(config.control_options(), state.handle());
 
-    let (listener_exit_tx, listener_exit_rx) = std::sync::mpsc::channel::<String>();
-    let proxy_state = state.clone();
+    let (listener_exit_tx, listener_exit_rx) = std::sync::mpsc::channel::<CliError>();
+    let proxy_state = state;
     let proxy_exit_tx = listener_exit_tx.clone();
     thread::spawn(move || {
-        let message = match proxy::serve(proxy_listener, proxy_state) {
-            Ok(()) => "proxy listener stopped unexpectedly".to_string(),
-            Err(error) => format!("proxy listener stopped: {error}"),
+        let error = match rsproxy_engine::serve(proxy_listener, proxy_state) {
+            Ok(()) => CliError::ListenerStopped { listener: "proxy" },
+            Err(error) => error.into(),
         };
-        let _ = proxy_exit_tx.send(message);
+        let _ = proxy_exit_tx.send(error);
     });
 
-    let control_state = state.clone();
     let control_exit_tx = listener_exit_tx;
     thread::spawn(move || {
-        let message = match control::serve(control_listener, control_state) {
-            Ok(()) => "control listener stopped unexpectedly".to_string(),
-            Err(error) => format!("control listener stopped: {error}"),
+        let error = match control::serve(control_listener, control_state) {
+            Ok(()) => CliError::ListenerStopped {
+                listener: "control",
+            },
+            Err(error) => error.into(),
         };
-        let _ = control_exit_tx.send(message);
+        let _ = control_exit_tx.send(error);
     });
 
     let config_source = config
@@ -124,34 +85,54 @@ pub(super) fn run_server(args: Vec<String>) -> Result<(), String> {
     );
     let error = listener_exit_rx
         .recv()
-        .unwrap_or_else(|_| "listener supervision channel closed".to_string());
+        .map_err(|source| CliError::ListenerSupervision { source })?;
     tracing::error!(event = "daemon_listener_stopped", error = %error, "daemon listener stopped");
     Err(error)
 }
 
-pub(super) fn start_server(args: Vec<String>) -> Result<(), String> {
-    let mut config = runtime_config(&args)?;
+pub(super) fn start_server(args: &RuntimeArgs) -> CliResult<()> {
+    let mut config = runtime_config(args)?;
     validate_daemon_addresses(&config)?;
     prepare_server_api_auth(&mut config)?;
     set_api_token(config.api_token.clone());
-    fs::create_dir_all(config.storage.join("run")).map_err(|e| e.to_string())?;
+    fs::create_dir_all(config.storage.join("run")).map_err(|source| {
+        CliError::io(
+            format!(
+                "create runtime directory {}",
+                config.storage.join("run").display()
+            ),
+            source,
+        )
+    })?;
     let pid_path = pid_path(&config);
-    if let Ok(raw_pid) = fs::read_to_string(&pid_path) {
-        if let Ok(pid) = parse_pid(&raw_pid)
-            && process_alive(pid)
-        {
-            if daemon_identity_matches(&config) {
-                return Err(format!(
-                    "rsproxy already running with pid {pid} ({})",
-                    pid_path.display()
-                ));
+    match fs::read_to_string(&pid_path) {
+        Ok(raw_pid) => {
+            if let Ok(pid) = parse_pid(&raw_pid)
+                && process_alive(pid)
+            {
+                if daemon_identity_matches(&config) {
+                    return Err(DaemonConflict::AlreadyRunning {
+                        pid,
+                        pid_path: pid_path.clone(),
+                    }
+                    .into());
+                }
+                return Err(DaemonConflict::IdentityMismatch {
+                    pid,
+                    pid_path: pid_path.clone(),
+                    operation: "replace it",
+                }
+                .into());
             }
-            return Err(format!(
-                "pidfile {} references live process {pid}, but daemon identity could not be verified; refusing to replace it",
-                pid_path.display()
+            let _ = fs::remove_file(&pid_path);
+        }
+        Err(source) if source.kind() == std::io::ErrorKind::NotFound => {}
+        Err(source) => {
+            return Err(CliError::io(
+                format!("read pidfile {}", pid_path.display()),
+                source,
             ));
         }
-        let _ = fs::remove_file(&pid_path);
     }
 
     let log_path = config.storage.join("run/rsproxy.log");
@@ -159,30 +140,42 @@ pub(super) fn start_server(args: Vec<String>) -> Result<(), String> {
         .create(true)
         .append(true)
         .open(&log_path)
-        .map_err(|e| format!("open log {}: {e}", log_path.display()))?;
-    let log_err = log.try_clone().map_err(|e| e.to_string())?;
-    let mut command = Command::new(env::current_exe().map_err(|e| e.to_string())?);
+        .map_err(|source| CliError::io(format!("open log {}", log_path.display()), source))?;
+    let log_err = log
+        .try_clone()
+        .map_err(|source| CliError::io(format!("clone log {}", log_path.display()), source))?;
+    let executable =
+        env::current_exe().map_err(|source| CliError::io("resolve current executable", source))?;
+    let mut command = Command::new(executable);
+    command.arg("run");
+    append_runtime_arguments(&mut command, args);
     command
-        .arg("run")
-        .args(args)
         .stdout(Stdio::from(log))
         .stderr(Stdio::from(log_err));
     detach_daemon(&mut command);
-    let mut child = command.spawn().map_err(|e| e.to_string())?;
+    let mut child = command
+        .spawn()
+        .map_err(|source| CliError::io("spawn rsproxy daemon", source))?;
     if let Err(error) = fs::write(&pid_path, child.id().to_string()) {
         let _ = child.kill();
         let _ = child.wait();
         remove_runtime_files(&config, &pid_path);
-        return Err(format!("write pidfile {}: {error}", pid_path.display()));
+        return Err(CliError::io(
+            format!("write pidfile {}", pid_path.display()),
+            error,
+        ));
     }
 
     for _ in 0..50 {
-        if let Ok(Some(status)) = child.try_wait() {
+        if let Some(status) = child
+            .try_wait()
+            .map_err(|source| CliError::io("poll rsproxy daemon", source))?
+        {
             remove_runtime_files(&config, &pid_path);
-            return Err(format!(
-                "rsproxy exited during start with status {status}; see {}",
-                log_path.display()
-            ));
+            return Err(CliError::DaemonExited {
+                status,
+                log_path: log_path.clone(),
+            });
         }
         if daemon_ready(&config) {
             println!(
@@ -207,22 +200,34 @@ pub(super) fn start_server(args: Vec<String>) -> Result<(), String> {
         }
         thread::sleep(Duration::from_millis(100));
     }
-    let error = format!(
-        "rsproxy did not become ready; pid={} log={}",
-        child.id(),
-        log_path.display()
-    );
+    let error = CliError::DaemonReadinessTimeout {
+        pid: child.id(),
+        log_path,
+    };
     let _ = child.kill();
     let _ = child.wait();
     remove_runtime_files(&config, &pid_path);
     Err(error)
 }
 
-pub(super) fn stop_server(args: Vec<String>) -> Result<(), String> {
-    let config = runtime_config(&args)?;
+pub(super) fn stop_server(args: &RuntimeArgs) -> CliResult<()> {
+    let config = runtime_config(args)?;
     let pid_path = pid_path(&config);
-    let raw_pid = fs::read_to_string(&pid_path)
-        .map_err(|_| format!("pidfile not found: {}", pid_path.display()))?;
+    let raw_pid = match fs::read_to_string(&pid_path) {
+        Ok(raw_pid) => raw_pid,
+        Err(source) if source.kind() == std::io::ErrorKind::NotFound => {
+            return Err(DaemonConflict::NotRunning {
+                pid_path: pid_path.clone(),
+            }
+            .into());
+        }
+        Err(source) => {
+            return Err(CliError::io(
+                format!("read pidfile {}", pid_path.display()),
+                source,
+            ));
+        }
+    };
     let pid = match parse_pid(&raw_pid) {
         Ok(pid) => pid,
         Err(_) => {
@@ -236,12 +241,14 @@ pub(super) fn stop_server(args: Vec<String>) -> Result<(), String> {
         println!("removed stale pidfile {}", pid_path.display());
         return Ok(());
     }
-    configure_client_api_auth(&args)?;
+    configure_client_api_auth(&args.client)?;
     if !daemon_identity_matches(&config) {
-        return Err(format!(
-            "pidfile {} references live process {pid}, but daemon identity could not be verified; refusing to terminate it",
-            pid_path.display()
-        ));
+        return Err(DaemonConflict::IdentityMismatch {
+            pid,
+            pid_path: pid_path.clone(),
+            operation: "terminate it",
+        }
+        .into());
     }
     terminate_process(pid)?;
     for _ in 0..50 {
@@ -252,7 +259,7 @@ pub(super) fn stop_server(args: Vec<String>) -> Result<(), String> {
         }
         thread::sleep(Duration::from_millis(100));
     }
-    Err(format!("pid {pid} did not stop in time"))
+    Err(CliError::DaemonStopTimeout { pid })
 }
 
 pub(super) fn pid_path(config: &AppConfig) -> PathBuf {
@@ -266,12 +273,12 @@ fn remove_runtime_files(config: &AppConfig, pid_path: &Path) {
     }
 }
 
-fn validate_daemon_addresses(config: &AppConfig) -> Result<(), String> {
+fn validate_daemon_addresses(config: &AppConfig) -> CliResult<()> {
     if config.port == 0 {
-        return Err(
+        return Err(CliError::Usage(
             "daemon mode requires a non-zero proxy port; use `run` for an ephemeral port"
                 .to_string(),
-        );
+        ));
     }
     if unix_api_path(&config.api).is_none()
         && config
@@ -279,10 +286,10 @@ fn validate_daemon_addresses(config: &AppConfig) -> Result<(), String> {
             .rsplit_once(':')
             .is_some_and(|(_, port)| port == "0")
     {
-        return Err(
+        return Err(CliError::Usage(
             "daemon mode requires a non-zero control port; use `run` for an ephemeral port"
                 .to_string(),
-        );
+        ));
     }
     Ok(())
 }
@@ -305,4 +312,147 @@ fn daemon_status(config: &AppConfig) -> Option<serde_json::Value> {
         && status.get("storage").and_then(|value| value.as_str())
             == Some(config.storage.to_string_lossy().as_ref()))
     .then_some(status)
+}
+
+fn append_runtime_arguments(command: &mut Command, args: &RuntimeArgs) {
+    append_display(command, "--port", args.port);
+    append_string(command, "--host", args.host.as_deref());
+    append_string(command, "--api", args.client.api.as_deref());
+    append_string(command, "--api-token", args.client.api_token.as_deref());
+    append_path(command, "--storage", args.client.storage.as_deref());
+    append_path(command, "--config", args.client.config.as_deref());
+    append_flag(command, "--watch", args.watch);
+    append_display(command, "--watch-debounce-ms", args.watch_debounce_ms);
+    append_string(command, "--proxy-auth", args.proxy_auth.as_deref());
+    append_string(
+        command,
+        "--max-header-size",
+        args.max_header_size.as_deref(),
+    );
+    append_display(command, "--max-header-count", args.max_header_count);
+    append_string(
+        command,
+        "--body-buffer-limit",
+        args.body_buffer_limit.as_deref(),
+    );
+    append_string(
+        command,
+        "--trace-body-limit",
+        args.trace_body_limit.as_deref(),
+    );
+    append_string(command, "--trace-filter", args.trace_filter.as_deref());
+    append_display(command, "--trace-queue-capacity", args.trace_queue_capacity);
+    append_string(
+        command,
+        "--trace-mem-budget",
+        args.trace_mem_budget.as_deref(),
+    );
+    append_string(
+        command,
+        "--trace-segment-size",
+        args.trace_segment_size.as_deref(),
+    );
+    append_string(
+        command,
+        "--trace-disk-budget",
+        args.trace_disk_budget.as_deref(),
+    );
+    append_string(
+        command,
+        "--trace-spill-compression",
+        args.trace_spill_compression.as_deref(),
+    );
+    append_flag(command, "--no-mitm", args.no_mitm);
+    append_flag(command, "--strict-mitm", args.strict_mitm);
+    append_display(
+        command,
+        "--mitm-cert-cache-capacity",
+        args.mitm_cert_cache_capacity,
+    );
+    append_display(
+        command,
+        "--mitm-failure-cache-capacity",
+        args.mitm_failure_cache_capacity,
+    );
+    append_display(
+        command,
+        "--mitm-failure-ttl-seconds",
+        args.mitm_failure_ttl_seconds,
+    );
+    append_display(
+        command,
+        "--connect-probe-timeout-ms",
+        args.connect_probe_timeout_ms,
+    );
+    append_display(
+        command,
+        "--h1-pool-max-active-per-key",
+        args.h1_pool_max_active_per_key,
+    );
+    append_display(
+        command,
+        "--h1-pool-wait-timeout-ms",
+        args.h1_pool_wait_timeout_ms,
+    );
+    append_display(
+        command,
+        "--h2-pool-max-active-streams-per-key",
+        args.h2_pool_max_active_streams_per_key,
+    );
+    append_display(
+        command,
+        "--h2-pool-wait-timeout-ms",
+        args.h2_pool_wait_timeout_ms,
+    );
+    append_display(
+        command,
+        "--tcp-connect-timeout-ms",
+        args.tcp_connect_timeout_ms,
+    );
+    append_display(command, "--dns-timeout-ms", args.dns_timeout_ms);
+    append_display(command, "--dns-cache", args.dns_cache);
+    for server in &args.dns_server {
+        command.args(["--dns-server", server]);
+    }
+    append_display(
+        command,
+        "--client-tls-handshake-timeout-ms",
+        args.client_tls_handshake_timeout_ms,
+    );
+    append_display(
+        command,
+        "--upstream-tls-handshake-timeout-ms",
+        args.upstream_tls_handshake_timeout_ms,
+    );
+    append_display(
+        command,
+        "--upstream-ttfb-timeout-ms",
+        args.upstream_ttfb_timeout_ms,
+    );
+    append_display(command, "--request-timeout-ms", args.request_timeout_ms);
+    append_flag(command, "--no-trace-body", args.no_trace_body);
+}
+
+fn append_string(command: &mut Command, name: &str, value: Option<&str>) {
+    if let Some(value) = value {
+        command.args([name, value]);
+    }
+}
+
+fn append_path(command: &mut Command, name: &str, value: Option<&Path>) {
+    if let Some(value) = value {
+        command.arg(name).arg(value);
+    }
+}
+
+fn append_display<T: ToString>(command: &mut Command, name: &str, value: Option<T>) {
+    if let Some(value) = value {
+        command.arg(name).arg(value.to_string());
+    }
+}
+
+fn append_flag(command: &mut Command, name: &str, enabled: bool) {
+    if enabled {
+        command.arg(name);
+    }
 }

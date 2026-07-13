@@ -192,32 +192,46 @@ fn json_errors_are_single_stable_documents() {
     fs::write(storage.join("broken.toml"), "port = 'not-a-number'\n").unwrap();
     let broken_config = storage.join("broken.toml").display().to_string();
     let cases = [
-        vec!["unknown", "--json"],
-        vec!["rules", "test", "--json"],
-        vec![
-            "status",
-            "--api",
-            "127.0.0.1:1",
-            "--storage",
-            storage.to_str().unwrap(),
-            "--json",
-        ],
-        vec!["status", "--config", &broken_config, "--json"],
+        (vec!["unknown", "--json"], "usage_error", 2),
+        (vec!["rules", "test", "--json"], "usage_error", 2),
+        (
+            vec![
+                "status",
+                "--api",
+                "127.0.0.1:1",
+                "--storage",
+                storage.to_str().unwrap(),
+                "--json",
+            ],
+            "control_error",
+            1,
+        ),
+        (
+            vec!["status", "--config", &broken_config, "--json"],
+            "config_error",
+            1,
+        ),
+        (
+            vec!["stop", "--storage", storage.to_str().unwrap(), "--json"],
+            "daemon_conflict",
+            3,
+        ),
     ];
 
-    for args in cases {
+    for (args, expected_code, expected_exit) in cases {
         let output = Command::new(env!("CARGO_BIN_EXE_rsproxy"))
             .args(&args)
             .env("RSPROXY_HOME", &storage)
             .output()
             .unwrap();
         assert!(!output.status.success(), "{args:?} unexpectedly succeeded");
+        assert_eq!(output.status.code(), Some(expected_exit), "{args:?}");
         assert!(output.stdout.is_empty());
         let error: Value = serde_json::from_slice(&output.stderr)
             .unwrap_or_else(|parse| panic!("{args:?}: {parse}: {}", stderr(&output)));
         assert_eq!(error["schema"], "rsproxy.cli.error/v1");
         assert_eq!(error["ok"], false);
-        assert_eq!(error["error"]["code"], "command_failed");
+        assert_eq!(error["error"]["code"], expected_code);
         assert!(error["error"]["message"].is_string());
         assert_exact_keys(&error, &["error", "ok", "schema"]);
         assert_exact_keys(&error["error"], &["code", "message"]);

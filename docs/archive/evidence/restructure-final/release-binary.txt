@@ -1,0 +1,4 @@
+binary=target/release/rsproxy
+bytes=11964432
+sha256=8004c33b6191006987d183ddca60e83ad7aacf9ae0494b1d838d8d1fe853afb3
+version=rsproxy 0.2.0

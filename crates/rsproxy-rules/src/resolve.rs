@@ -40,7 +40,7 @@ impl RuleSet {
                         code: error.code,
                         group: group.to_string(),
                         line: line_no,
-                        message: error.message,
+                        message: error.source.to_string(),
                     }),
                 }
             }

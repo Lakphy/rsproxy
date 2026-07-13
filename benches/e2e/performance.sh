@@ -85,7 +85,8 @@ done
 
 cd "$ROOT"
 if [ "$SKIP_BUILD" != "1" ]; then
-    cargo build --release -p rsproxy --bin rsproxy --example bench_origin --locked
+    cargo build --release -p rsproxy-cli --bin rsproxy --locked
+    cargo build --release -p rsproxy-engine --example bench_origin --locked
 fi
 
 "$ROOT/target/release/examples/bench_origin" \
@@ -97,7 +98,7 @@ ORIGIN_ADDR=${ORIGIN_ADDR#origin_addr=}
 mkdir -p "$TMP_ROOT/home" "$TMP_ROOT/storage"
 HOME="$TMP_ROOT/home" \
 RSPROXY_HOME="$TMP_ROOT/home" \
-RSPROXY_LOG="rsproxy=info" \
+RSPROXY_LOG="rsproxy_cli=info" \
 RSPROXY_LOG_FORMAT=json \
 "$ROOT/target/release/rsproxy" run \
     --host 127.0.0.1 \

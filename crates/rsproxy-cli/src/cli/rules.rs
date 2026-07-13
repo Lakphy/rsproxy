@@ -1,58 +1,55 @@
-use super::*;
-
 mod bench;
 mod groups;
-mod request;
+pub(super) mod request;
 
-use bench::run_rules_bench;
+use super::command::{RulesArgs, RulesCommand, RuntimeArgs};
+use super::config::runtime_config;
+use super::util::read_stdin;
+use crate::{CliError, CliResult, RuleDiagnostics};
 use groups::{
     load_rule_set, run_rules_cat, run_rules_edit, run_rules_list, run_rules_remove, run_rules_set,
     run_rules_toggle,
 };
-use request::run_rules_test;
+use rsproxy_rules::RuleSet;
+use std::fs;
+
 #[cfg(test)]
 pub(super) use request::{parse_header_arg, response_meta, rules_test_api_path};
-pub(super) use request::{
-    request_body, request_client_ip, request_headers, request_method, request_server_ip,
-    request_url,
-};
 
-pub(super) fn rules_cmd(mut args: Vec<String>) -> Result<(), String> {
-    if args.is_empty() {
-        return Err("rules command required".to_string());
-    }
-    let sub = args.remove(0);
-    let config = runtime_config(&args)?;
-    let api = config.api;
-    let storage = config.storage;
-    match sub.as_str() {
-        "check" => {
-            let text = if let Some(file) = rules_primary_positional(&args) {
-                fs::read_to_string(file).map_err(|e| e.to_string())?
+pub(super) fn rules_cmd(args: RulesArgs, json: bool) -> CliResult<()> {
+    let config = runtime_config(&RuntimeArgs::from_client(args.client))?;
+    let api = config.api.clone();
+    let storage = config.storage.clone();
+    match args.command {
+        RulesCommand::Check(args) => {
+            let text = if let Some(file) = args.file {
+                fs::read_to_string(&file).map_err(|source| {
+                    CliError::io(format!("read rules file {}", file.display()), source)
+                })?
             } else {
                 read_stdin()?
             };
             match RuleSet::parse("default", &text) {
-                Ok(set) if has_flag(&args, "--json") => println!(
+                Ok(set) if json => println!(
                     "{}",
                     serde_json::json!({"ok": true, "rules": set.rules.len()})
                 ),
                 Ok(set) => println!("ok: {} rule(s)", set.rules.len()),
-                Err(errors) => return Err(format_rule_errors(errors)),
+                Err(errors) => return Err(RuleDiagnostics(errors).into()),
             }
             Ok(())
         }
-        "set" => run_rules_set(&args, &api, &storage),
-        "cat" => run_rules_cat(&args, &api, &storage),
-        "edit" => run_rules_edit(&args, &api, &storage),
-        "rm" => run_rules_remove(&args, &api, &storage),
-        "enable" => run_rules_toggle(&args, &api, &storage, true),
-        "disable" => run_rules_toggle(&args, &api, &storage, false),
-        "ls" => run_rules_list(&args, &api, &storage),
-        "stats" => {
-            let rules = load_rule_set(&args, &api, &storage)?;
+        RulesCommand::Set(args) => run_rules_set(&args.group, args.file.as_deref(), &api, &storage),
+        RulesCommand::Cat(args) => run_rules_cat(&args.group, json, &api, &storage),
+        RulesCommand::Edit(args) => run_rules_edit(&args.group, &api, &storage),
+        RulesCommand::Remove(args) => run_rules_remove(&args.group, &api, &storage),
+        RulesCommand::Enable(args) => run_rules_toggle(&args.group, &api, &storage, true),
+        RulesCommand::Disable(args) => run_rules_toggle(&args.group, &api, &storage, false),
+        RulesCommand::List(_) => run_rules_list(json, &api, &storage),
+        RulesCommand::Stats(args) => {
+            let rules = load_rule_set(args.file.as_deref(), &api, &storage)?;
             let stats = rules.stats();
-            if has_flag(&args, "--json") {
+            if json {
                 println!(
                     "{}",
                     serde_json::json!({
@@ -78,15 +75,7 @@ pub(super) fn rules_cmd(mut args: Vec<String>) -> Result<(), String> {
             }
             Ok(())
         }
-        "bench" => run_rules_bench(&args, &api, &storage),
-        "test" => run_rules_test(&args, &api, &storage),
-        _ => Err(format!("unknown rules command `{sub}`")),
+        RulesCommand::Bench(args) => bench::run_rules_bench(args, json, &api, &storage),
+        RulesCommand::Test(args) => request::run_rules_test(args, json, &api, &storage),
     }
-}
-
-fn rules_primary_positional(args: &[String]) -> Option<String> {
-    positional_skipping_values(
-        args,
-        &["--api", "--api-token", "--config", "--storage", "--file"],
-    )
 }

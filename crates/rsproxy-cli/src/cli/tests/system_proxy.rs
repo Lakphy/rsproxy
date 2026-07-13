@@ -1,106 +1,32 @@
-use super::super::*;
+use crate::cli::command::{Cli, ClientArgs, ProxyMutationArgs, ProxyPlatformArg, TopLevelCommand};
+use crate::cli::system_proxy::{
+    SystemProxyResult, proxy_options, proxy_platform, proxy_report_json, proxy_report_lines,
+    proxy_target,
+};
+use clap::Parser;
+use rsproxy_platform::system_proxy::{
+    MacosBypassStatus, MacosEndpointStatus, MacosServiceStatus, ProxyAction, ProxyChange,
+    ProxyCommand, ProxyOutcome, ProxyPlan, ProxyPlanStep, ProxyPlatform, ProxyStatus, ProxyTarget,
+};
+use std::fs;
 
 #[test]
 fn proxy_platform_parses_explicit_aliases() {
+    for (value, expected) in [
+        ("darwin", ProxyPlatform::Macos),
+        ("win", ProxyPlatform::Windows),
+        ("linux", ProxyPlatform::Linux),
+    ] {
+        let cli = Cli::try_parse_from(["rsproxy", "proxy", "status", "--platform", value]).unwrap();
+        let Some(TopLevelCommand::Proxy(args)) = cli.command else {
+            panic!("proxy command expected");
+        };
+        assert_eq!(proxy_platform(args.platform), expected);
+    }
+    assert!(Cli::try_parse_from(["rsproxy", "proxy", "status", "--platform", "freebsd"]).is_err());
     assert_eq!(
-        proxy_platform(&[
-            "status".to_string(),
-            "--platform".to_string(),
-            "darwin".to_string()
-        ])
-        .unwrap(),
-        ProxyPlatform::Macos
-    );
-    assert_eq!(
-        proxy_platform(&[
-            "status".to_string(),
-            "--platform".to_string(),
-            "win".to_string()
-        ])
-        .unwrap(),
+        proxy_platform(Some(ProxyPlatformArg::Windows)),
         ProxyPlatform::Windows
-    );
-    assert_eq!(
-        proxy_platform(&[
-            "status".to_string(),
-            "--platform".to_string(),
-            "linux".to_string()
-        ])
-        .unwrap(),
-        ProxyPlatform::Linux
-    );
-    assert!(
-        proxy_platform(&[
-            "status".to_string(),
-            "--platform".to_string(),
-            "freebsd".to_string(),
-        ])
-        .is_err()
-    );
-}
-
-#[test]
-fn windows_proxy_dry_run_renders_registry_plan() {
-    let bypass = vec!["localhost".to_string(), "*.local".to_string()];
-    let lines = windows_proxy_set_dry_run_lines(true, "127.0.0.1", 18916, Some(&bypass));
-    assert!(
-        lines
-            .iter()
-            .any(|line| line.contains("/v ProxyEnable /t REG_DWORD /d 1 /f"))
-    );
-    assert!(lines.iter().any(|line| {
-        line.contains("/v ProxyServer /t REG_SZ /d http=127.0.0.1:18916;https=127.0.0.1:18916 /f")
-    }));
-    assert!(
-        lines
-            .iter()
-            .any(|line| line.contains("/v ProxyOverride /t REG_SZ /d localhost;*.local /f"))
-    );
-
-    let lines = windows_proxy_set_dry_run_lines(false, "127.0.0.1", 18916, None);
-    assert!(
-        lines
-            .iter()
-            .any(|line| line.contains("/v ProxyEnable /t REG_DWORD /d 0 /f"))
-    );
-    assert!(
-        lines
-            .iter()
-            .any(|line| line.contains("reg delete") && line.contains("/v ProxyServer /f"))
-    );
-    assert!(
-        lines
-            .iter()
-            .any(|line| line.contains("reg delete") && line.contains("/v ProxyOverride /f"))
-    );
-}
-
-#[test]
-fn linux_proxy_dry_run_renders_gsettings_and_env_plan() {
-    let bypass = vec!["localhost".to_string(), "127.0.0.1".to_string()];
-    let lines = linux_proxy_set_dry_run_lines(true, "127.0.0.1", 18916, Some(&bypass));
-    assert!(
-        lines.contains(
-            &"dry-run linux gsettings set org.gnome.system.proxy mode manual".to_string()
-        )
-    );
-    assert!(lines.contains(
-        &"dry-run linux gsettings set org.gnome.system.proxy.http host 127.0.0.1".to_string()
-    ));
-    assert!(lines.contains(
-        &"dry-run linux gsettings set org.gnome.system.proxy.http port 18916".to_string()
-    ));
-    assert!(lines.contains(&"dry-run linux gsettings set org.gnome.system.proxy ignore-hosts \"['localhost', '127.0.0.1']\"".to_string()));
-    assert!(lines.contains(&"dry-run linux env export http_proxy=http://127.0.0.1:18916 https_proxy=http://127.0.0.1:18916 all_proxy=http://127.0.0.1:18916".to_string()));
-
-    let lines = linux_proxy_set_dry_run_lines(false, "127.0.0.1", 18916, None);
-    assert_eq!(
-        lines[0],
-        "dry-run linux gsettings set org.gnome.system.proxy mode none"
-    );
-    assert_eq!(
-        lines[1],
-        "dry-run linux env unset http_proxy https_proxy all_proxy HTTP_PROXY HTTPS_PROXY ALL_PROXY"
     );
 }
 
@@ -112,126 +38,127 @@ fn proxy_target_uses_config_and_cli_precedence() {
         rsproxy_trace::now_millis()
     ));
     fs::write(&path, "host = \"0.0.0.0\"\nport = 18888\n").unwrap();
-    let args = vec!["--config".to_string(), path.display().to_string()];
-    assert_eq!(proxy_target(&args).unwrap(), ("0.0.0.0".to_string(), 18888));
-
-    let args = vec![
-        "--config".to_string(),
-        path.display().to_string(),
-        "--host".to_string(),
-        "127.0.0.1".to_string(),
-        "--port".to_string(),
-        "28888".to_string(),
-    ];
+    let client = ClientArgs {
+        config: Some(path.clone()),
+        ..ClientArgs::default()
+    };
+    let defaults = ProxyMutationArgs {
+        host: None,
+        port: None,
+        bypass: None,
+        all: false,
+    };
     assert_eq!(
-        proxy_target(&args).unwrap(),
+        proxy_target(&client, &defaults).unwrap(),
+        ("0.0.0.0".to_string(), 18888)
+    );
+    let overrides = ProxyMutationArgs {
+        host: Some("127.0.0.1".to_string()),
+        port: Some(28888),
+        bypass: None,
+        all: false,
+    };
+    assert_eq!(
+        proxy_target(&client, &overrides).unwrap(),
         ("127.0.0.1".to_string(), 28888)
     );
     let _ = fs::remove_file(path);
 }
 
-#[cfg(target_os = "macos")]
 #[test]
-fn macos_network_service_parser_filters_headers_disabled_markers_and_blanks() {
-    let output = "An asterisk (*) denotes that a network service is disabled.\nWi-Fi\n*USB 10/100/1000 LAN\n\nThunderbolt Bridge\n";
-    assert_eq!(
-        parse_macos_network_services(output).unwrap(),
-        ["Wi-Fi", "USB 10/100/1000 LAN", "Thunderbolt Bridge"]
-    );
-    assert!(parse_macos_network_services("\nAn asterisk marks disabled services\n").is_err());
+fn proxy_options_parse_cli_selection_and_bypass_without_platform_argv_leaks() {
+    let mutation = ProxyMutationArgs {
+        host: Some("127.0.0.1".to_string()),
+        port: Some(18888),
+        bypass: Some("localhost, *.local, ,".to_string()),
+        all: true,
+    };
+    let options = proxy_options(
+        &ClientArgs::default(),
+        Some("Wi-Fi".to_string()),
+        Some(mutation),
+        ProxyAction::Enable,
+    )
+    .unwrap();
+    assert_eq!(options.target.unwrap().host, "127.0.0.1");
+    assert_eq!(options.service.as_deref(), Some("Wi-Fi"));
+    assert!(options.all_services);
+    assert_eq!(options.bypass.unwrap(), ["localhost", "*.local"]);
+
+    let status = proxy_options(&ClientArgs::default(), None, None, ProxyAction::Status).unwrap();
+    assert!(status.target.is_none());
 }
 
-#[cfg(target_os = "macos")]
 #[test]
-fn macos_proxy_status_and_bypass_parsers_cover_missing_and_invalid_fields() {
-    let status = "Enabled: Yes\nServer: 127.0.0.1\nPort: 18916\nAuthenticated Proxy Enabled: 1\n";
+fn cli_renders_typed_plan_into_the_existing_human_and_json_contracts() {
+    let report = SystemProxyResult::Plan(ProxyPlan {
+        platform: ProxyPlatform::Windows,
+        steps: vec![
+            ProxyPlanStep::Command(ProxyCommand::WindowsRegistry {
+                args: vec![
+                    "add".to_string(),
+                    r"HKCU\Software\Internet Settings".to_string(),
+                    "/v".to_string(),
+                    "ProxyEnable".to_string(),
+                    "/d".to_string(),
+                    "1".to_string(),
+                ],
+            }),
+            ProxyPlanStep::Change(ProxyChange {
+                platform: ProxyPlatform::Windows,
+                enabled: true,
+                target: ProxyTarget {
+                    host: "127.0.0.1".to_string(),
+                    port: 18916,
+                },
+                bypass: None,
+                service: None,
+            }),
+        ],
+    });
     assert_eq!(
-        proxy_status_value(status, "enabled").as_deref(),
-        Some("Yes")
+        proxy_report_lines(&report),
+        [
+            r#"dry-run windows reg add "HKCU\\Software\\Internet Settings" /v ProxyEnable /d 1"#,
+            "proxy_on platform=windows host=127.0.0.1 port=18916",
+        ]
     );
-    assert_eq!(proxy_status_value("malformed", "Enabled"), None);
-    assert_eq!(
-        compact_proxy_status(status),
-        "enabled=Yes server=127.0.0.1 port=18916 authenticated=1"
-    );
-    let json = proxy_status_json(status);
-    assert_eq!(json["enabled"], true);
-    assert_eq!(json["server"], "127.0.0.1");
-    assert_eq!(json["port"], 18916);
-    assert_eq!(json["authenticated"], true);
-
-    let missing = proxy_status_json("Enabled: No\nServer:\nPort: invalid\n");
-    assert_eq!(missing["enabled"], false);
-    assert!(missing["server"].is_null());
-    assert!(missing["port"].is_null());
-    assert_eq!(
-        compact_proxy_status("Enabled: No\nServer:\n"),
-        "enabled=No server=- port=- authenticated=-"
-    );
-
-    assert_eq!(
-        compact_bypass_domains("localhost\n*.local\n"),
-        "localhost,*.local"
-    );
-    assert_eq!(compact_bypass_domains("\n"), "-");
-    assert_eq!(
-        compact_bypass_domains("There aren't any bypass domains"),
-        "-"
-    );
-    assert_eq!(
-        bypass_domains_json("localhost\n*.local"),
-        ["localhost", "*.local"]
-    );
-    assert!(bypass_domains_json("There aren't any").is_empty());
+    let json = proxy_report_json(&report).unwrap();
+    assert_eq!(json["platform"], "windows");
+    assert_eq!(json["dry_run"], true);
+    assert_eq!(json["commands"].as_array().unwrap().len(), 1);
 }
 
-#[cfg(target_os = "macos")]
 #[test]
-fn macos_service_selection_and_dry_run_cover_command_variants() {
-    let explicit = vec!["--service".to_string(), "Wi-Fi".to_string()];
-    assert_eq!(system_proxy_services(&explicit, false).unwrap(), ["Wi-Fi"]);
-    assert!(system_proxy_services(&[], false).is_err());
-
-    let enabled = vec![
-        "on".to_string(),
-        "--platform".to_string(),
-        "macos".to_string(),
-        "--service".to_string(),
-        "Wi-Fi".to_string(),
-        "--host".to_string(),
-        "127.0.0.1".to_string(),
-        "--port".to_string(),
-        "18916".to_string(),
-        "--bypass".to_string(),
-        "localhost, *.local".to_string(),
-        "--dry-run".to_string(),
-    ];
-    macos_system_proxy_set(&enabled, true).unwrap();
-
-    let empty_bypass = vec![
-        "on".to_string(),
-        "--service".to_string(),
-        "USB LAN".to_string(),
-        "--bypass".to_string(),
-        ", ,".to_string(),
-        "--dry-run".to_string(),
-        "--json".to_string(),
-    ];
-    macos_system_proxy_set(&empty_bypass, true).unwrap();
-
-    let disabled = vec![
-        "off".to_string(),
-        "--service".to_string(),
-        "Wi-Fi".to_string(),
-        "--dry-run".to_string(),
-    ];
-    macos_system_proxy_set(&disabled, false).unwrap();
-
-    let status = vec![
-        "status".to_string(),
-        "--service".to_string(),
-        "Wi-Fi".to_string(),
-        "--dry-run".to_string(),
-    ];
-    macos_system_proxy_status(&status).unwrap();
+fn cli_renders_typed_macos_status_without_platform_presentation_fields() {
+    let endpoint = MacosEndpointStatus {
+        enabled: true,
+        server: Some("127.0.0.1".to_string()),
+        port: Some(18916),
+        authenticated: true,
+        reported_enabled: Some("Yes".to_string()),
+        reported_port: Some("18916".to_string()),
+        reported_authenticated: Some("1".to_string()),
+    };
+    let report = SystemProxyResult::Outcome(ProxyOutcome::Status(ProxyStatus::Macos {
+        services: vec![MacosServiceStatus {
+            service: "Wi-Fi".to_string(),
+            http: endpoint.clone(),
+            https: endpoint,
+            bypass: MacosBypassStatus::Domains(vec!["localhost".to_string()]),
+        }],
+    }));
+    assert_eq!(
+        proxy_report_lines(&report),
+        [
+            "service=Wi-Fi",
+            "  http  enabled=Yes server=127.0.0.1 port=18916 authenticated=1",
+            "  https enabled=Yes server=127.0.0.1 port=18916 authenticated=1",
+            "  bypass localhost",
+        ]
+    );
+    let json = proxy_report_json(&report).unwrap();
+    assert_eq!(json["platform"], "macos");
+    assert_eq!(json["services"][0]["http"]["enabled"], true);
+    assert_eq!(json["services"][0]["bypass"][0], "localhost");
 }

@@ -1,3 +1,4 @@
+use crate::RuleModelError;
 use regex::{Regex, RegexBuilder};
 use std::cell::RefCell;
 use std::collections::VecDeque;
@@ -24,7 +25,7 @@ struct ReplaceTransform {
 pub(super) fn apply_replace_transform(
     expression: &str,
     resolve: impl FnOnce(&str) -> String,
-) -> Option<Result<String, String>> {
+) -> Option<Result<String, RuleModelError>> {
     let parsed = match parse_replace_transform(expression) {
         Ok(Some(parsed)) => parsed,
         Ok(None) => return None,
@@ -39,18 +40,22 @@ pub(super) fn apply_replace_transform(
     ))
 }
 
-pub(crate) fn validate_template(input: &str) -> Result<(), String> {
+pub(crate) fn validate_template(input: &str) -> Result<(), RuleModelError> {
     let mut offset = 0;
     while let Some(relative_start) = input[offset..].find("${") {
         let start = offset + relative_start + 2;
-        let end = find_template_end(input, start)
-            .ok_or_else(|| "unterminated template variable".to_string())?;
+        let end = find_template_end(input, start).ok_or_else(|| {
+            RuleModelError::template("template variable", "unterminated template variable")
+        })?;
         let expression = &input[start..end];
         if let Some(transform) = parse_replace_transform(expression)? {
             RegexBuilder::new(&transform.pattern)
                 .case_insensitive(transform.case_insensitive)
                 .build()
-                .map_err(|error| format!("invalid template replace regex: {error}"))?;
+                .map_err(|source| RuleModelError::InvalidRegex {
+                    context: "invalid template replace regex",
+                    source: Box::new(source),
+                })?;
         }
         offset = end + 1;
     }
@@ -81,16 +86,22 @@ pub(super) fn find_template_end(input: &str, start: usize) -> Option<usize> {
     None
 }
 
-fn parse_replace_transform(expression: &str) -> Result<Option<ReplaceTransform>, String> {
+fn parse_replace_transform(expression: &str) -> Result<Option<ReplaceTransform>, RuleModelError> {
     let Some((variable, call)) = expression.split_once(".replace(") else {
         return Ok(None);
     };
     if variable.trim().is_empty() || !call.ends_with(')') {
-        return Err("template replace must be `${var.replace(/regex/, replacement)}`".to_string());
+        return Err(RuleModelError::template(
+            "template replace",
+            "template replace must be `${var.replace(/regex/, replacement)}`",
+        ));
     }
     let arguments = &call[..call.len() - 1];
     if !arguments.starts_with('/') {
-        return Err("template replace regex must start with `/`".to_string());
+        return Err(RuleModelError::template(
+            "template replace regex",
+            "template replace regex must start with `/`",
+        ));
     }
     let (end, case_insensitive, replacement_start) = replace_separator(arguments)?;
     Ok(Some(ReplaceTransform {
@@ -101,7 +112,7 @@ fn parse_replace_transform(expression: &str) -> Result<Option<ReplaceTransform>,
     }))
 }
 
-fn replace_separator(arguments: &str) -> Result<(usize, bool, usize), String> {
+fn replace_separator(arguments: &str) -> Result<(usize, bool, usize), RuleModelError> {
     let mut escaped = false;
     for (index, character) in arguments.char_indices().skip(1) {
         if escaped {
@@ -127,7 +138,10 @@ fn replace_separator(arguments: &str) -> Result<(usize, bool, usize), String> {
             return Ok((index, case_insensitive, start));
         }
     }
-    Err("template replace must separate regex and replacement with a comma".to_string())
+    Err(RuleModelError::template(
+        "template replace",
+        "template replace must separate regex and replacement with a comma",
+    ))
 }
 
 fn replace_cached(
@@ -135,7 +149,7 @@ fn replace_cached(
     pattern: &str,
     case_insensitive: bool,
     replacement: &str,
-) -> Result<String, String> {
+) -> Result<String, RuleModelError> {
     REGEX_CACHE.with(|cache| {
         let mut cache = cache.borrow_mut();
         if let Some(index) = cache.iter().position(|entry| {
@@ -149,7 +163,10 @@ fn replace_cached(
         let regex = RegexBuilder::new(pattern)
             .case_insensitive(case_insensitive)
             .build()
-            .map_err(|error| format!("invalid template replace regex: {error}"))?;
+            .map_err(|source| RuleModelError::InvalidRegex {
+                context: "invalid template replace regex",
+                source: Box::new(source),
+            })?;
         let output = regex.replace_all(input, replacement).into_owned();
         if cache.len() == REGEX_CACHE_CAPACITY {
             cache.pop_front();

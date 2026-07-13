@@ -35,8 +35,9 @@ command -v curl >/dev/null 2>&1 || {
 }
 
 if [ "$SKIP_BUILD" != "1" ]; then
-    cargo build --release -p rsproxy --bin rsproxy \
-        --example bench_origin --example bench_client
+    cargo build --release -p rsproxy-cli --bin rsproxy --locked
+    cargo build --release -p rsproxy-engine \
+        --example bench_origin --example bench_client --locked
 fi
 
 ORIGIN_BIN="$ROOT/target/release/examples/bench_origin"
@@ -66,7 +67,7 @@ done
 mkdir -p "$TMP_ROOT/home" "$TMP_ROOT/storage"
 HOME="$TMP_ROOT/home" \
 RSPROXY_HOME="$TMP_ROOT/home" \
-RSPROXY_LOG="rsproxy=info" \
+RSPROXY_LOG="rsproxy_cli=info" \
 RSPROXY_LOG_FORMAT=json \
 "$PROXY_BIN" run \
     --host 127.0.0.1 \

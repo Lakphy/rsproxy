@@ -3,7 +3,12 @@ exclude = ["fuzz"]
 members = [
     "crates/rsproxy-rules",
     "crates/rsproxy-trace",
+    "crates/rsproxy-net",
+    "crates/rsproxy-engine",
+    "crates/rsproxy-control",
+    "crates/rsproxy-platform",
     "crates/rsproxy-cli",
+    "crates/xtask",
 ]
 resolver = "3"
 
@@ -11,4 +16,76 @@ resolver = "3"
 edition = "2024"
 license = "MIT"
 publish = false
-version = "0.1.0"
+rust-version = "1.88"
+version = "0.2.0"
+
+[workspace.dependencies]
+aho-corasick = "1"
+arc-swap = "1"
+base64 = "0.22"
+bytes = "1"
+clap = { version = "4.6", features = ["derive", "wrap_help"] }
+clap_complete = "4.6"
+criterion = "0.5.1"
+crossterm = "0.29"
+fancy-regex = "0.14"
+getrandom = "0.4"
+http-body = "1"
+http-body-util = "0.1"
+hickory-resolver = "0.26"
+hyper = { version = "1", features = ["client", "http1", "http2", "server"] }
+hyper-util = { version = "0.1", features = ["tokio"] }
+indexmap = { version = "2", features = ["serde"] }
+libc = "0.2"
+notify = "8"
+proptest = "1"
+ratatui = { version = "0.30.2", default-features = false, features = ["crossterm_0_29"] }
+rcgen = { version = "0.14", features = ["pem", "x509-parser"] }
+regex = "1"
+regex-syntax = "0.8"
+semver = "1"
+rsproxy-rules = { path = "crates/rsproxy-rules" }
+rsproxy-trace = { path = "crates/rsproxy-trace" }
+rsproxy-net = { path = "crates/rsproxy-net" }
+rsproxy-engine = { path = "crates/rsproxy-engine" }
+rsproxy-control = { path = "crates/rsproxy-control" }
+rsproxy-platform = { path = "crates/rsproxy-platform" }
+rustls = "0.23"
+rustls-native-certs = "0.8"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha1 = "0.10"
+sha2 = "0.10"
+syn = { version = "2", features = ["full", "visit"] }
+time = { version = "0.3", features = ["formatting"] }
+thiserror = "2"
+tempfile = "3"
+tokio = { version = "1", features = ["io-util", "net", "rt-multi-thread", "sync", "time"] }
+toml = "1.1"
+toml_edit = "0.24"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+webpki-roots = "1"
+windows-sys = { version = "0.61", features = [
+    "Win32_Foundation",
+    "Win32_Networking_WinInet",
+    "Win32_Security",
+    "Win32_Storage_FileSystem",
+    "Win32_System_IO",
+    "Win32_System_Pipes",
+    "Win32_System_ProcessStatus",
+    "Win32_System_Threading",
+] }
+yaml-rust2 = "0.10"
+zstd = "0.13"
+
+[workspace.lints.rust]
+unsafe_code = "deny"
+
+[workspace.lints.clippy]
+all = { level = "deny", priority = -1 }
+
+[profile.release]
+codegen-units = 1
+lto = "thin"
+strip = "symbols"

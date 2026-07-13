@@ -1,35 +1,32 @@
-use super::*;
+use super::groups::load_rule_set;
+use super::request::request_meta;
+use crate::cli::command::RulesBenchArgs;
+use crate::{CliError, CliResult};
+use std::path::Path;
+use std::time::Instant;
 
-pub(super) fn run_rules_bench(args: &[String], api: &str, storage: &Path) -> Result<(), String> {
-    let rules = load_rule_set(args, api, storage)?;
-    let url = option_value(args, "--url")
-        .or_else(|| request_url(args))
-        .ok_or_else(|| "rules bench requires --url URL".to_string())?;
-    let req = RequestMeta {
-        method: request_method(args),
-        headers: request_headers(args)?,
-        body: request_body(args),
-        client_ip: request_client_ip(args),
-        server_ip: request_server_ip(args, &url),
-        url,
-        template: Default::default(),
-    };
-    let iterations = option_value(args, "--iterations")
-        .or_else(|| option_value(args, "-n"))
-        .and_then(|value| value.parse::<usize>().ok())
-        .unwrap_or(10_000)
-        .max(1);
-    let warmup = option_value(args, "--warmup")
-        .and_then(|value| value.parse::<usize>().ok())
-        .unwrap_or(100);
+pub(super) fn run_rules_bench(
+    args: RulesBenchArgs,
+    json: bool,
+    api: &str,
+    storage: &Path,
+) -> CliResult<()> {
+    let rules = load_rule_set(args.source.file.as_deref(), api, storage)?;
+    let url = args
+        .url
+        .or(args.positional_url)
+        .ok_or_else(|| CliError::Usage("rules bench requires --url URL".to_string()))?;
+    let request = request_meta(&args.request, url)?;
+    let iterations = args.iterations.unwrap_or(10_000).max(1);
+    let warmup = args.warmup.unwrap_or(100);
     let mut matched_actions = 0usize;
     for _ in 0..warmup {
-        matched_actions = matched_actions.wrapping_add(rules.resolve(&req).actions.len());
+        matched_actions = matched_actions.wrapping_add(rules.resolve(&request).actions.len());
     }
     let mut samples = Vec::with_capacity(iterations);
     for _ in 0..iterations {
         let started = Instant::now();
-        let result = rules.resolve(&req);
+        let result = rules.resolve(&request);
         matched_actions = matched_actions.wrapping_add(result.actions.len());
         samples.push(started.elapsed().as_nanos());
     }
@@ -38,7 +35,7 @@ pub(super) fn run_rules_bench(args: &[String], api: &str, storage: &Path) -> Res
     let p50_ns = percentile(&samples, 50);
     let p99_ns = percentile(&samples, 99);
     let max_ns = samples.last().copied().unwrap_or(0);
-    if has_flag(args, "--json") {
+    if json {
         println!(
             "{}",
             serde_json::json!({

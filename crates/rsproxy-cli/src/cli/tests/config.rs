@@ -1,4 +1,4 @@
-use super::super::*;
+use super::*;
 
 fn temp_config(name: &str, text: &str) -> PathBuf {
     let path = std::env::temp_dir().join(format!(
@@ -135,22 +135,34 @@ fn config_file_rejects_unknown_invalid_and_missing_inputs() {
     let unknown = temp_config("unknown", "porrt = 8899\n");
     let error =
         runtime_config(&["--config".to_string(), unknown.display().to_string()]).unwrap_err();
-    assert!(error.contains("unknown field"));
-    assert!(error.contains("porrt"));
+    assert!(error.to_string().contains("unknown field"));
+    assert!(error.to_string().contains("porrt"));
 
     let invalid = temp_config("invalid", "h1_pool_wait_timeout_ms = 0\n");
     let error =
         runtime_config(&["--config".to_string(), invalid.display().to_string()]).unwrap_err();
-    assert!(error.contains("h1_pool_wait_timeout_ms must be greater than zero"));
+    assert!(
+        error
+            .to_string()
+            .contains("h1_pool_wait_timeout_ms must be greater than zero")
+    );
 
     let invalid_watch = temp_config("invalid-watch", "watch_debounce_ms = 0\n");
     let error =
         runtime_config(&["--config".to_string(), invalid_watch.display().to_string()]).unwrap_err();
-    assert!(error.contains("watch_debounce_ms must be greater than zero"));
+    assert!(
+        error
+            .to_string()
+            .contains("watch_debounce_ms must be greater than zero")
+    );
     let error =
         runtime_config_without_default(&["--watch-debounce-ms".to_string(), "0".to_string()])
             .unwrap_err();
-    assert!(error.contains("--watch-debounce-ms must be greater than zero"));
+    assert!(
+        error
+            .to_string()
+            .contains("--watch-debounce-ms must be greater than zero")
+    );
 
     let conflicting_mitm = temp_config("conflicting-mitm", "no_mitm = true\nstrict_mitm = true\n");
     let error = runtime_config(&[
@@ -158,7 +170,7 @@ fn config_file_rejects_unknown_invalid_and_missing_inputs() {
         conflicting_mitm.display().to_string(),
     ])
     .unwrap_err();
-    assert!(error.contains("--no-mitm and --strict-mitm"));
+    assert!(error.to_string().contains("--no-mitm and --strict-mitm"));
 
     for (name, text, expected) in [
         (
@@ -185,7 +197,7 @@ fn config_file_rejects_unknown_invalid_and_missing_inputs() {
         let path = temp_config(name, text);
         let error =
             runtime_config(&["--config".to_string(), path.display().to_string()]).unwrap_err();
-        assert!(error.contains(expected));
+        assert!(error.to_string().contains(expected));
         let _ = fs::remove_file(path);
     }
 
@@ -201,7 +213,7 @@ fn config_file_rejects_unknown_invalid_and_missing_inputs() {
     ] {
         let error = runtime_config_without_default(&[option.to_string(), "0".to_string()])
             .expect_err("zero trace capacity must fail");
-        assert!(error.contains(expected));
+        assert!(error.to_string().contains(expected));
     }
 
     let zero_body_limit = temp_config("zero-body-limit", "body_buffer_limit = 0\n");
@@ -210,19 +222,21 @@ fn config_file_rejects_unknown_invalid_and_missing_inputs() {
         zero_body_limit.display().to_string(),
     ])
     .unwrap_err();
-    assert!(error.contains("body_buffer_limit must be greater than zero"));
+    assert!(
+        error
+            .to_string()
+            .contains("body_buffer_limit must be greater than zero")
+    );
 
     let malformed = temp_config("malformed", "port = \"not-a-port\"\n");
     let error =
         runtime_config(&["--config".to_string(), malformed.display().to_string()]).unwrap_err();
-    assert!(error.contains("parse config"));
-    assert!(error.contains("port"));
+    assert!(error.to_string().contains("parse config"));
+    assert!(error.to_string().contains("port"));
 
-    assert!(
-        runtime_config(&["--config".to_string()])
-            .unwrap_err()
-            .contains("--config requires a file path")
-    );
+    let error = runtime_config(&["--config".to_string()]).unwrap_err();
+    assert!(error.to_string().contains("--config"));
+    assert!(error.to_string().contains("value"));
     let missing = std::env::temp_dir().join(format!(
         "rsproxy-config-missing-{}-{}.toml",
         std::process::id(),
@@ -230,7 +244,7 @@ fn config_file_rejects_unknown_invalid_and_missing_inputs() {
     ));
     let error =
         runtime_config(&["--config".to_string(), missing.display().to_string()]).unwrap_err();
-    assert!(error.contains("read config"));
+    assert!(error.to_string().contains("read config"));
 
     let _ = fs::remove_file(unknown);
     let _ = fs::remove_file(invalid);
@@ -281,4 +295,34 @@ fn implicit_control_endpoint_tracks_storage_and_explicit_api_wins() {
     ])
     .unwrap();
     assert_eq!(config.api, "127.0.0.1:19999");
+}
+
+#[test]
+fn composition_root_injects_only_initialized_ca_material() {
+    let storage = std::env::temp_dir().join(format!(
+        "rsproxy-config-ca-material-{}-{}",
+        std::process::id(),
+        rsproxy_trace::now_millis()
+    ));
+    let config =
+        runtime_config_without_default(&["--storage".to_string(), storage.display().to_string()])
+            .unwrap();
+
+    assert!(
+        config
+            .proxy_config_with_ca_material()
+            .unwrap()
+            .ca_material
+            .is_none()
+    );
+
+    let ca_directory = storage.join("ca");
+    rsproxy_platform::ca::initialize_root_ca(&ca_directory, "rsproxy CLI test root", false)
+        .unwrap();
+    let engine = config.proxy_config_with_ca_material().unwrap();
+    let material = engine.ca_material.unwrap();
+    assert!(material.certificate_pem().contains("BEGIN CERTIFICATE"));
+    assert!(material.private_key_pem().contains("BEGIN PRIVATE KEY"));
+
+    let _ = fs::remove_dir_all(storage);
 }
