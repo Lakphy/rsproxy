@@ -215,13 +215,48 @@ bunx --bun @rsproxy/cli@X.Y.Z --version # same artifact under Bun
 To verify an archive: download it and `SHA256SUMS`, then
 `shasum -a 256 --check SHA256SUMS --ignore-missing`.
 
-If the `github-release` job failed after npm publishing succeeded, fix the
-cause and re-run just that job from the workflow run page — the npm packages
-are immutable and must not be republished.
+**Registry propagation**: the source of truth for "published" is the
+`+ @rsproxy/<name>@X.Y.Z` confirmation lines in the publish job log. Newly
+created packages can return 404 from the registry read path for several
+minutes afterwards — poll before assuming a failure. If a package stays
+invisible well beyond that, check the npm account email: npm occasionally
+holds new packages from new publishers for an asynchronous security review.
 
 > 中文:发布后用 `npm view`、`gh release view` 和 `npx` 冒烟验证;归档用
-> `shasum -a 256 --check` 校验。若 npm 已发成功而 GitHub Release 失败,
-> 只重跑该 job,切勿重发 npm 包。
+> `shasum -a 256 --check` 校验。"是否发布成功"以 publish job 日志里的
+> `+ @rsproxy/<name>@X.Y.Z` 确认行为准——新包在 registry 读路径上可能
+> 404 几分钟,先轮询别慌;长时间不可见则查 npm 邮箱,可能触发了新发布者
+> 的异步安全审查。
+
+## Recovering from a failed release(发布失败恢复)
+
+Which recovery applies depends on **where** the tag run failed. Check the
+publish job log for `+ @rsproxy/<name>@X.Y.Z` lines to establish what is
+already public, then follow exactly one row:
+
+| Failure point | State | Recovery |
+| --- | --- | --- |
+| Any `native` job, or the publish job **before** its first successful `npm publish` (inventory check included) | Nothing is public; the version number is still unused | Fix on `main`, wait for CI green, then **move the tag** and let the pipeline rerun (commands below) |
+| `publish` after **some** packages went out | Published versions are immutable | Do **not** move the tag or re-run publish — the remaining packages of that version can be published, but the simplest safe path is a patch bump: full release prep for `X.Y.(Z+1)`, new tag |
+| `github-release` (npm fully published) | npm complete, only the GitHub release is missing | Re-run just that job from the run page (`gh run rerun <run-id> --failed`); never retag or republish |
+
+Moving the tag (first row only):
+
+```sh
+git push origin :refs/tags/vX.Y.Z   # delete remote tag
+git tag -d vX.Y.Z                   # delete local tag
+git tag vX.Y.Z <fixed-commit>       # retag the CI-green fix
+git push origin vX.Y.Z              # pipeline reruns from scratch
+```
+
+Hard rule: a tag may only be moved while the first row holds. The moment any
+npm package of that version is public, the tag is frozen forever.
+
+> 中文:先看 publish 日志里的 `+ @rsproxy/...` 确认行判断"哪些已经公开",
+> 再对号入座:①npm 一个都没发出去(native 失败/清单校验失败)→ 修复、CI
+> 绿后**挪 tag** 重跑,版本号未消耗;②npm 发出去一部分 → 版本不可变,
+> 最稳妥是 patch 递增走完整发布;③只有 GitHub Release 失败 → 只重跑该
+> job。铁律:只要该版本有任何 npm 包已公开,tag 永远冻结不可再挪。
 
 ## Hotfix procedure(热修复流程)
 
@@ -252,6 +287,11 @@ If `main` has not diverged from the release, skip the branch and release from
   already configured. Rotate the token on expiry; a future option is npm
   [Trusted Publishing](https://docs.npmjs.com/generating-provenance-statements)
   (OIDC), which removes the long-lived token entirely.
+- **Provenance manifest contract** — every published `package.json` must
+  declare `repository.url` as `git+https://github.com/Lakphy/rsproxy.git`;
+  the registry rejects provenance publishes otherwise (`E422`). The native
+  package generator stamps it and `packages/npm/tests/package-contract.test.js`
+  enforces it in CI, so a drift fails the distribution job, not the release.
 - **`GITHUB_TOKEN`** — the default workflow token; sufficient for
   `gh release create`. No personal access token is needed.
 - **Dependabot** (`.github/dependabot.yml`) — weekly grouped cargo updates,
@@ -275,5 +315,7 @@ If `main` has not diverged from the release, skip the branch and release from
 
 > 中文:发布只需两个凭据——`NPM_TOKEN`(@rsproxy scope 的自动化 token,
 > 到期轮换,未来可迁移到 OIDC Trusted Publishing)和默认的 `GITHUB_TOKEN`。
-> Dependabot 每周(cargo)/每月(npm、actions)自动开升级 PR,一律过全量
-> CI 与 cargo-deny;whistle 基准夹具依赖除外。
+> provenance 硬性要求每个包清单的 `repository.url` 指向本仓库(否则发布
+> 报 E422),该字段由生成器写入并有契约测试在 CI 兜底。Dependabot 每周
+> (cargo)/每月(npm、actions)自动开升级 PR,一律过全量 CI 与
+> cargo-deny;whistle 基准夹具依赖除外。

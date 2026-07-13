@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Hardened the release SOP with lessons from the v0.0.1 launch: a
+  failure-recovery playbook (when a tag may be moved versus when a version
+  is frozen), registry propagation guidance, the provenance manifest
+  contract, and a mandatory packaging drill before tagging.
+
 ## [0.0.1] - 2026-07-13
 
 Initial public release.
