@@ -140,15 +140,23 @@ function archiveName(name, version) {
 function runPack(manager, directory, dist, manifest) {
   const archive = join(dist, archiveName(manifest.name, manifest.version));
   rmSync(archive, { force: true });
+  // On Windows npm resolves to npm.cmd, which spawnSync can only execute
+  // through a shell; shell mode does not quote arguments, so quote them here.
+  const windows = process.platform === 'win32';
   const command = manager === 'npm' ? 'npm' : 'bun';
   const args = manager === 'npm'
     ? ['pack', '--ignore-scripts', '--pack-destination', dist]
     : ['pm', 'pack', '--ignore-scripts', '--quiet', '--destination', dist];
-  const result = spawnSync(command, args, {
-    cwd: directory,
-    encoding: 'utf8',
-    stdio: ['ignore', 'pipe', 'pipe']
-  });
+  const result = spawnSync(
+    windows ? `${command}.cmd` : command,
+    windows ? args.map((arg) => (/\s/.test(arg) ? `"${arg}"` : arg)) : args,
+    {
+      cwd: directory,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+      shell: windows
+    }
+  );
   if (result.status !== 0) {
     process.stderr.write(result.stdout || '');
     process.stderr.write(result.stderr || '');

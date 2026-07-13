@@ -189,13 +189,19 @@ in-flight release is never cancelled):
    --verify-tag`. This job is the only place granted `contents: write`.
 
 A `workflow_dispatch` run of `release.yml` from a branch exercises the native
-build matrix as a dry run; the version check, archive, publish, and release
-steps are all tag-gated and skipped.
+build matrix **and the npm packaging step** as a dry run; the version check,
+archive, publish, and release steps are all tag-gated and skipped. Run this
+drill before tagging whenever `release.yml`, `scripts/package-npm.sh`, or
+`packages/npm/scripts/` changed — the packaging step runs on all three
+operating systems only inside this workflow, so the drill is the first place
+platform-specific packaging bugs can surface.
 
 > 中文:在 main 上打 `vX.Y.Z` 标签并推送即触发发布:8 平台构建 → npm 发布
 > (10 包,带 provenance)→ npm 成功后才创建 GitHub Release(归档 +
-> SHA256SUMS + CHANGELOG 提取的说明)。手动 `workflow_dispatch` 只演练
-> 构建矩阵,不会发布。
+> SHA256SUMS + CHANGELOG 提取的说明)。手动 `workflow_dispatch` 演练构建
+> 矩阵和 npm 打包步骤但不发布;凡是改过 release.yml 或打包脚本,打 tag 前
+> **必须**先空跑一次演练——打包步骤只有这条 workflow 会在三个操作系统上
+> 执行,平台特有的打包问题只能在演练里提前暴露。
 
 ## Verifying a release(发布验证)
 
