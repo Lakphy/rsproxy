@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Publish a GitHub release on every version tag with one binary archive per
+  target, a `SHA256SUMS` manifest, and notes extracted from this changelog,
+  created only after the npm packages publish successfully.
+- Added Dependabot updates for cargo (weekly, grouped), npm, and
+  github-actions dependencies, all validated by the existing CI gates.
+- Documented the development and release standard operating procedure in
+  `docs/release-process.md` (bilingual English/Chinese).
+
+### Changed
+
+- CI now runs once per change: pushes trigger it only on `main`, pull
+  requests and merge groups cover branches, and superseded PR runs are
+  cancelled through a concurrency group.
+- Split the serial repository-contract CI job into parallel lint,
+  repository-contract, and distribution jobs to shorten the critical path.
+- Serialized release workflow runs with a concurrency group and extended the
+  workflow contracts to scope `contents: write` to the GitHub-release job.
+- Decoupled the performance and fuzz workflows from pushes and PRs: both run
+  on daily schedules plus manual dispatch and must pass before every release.
+- Switched CI test execution to a pinned cargo-nextest, dropped the
+  rarely-hit release-matrix Rust caches so the repository cache quota serves
+  hot PR caches, and tightened CI job timeouts.
+- Gated PR CI runs behind manual approval (`ci-approval` environment): runs
+  wait at no cost until approved from the PR page, and branch protection on
+  `main` requires the gate plus every CI job before merging.
+
 ## [0.2.0] - 2026-07-12
 
 ### Added

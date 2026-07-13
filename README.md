@@ -17,7 +17,7 @@ packages/npm/     npm/Bun launchers, native-target map and package contracts
 docs/             live design docs plus archived qualification evidence
 benches/e2e/      reproducible local proxy benchmark orchestration
 scripts/          process orchestration for coverage, fuzz, packaging and network/resource acceptance
-.github/workflows/ cross-platform CI, performance, fuzz and npm release pipelines
+.github/workflows/ cross-platform CI, performance, fuzz, npm and GitHub release pipelines
 ```
 
 The CLI composition root depends on `{rsproxy-control, rsproxy-engine,
@@ -98,10 +98,12 @@ checked through `cargo xtask targets`; coverage is collected by
 The Whistle comparison uses the lock under `benches/e2e/whistle-driver/` and
 installs its pinned dependency only into ignored `target/bench-deps/` state.
 
-The release workflow builds eight native packages and publishes only to the npm
-registry: `@rsproxy/cli` for npm and `@rsproxy/bun` for Bun. It does not publish
-Cargo crates, standalone GitHub release archives, Homebrew formulae, or other
-installer formats. Workspace and npm versions are synchronized by
+The release workflow builds eight native packages and publishes to the npm
+registry (`@rsproxy/cli` for npm, `@rsproxy/bun` for Bun) and, after npm
+publishing succeeds, to a GitHub Release carrying one binary archive per Rust
+target plus a `SHA256SUMS` manifest, with notes extracted from `CHANGELOG.md`.
+It does not publish Cargo crates, Homebrew formulae, or other installer
+formats. Workspace and npm versions are synchronized by
 `cargo xtask release <VERSION>`; npm packaging reads the authoritative Cargo
 version through `cargo metadata`, not by parsing TOML text. The package contract
 is `scripts/verify.sh package`; current runtime qualification remains local

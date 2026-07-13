@@ -47,6 +47,7 @@ fn violations(root: &Path) -> Result<Vec<Violation>, CheckError> {
             Ok(documents) if documents.len() == 1 => {
                 stable_action_violations(&documents[0], &relative, &mut violations);
                 command_violations(&documents[0], contract.file, &relative, &mut violations);
+                workflow_permission_violations(&documents[0], &relative, &mut violations);
             }
             Ok(documents) => violations.push(Violation::new(
                 &relative,
@@ -138,6 +139,29 @@ fn stable_action(action: &str) -> bool {
         return matches!(reference, "stable" | "nightly") || numeric_version(reference);
     }
     version_tag(reference) || commit_hash(reference)
+}
+
+fn workflow_permission_violations(yaml: &Yaml, path: &Path, violations: &mut Vec<Violation>) {
+    let permissions = &yaml["permissions"];
+    if permissions.as_str() == Some("write-all") {
+        violations.push(Violation::new(
+            path,
+            "workflow-level permissions must not be `write-all`; grant write scopes per job",
+        ));
+    }
+    if let Yaml::Hash(values) = permissions {
+        for (scope, level) in values {
+            if level.as_str() == Some("write") {
+                violations.push(Violation::new(
+                    path,
+                    format!(
+                        "workflow-level permission `{}: write` is forbidden; grant write scopes per job",
+                        scope.as_str().unwrap_or("<non-string>")
+                    ),
+                ));
+            }
+        }
+    }
 }
 
 fn command_violations(yaml: &Yaml, workflow: &str, path: &Path, violations: &mut Vec<Violation>) {

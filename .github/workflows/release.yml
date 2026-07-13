@@ -9,6 +9,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
 env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: "1"
@@ -62,10 +66,6 @@ jobs:
       - name: Install musl linker
         if: matrix.musl
         run: sudo apt-get update && sudo apt-get install --yes musl-tools
-      - name: Restore Rust cache
-        uses: Swatinem/rust-cache@v2
-        with:
-          key: npm-${{ matrix.target }}
       - name: Verify tag and package versions
         if: startsWith(github.ref, 'refs/tags/')
         shell: bash
@@ -90,6 +90,31 @@ jobs:
         with:
           name: npm-${{ matrix.target }}
           path: dist/npm/*.tgz
+          if-no-files-found: error
+          retention-days: 14
+      - name: Package release archive
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        run: |
+          version=${GITHUB_REF_NAME#v}
+          name="rsproxy-v${version}-${{ matrix.target }}"
+          mkdir -p dist/github
+          case "${{ matrix.target }}" in
+            *-windows-*)
+              cp "target/${{ matrix.target }}/release/rsproxy.exe" rsproxy.exe
+              7z a "dist/github/${name}.zip" rsproxy.exe LICENSE README.md
+              ;;
+            *)
+              cp "target/${{ matrix.target }}/release/rsproxy" rsproxy
+              tar -czf "dist/github/${name}.tar.gz" rsproxy LICENSE README.md
+              ;;
+          esac
+      - name: Upload release archive
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: actions/upload-artifact@v6
+        with:
+          name: archive-${{ matrix.target }}
+          path: dist/github
           if-no-files-found: error
           retention-days: 14
 
@@ -157,3 +182,40 @@ jobs:
           npm publish "dist/npm/rsproxy-runtime-$version.tgz" --access public --provenance
           npm publish "dist/npm/rsproxy-cli-$version.tgz" --access public --provenance
           npm publish "dist/npm/rsproxy-bun-$version.tgz" --access public --provenance
+
+  github-release:
+    name: Publish GitHub release
+    if: startsWith(github.ref, 'refs/tags/')
+    needs:
+      - native
+      - publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Download release archives
+        uses: actions/download-artifact@v6
+        with:
+          pattern: archive-*
+          path: dist/github
+          merge-multiple: true
+      - name: Verify archive inventory and assemble checksums
+        shell: bash
+        run: |
+          test "$(find dist/github -maxdepth 1 -type f | wc -l | tr -d ' ')" = 8
+          (cd dist/github && shasum -a 256 rsproxy-* > SHA256SUMS)
+      - name: Extract release notes from the changelog
+        shell: bash
+        run: |
+          version=${GITHUB_REF_NAME#v}
+          awk -v version="$version" '/^## \[/ { flag = index($0, "## [" version "] ") == 1 } flag' CHANGELOG.md > "$RUNNER_TEMP/release-notes.md"
+          test -s "$RUNNER_TEMP/release-notes.md"
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" --verify-tag --title "$GITHUB_REF_NAME" --notes-file "$RUNNER_TEMP/release-notes.md" dist/github/*

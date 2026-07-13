@@ -1,0 +1,37 @@
+# Automated dependency updates. Every Dependabot pull request is validated by
+# the full CI gate (tests, cargo-deny supply-chain policy, --locked builds).
+#
+# Deliberately NOT covered: benches/e2e/whistle-driver. Its whistle@2.10.5
+# dependency is pinned to the vendored fixture snapshot enforced by
+# `cargo xtask check layout`; refreshing it is a manual procedure that
+# regenerates the fixture evidence.
+#
+# Note on github-actions updates: bumping a pinned action (for example
+# actions/checkout@v6 -> @v7) fails `cargo xtask check workflows` until the
+# matching pin in crates/xtask/src/check/workflow_contracts.rs is updated in
+# the same pull request. This lockstep is intentional; see
+# docs/release-process.md.
+version: 2
+updates:
+  - package-ecosystem: cargo
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      cargo-minor-and-patch:
+        update-types:
+          - minor
+          - patch
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 3
+  # The root package.json has no dependencies today; this entry exists so any
+  # future root-level tooling dependency is covered without a config change.
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 3

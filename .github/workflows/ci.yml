@@ -2,19 +2,37 @@ name: CI
 
 on:
   push:
+    branches: [main]
   pull_request:
+  merge_group:
   workflow_dispatch:
 
 permissions:
   contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: "1"
 
 jobs:
+  gate:
+    name: Manual CI approval
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: ci-approval
+    steps:
+      - name: Record CI approval
+        run: echo "CI run approved for $GITHUB_SHA"
+
   workspace:
     name: Workspace (${{ matrix.os }})
+    needs: gate
+    if: ${{ !cancelled() && (needs.gate.result == 'success' || needs.gate.result == 'skipped') }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 40
     strategy:
@@ -33,6 +51,8 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
       - name: Restore Rust cache
         uses: Swatinem/rust-cache@v2
+      - name: Install cargo-nextest
+        run: cargo install cargo-nextest --version 0.9.140 --locked
       - name: Check portable repository contracts
         run: |
           cargo xtask check lines
@@ -42,14 +62,16 @@ jobs:
       - name: Check all targets
         run: cargo check --workspace --all-targets --locked
       - name: Test all targets
-        run: cargo test --workspace --all-targets --no-fail-fast --locked
+        run: cargo nextest run --workspace --all-targets --no-fail-fast --locked
       - name: Build release binaries
         run: cargo build --release --workspace --locked
 
   msrv:
     name: Minimum Rust 1.88
+    needs: gate
+    if: ${{ !cancelled() && (needs.gate.result == 'success' || needs.gate.result == 'skipped') }}
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 15
     steps:
       - name: Check out source
         uses: actions/checkout@v6
@@ -64,10 +86,12 @@ jobs:
       - name: Check workspace at MSRV
         run: cargo check --workspace --locked
 
-  repository-contracts:
-    name: Repository contracts
+  lints:
+    name: Formatting, Clippy, and docs
+    needs: gate
+    if: ${{ !cancelled() && (needs.gate.result == 'success' || needs.gate.result == 'skipped') }}
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 15
     steps:
       - name: Check out source
         uses: actions/checkout@v6
@@ -77,10 +101,56 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
+      - name: Restore Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: lints
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+      - name: Run Clippy
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - name: Check Rust documentation
+        run: RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --locked
+
+  repository-contracts:
+    name: Repository contracts
+    needs: gate
+    if: ${{ !cancelled() && (needs.gate.result == 'success' || needs.gate.result == 'skipped') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Restore Rust cache
+        uses: Swatinem/rust-cache@v2
       - name: Install pinned Rust public-API toolchain
         run: rustup toolchain install nightly-2026-07-10 --profile minimal
       - name: Install Rust public-API checker
         run: cargo install cargo-public-api --version 0.52.0 --locked
+      - name: Check repository structure
+        run: cargo xtask check all
+      - name: Check shell syntax
+        run: find scripts benches -type f -name '*.sh' -exec sh -n {} \;
+      - name: Check fuzz target
+        run: cargo check --manifest-path fuzz/Cargo.toml --bin parse_resolve --locked
+
+  distribution:
+    name: Distribution contracts
+    needs: gate
+    if: ${{ !cancelled() && (needs.gate.result == 'success' || needs.gate.result == 'skipped') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
       - name: Install Node
         uses: actions/setup-node@v6
         with:
@@ -91,18 +161,8 @@ jobs:
           bun-version: 1.3.11
       - name: Restore Rust cache
         uses: Swatinem/rust-cache@v2
-      - name: Check formatting
-        run: cargo fmt --all -- --check
-      - name: Run Clippy
-        run: cargo clippy --workspace --all-targets --locked -- -D warnings
-      - name: Check Rust documentation
-        run: RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --locked
-      - name: Check repository structure
-        run: cargo xtask check all
-      - name: Check shell syntax
-        run: find scripts benches -type f -name '*.sh' -exec sh -n {} \;
-      - name: Check fuzz target
-        run: cargo check --manifest-path fuzz/Cargo.toml --bin parse_resolve --locked
+        with:
+          key: distribution
       - name: Run protocol matrix
         run: ./scripts/verify.sh matrix
       - name: Run action contracts
@@ -112,8 +172,10 @@ jobs:
 
   supply-chain:
     name: Supply chain policy
+    needs: gate
+    if: ${{ !cancelled() && (needs.gate.result == 'success' || needs.gate.result == 'skipped') }}
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 10
     steps:
       - name: Check out source
         uses: actions/checkout@v6
@@ -129,8 +191,10 @@ jobs:
 
   coverage:
     name: Production line coverage
+    needs: gate
+    if: ${{ !cancelled() && (needs.gate.result == 'success' || needs.gate.result == 'skipped') }}
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 45
     steps:
       - name: Check out source
         uses: actions/checkout@v6

@@ -487,24 +487,34 @@ version. `cargo xtask check typed-errors` parses Rust with `syn` and rejects
 
 ## Automation boundaries
 
-`.github/workflows/ci.yml` keeps portable Rust check/test/release-build work in
-an Ubuntu/macOS/Windows matrix and checks the workspace separately on the
-declared Rust 1.88 MSRV. The matrix runs filesystem, source and workflow checks;
-the Ubuntu repository-contract job runs `cargo xtask check all`, including the
-pinned-nightly API snapshot gate, so one checked-in snapshot is not compared
-against three host-specific `cfg` surfaces. Formatting, Clippy, fuzz-target
-compilation, quality-gate contracts and coverage run in dedicated Ubuntu jobs.
-A cargo-deny job enforces advisory, license, ban and registry-source policy.
+`.github/workflows/ci.yml` runs once per change — pushes trigger it only on
+`main`, pull requests and merge groups cover branches, and a concurrency group
+cancels superseded PR runs. It keeps portable Rust check/test/release-build
+work in an Ubuntu/macOS/Windows matrix and checks the workspace separately on
+the declared Rust 1.88 MSRV. The matrix runs filesystem, source and workflow
+checks; the Ubuntu repository-contract job runs `cargo xtask check all`,
+including the pinned-nightly API snapshot gate, so one checked-in snapshot is
+not compared against three host-specific `cfg` surfaces. Formatting, Clippy
+and rustdoc, distribution contracts, fuzz-target compilation and coverage run
+in dedicated parallel Ubuntu jobs. A cargo-deny job enforces advisory,
+license, ban and registry-source policy, and `.github/dependabot.yml` opens
+grouped cargo, npm and github-actions update PRs through the same gates.
 `.github/workflows/performance.yml` compares Criterion
-results for the base and current commits on one runner and blocks regressions
-above 10% through typed `cargo xtask targets` report parsing.
-`.github/workflows/fuzz.yml` owns the daily nightly/libFuzzer run. The npm
+results for the parent and current commits on one runner and blocks
+regressions above 10% through typed `cargo xtask targets` report parsing.
+`.github/workflows/fuzz.yml` owns the nightly libFuzzer run; it and
+`performance.yml` run on daily schedules plus manual dispatch, decoupled from
+pushes and PRs, and are expected to pass before every release. The npm
 distribution boundary lives under `packages/npm/`: `@rsproxy/runtime` resolves
 one of eight OS/architecture/libc packages, while `@rsproxy/cli` and
 `@rsproxy/bun` provide runtime-specific launchers. `release.yml` builds those
-native packages and publishes only to the npm registry, with launchers published
-after every native artifact. Other target mappings are structural contracts in
-this round; current executable qualification remains local macOS ARM64.
+native packages, publishes to the npm registry with launchers published after
+every native artifact, and then — only after npm publishing succeeds — creates
+a GitHub release with one binary archive per target, a `SHA256SUMS` manifest
+and changelog-derived notes; `contents: write` is granted solely to that final
+job. Other target mappings are structural contracts in this round; current
+executable qualification remains local macOS ARM64. The operating procedure
+for development and releases is `docs/release-process.md`.
 
 `cargo xtask check workflows` constrains workflow inventory, YAML syntax,
 permissions, stable action references, triggers, platforms and commands.

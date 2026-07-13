@@ -10,9 +10,20 @@ pub(super) const CONTRACTS: &[WorkflowContract] = &[
         required: &[
             "name: CI",
             "push:",
+            "branches: [main]",
             "pull_request:",
+            "merge_group:",
             "workflow_dispatch:",
             "contents: read",
+            "concurrency:",
+            "group: ci-${{ github.ref }}",
+            "cancel-in-progress: ${{ github.event_name == 'pull_request' }}",
+            // Manual approval gate: PR runs wait for the ci-approval
+            // environment; non-PR events skip the gate and run directly.
+            "environment: ci-approval",
+            "if: github.event_name == 'pull_request'",
+            "needs: gate",
+            "if: ${{ !cancelled() && (needs.gate.result == 'success' || needs.gate.result == 'skipped') }}",
             "fail-fast: false",
             "ubuntu-latest",
             "macos-latest",
@@ -32,7 +43,8 @@ pub(super) const CONTRACTS: &[WorkflowContract] = &[
             "RUSTDOCFLAGS=\"-D warnings\" cargo doc --workspace --no-deps --locked",
             "cargo check --workspace --all-targets --locked",
             "cargo check --workspace --locked",
-            "cargo test --workspace --all-targets --no-fail-fast --locked",
+            "cargo install cargo-nextest --version 0.9.140 --locked",
+            "cargo nextest run --workspace --all-targets --no-fail-fast --locked",
             "cargo build --release --workspace --locked",
             "cargo xtask check all",
             "cargo xtask check lines",
@@ -89,7 +101,6 @@ pub(super) const CONTRACTS: &[WorkflowContract] = &[
         file: "performance.yml",
         required: &[
             "name: Performance",
-            "pull_request:",
             "schedule:",
             "cron: \"41 2 * * *\"",
             "workflow_dispatch:",
@@ -114,6 +125,9 @@ pub(super) const CONTRACTS: &[WorkflowContract] = &[
             "tags:",
             "workflow_dispatch:",
             "contents: read",
+            "concurrency:",
+            "group: release-${{ github.ref }}",
+            "cancel-in-progress: false",
             "fail-fast: false",
             "ubuntu-24.04-arm",
             "macos-15-intel",
@@ -143,8 +157,22 @@ pub(super) const CONTRACTS: &[WorkflowContract] = &[
             "rsproxy-cli",
             "rsproxy-bun",
             "persist-credentials: false",
+            // Job-scoped release permissions and GitHub release assets.
+            "      contents: write",
+            "dist/github",
+            "rsproxy-v${version}-${{ matrix.target }}",
+            "tar -czf",
+            "shasum -a 256",
+            "SHA256SUMS",
+            "GH_TOKEN: ${{ github.token }}",
+            "gh release create \"$GITHUB_REF_NAME\" --verify-tag",
+            "--notes-file",
+            "CHANGELOG.md",
         ],
-        rejected: &["gh release", "*.tar.gz", "contents: write"],
+        // Workflow-level write permissions are rejected structurally for every
+        // workflow (see `workflow_permission_violations`); the six-space
+        // required string above pins the write grant to the job level.
+        rejected: &[],
     },
 ];
 
