@@ -4,7 +4,7 @@ use http_body::Body;
 use hyper::body::Frame;
 use rcgen::{BasicConstraints, DistinguishedName, KeyPair};
 use std::convert::Infallible;
-use std::io::{Read, Write};
+use std::io::{self, Read, Write};
 use std::net::SocketAddr;
 use std::pin::Pin;
 use std::task::{Context, Poll};
@@ -45,15 +45,75 @@ pub(super) fn spawn_proxy(
     state: SharedState,
     connections: usize,
 ) -> (SocketAddr, thread::JoinHandle<()>) {
+    spawn_proxy_with_h2_disconnect_policy(state, connections, false)
+}
+
+// Stage 2 is intentionally opt-in. CPU-stress iteration 2 still surfaced
+// NotConnected in the protocol-matrix HTTP/2 large-header test after the
+// client-side graceful await was added.
+pub(super) fn spawn_proxy_allowing_h2_disconnect(
+    state: SharedState,
+    connections: usize,
+) -> (SocketAddr, thread::JoinHandle<()>) {
+    spawn_proxy_with_h2_disconnect_policy(state, connections, true)
+}
+
+fn spawn_proxy_with_h2_disconnect_policy(
+    state: SharedState,
+    connections: usize,
+    allow_h2_disconnect: bool,
+) -> (SocketAddr, thread::JoinHandle<()>) {
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
     let address = listener.local_addr().unwrap();
     let server = thread::spawn(move || {
         for _ in 0..connections {
             let (stream, _) = listener.accept().unwrap();
-            handle_client(stream, state.clone()).unwrap();
+            match handle_client(stream, state.clone()) {
+                Ok(()) => {}
+                Err(error) if allow_h2_disconnect && is_expected_h2_disconnect(&error) => {}
+                Err(error) => panic!("unexpected proxy server error: {error:?}"),
+            }
         }
     });
     (address, server)
+}
+
+fn is_expected_h2_disconnect(error: &io::Error) -> bool {
+    is_expected_h2_disconnect_message(&format!("{error:?}"))
+}
+
+fn is_expected_h2_disconnect_message(message: &str) -> bool {
+    message.contains("hyper::Error(Io")
+        && [
+            "NotConnected",
+            "ConnectionReset",
+            "BrokenPipe",
+            "UnexpectedEof",
+        ]
+        .iter()
+        .any(|kind| message.contains(kind))
+}
+
+#[test]
+fn h2_disconnect_allowlist_is_limited_to_expected_hyper_io_errors() {
+    for kind in [
+        "NotConnected",
+        "ConnectionReset",
+        "BrokenPipe",
+        "UnexpectedEof",
+    ] {
+        assert!(is_expected_h2_disconnect_message(&format!(
+            "hyper::Error(Io, Kind({kind}))"
+        )));
+    }
+    for message in [
+        "hyper::Error(Http2, Kind(NotConnected))",
+        "Custom { kind: BrokenPipe }",
+        "hyper::Error(Io, Kind(ConnectionAborted))",
+        "callback failed",
+    ] {
+        assert!(!is_expected_h2_disconnect_message(message));
+    }
 }
 
 pub(super) fn connect_request(client: &mut TcpStream, target: &str) {

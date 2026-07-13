@@ -249,7 +249,7 @@ fn oversized_h2_upload_streams_to_h2_origin_with_trailers() {
     let state = streaming_state("h2-to-h2-stream", host, origin);
     let (origin_started, observation, origin_stage, origin_server) =
         spawn_h2_origin(listener, &state, host);
-    let (proxy, proxy_server) = spawn_proxy(state.clone(), 1);
+    let (proxy, proxy_server) = spawn_proxy_allowing_h2_disconnect(state.clone(), 1);
     let mut client = connect_client(proxy);
     connect_request(&mut client, &format!("{host}:443"));
     let mut client = h2_tls_client(client, &state, host);
@@ -265,9 +265,7 @@ fn oversized_h2_upload_streams_to_h2_origin_with_trailers() {
                 .handshake(io)
                 .await
                 .unwrap();
-        let connection = tokio::spawn(async move {
-            let _ = connection.await;
-        });
+        let connection = tokio::spawn(connection);
         let (body_sender, body) = channel_request_body(2);
         let request = Request::builder()
             .method("POST")
@@ -317,8 +315,11 @@ fn oversized_h2_upload_streams_to_h2_origin_with_trailers() {
             response.into_body().collect().await.unwrap().to_bytes(),
             Bytes::from_static(b"ok")
         );
-        connection.abort();
-        let _ = connection.await;
+        tokio::time::timeout(Duration::from_secs(3), connection)
+            .await
+            .expect("h2 client connection should close within the shutdown deadline")
+            .expect("h2 client connection task should not panic")
+            .expect("h2 client connection should shut down cleanly after GOAWAY");
     });
 
     let observation = observation.recv_timeout(Duration::from_secs(3)).unwrap();

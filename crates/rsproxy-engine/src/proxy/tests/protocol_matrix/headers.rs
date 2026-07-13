@@ -33,7 +33,7 @@ fn h1_large_header_accepts_200kb_and_rejects_over_limit_with_431() {
 fn h2_large_header_accepts_200kb_and_rejects_over_limit_with_431() {
     let mut state = isolated_state("protocol-h2-headers", "headers.matrix.test status(209)");
     state.config.max_header_size = HEADER_LIMIT;
-    let (proxy, proxy_server) = spawn_proxy(state.clone(), 1);
+    let (proxy, proxy_server) = spawn_proxy_allowing_h2_disconnect(state.clone(), 1);
     let mut client = connect_client(proxy);
     connect_request(&mut client, "headers.matrix.test:443");
     let mut client = h2_tls_client(client, &state, "headers.matrix.test");
@@ -48,9 +48,7 @@ fn h2_large_header_accepts_200kb_and_rejects_over_limit_with_431() {
                 .handshake(io)
                 .await
                 .unwrap();
-        let connection = tokio::spawn(async move {
-            let _ = connection.await;
-        });
+        let connection = tokio::spawn(connection);
 
         let allowed = h2_request(&mut sender, "/allowed", ALLOWED_HEADER_BYTES).await;
         assert_eq!(allowed.0, StatusCode::from_u16(209).unwrap());
@@ -61,8 +59,11 @@ fn h2_large_header_accepts_200kb_and_rejects_over_limit_with_431() {
         assert!(body.contains(&HEADER_LIMIT.to_string()));
 
         drop(sender);
-        connection.abort();
-        let _ = connection.await;
+        tokio::time::timeout(Duration::from_secs(3), connection)
+            .await
+            .expect("h2 client connection should close within the shutdown deadline")
+            .expect("h2 client connection task should not panic")
+            .expect("h2 client connection should shut down cleanly after GOAWAY");
     });
 
     proxy_server.join().unwrap();

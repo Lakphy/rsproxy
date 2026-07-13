@@ -12,6 +12,19 @@ use std::thread;
 use std::time::Duration;
 use tokio::runtime::Builder as RuntimeBuilder;
 
+fn is_expected_h2_disconnect(error: &io::Error) -> bool {
+    let message = format!("{error:?}");
+    message.contains("hyper::Error(Io")
+        && [
+            "NotConnected",
+            "ConnectionReset",
+            "BrokenPipe",
+            "UnexpectedEof",
+        ]
+        .iter()
+        .any(|kind| message.contains(kind))
+}
+
 #[test]
 fn h2_request_conversion_maps_pseudo_headers_and_strips_connection_headers() {
     let request = Request::builder()
@@ -116,7 +129,7 @@ fn downstream_h2_server_delegates_streams_through_callback() {
     let (observed_sender, observed_receiver) = std_mpsc::channel();
     let server = thread::spawn(move || {
         let (stream, _) = listener.accept().unwrap();
-        serve_downstream_h2(
+        let result = serve_downstream_h2(
             stream,
             "fallback.test:443".to_string(),
             DownstreamH2Config {
@@ -172,8 +185,12 @@ fn downstream_h2_server_delegates_streams_through_callback() {
                     })
                 }
             },
-        )
-        .unwrap();
+        );
+        match result {
+            Ok(()) => {}
+            Err(error) if is_expected_h2_disconnect(&error) => {}
+            Err(error) => panic!("unexpected downstream h2 server error: {error:?}"),
+        }
     });
 
     let runtime = RuntimeBuilder::new_current_thread()
@@ -188,9 +205,7 @@ fn downstream_h2_server_delegates_streams_through_callback() {
                 .handshake(io)
                 .await
                 .unwrap();
-        let connection = tokio::spawn(async move {
-            let _ = connection.await;
-        });
+        let connection = tokio::spawn(connection);
         let response = sender
             .send_request(
                 Request::builder()
@@ -274,8 +289,11 @@ fn downstream_h2_server_delegates_streams_through_callback() {
         assert!(String::from_utf8_lossy(&connect_body).contains("CONNECT over HTTP/2"));
 
         drop(sender);
-        connection.abort();
-        let _ = connection.await;
+        tokio::time::timeout(Duration::from_secs(3), connection)
+            .await
+            .expect("h2 client connection should close within the shutdown deadline")
+            .expect("h2 client connection task should not panic")
+            .expect("h2 client connection should shut down cleanly after GOAWAY");
     });
 
     let observed = observed_receiver

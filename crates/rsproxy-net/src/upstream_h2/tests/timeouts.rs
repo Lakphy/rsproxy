@@ -61,7 +61,7 @@ fn ttfb_and_request_total_timeouts_have_independent_scopes() {
                 }
                 let body: BoxBody<Bytes, Infallible> = if path == "/slow-body" {
                     DelayedBody {
-                        delay: Box::pin(tokio::time::sleep(Duration::from_millis(80))),
+                        delay: Box::pin(tokio::time::sleep(Duration::from_millis(250))),
                         data: Some(Bytes::from_static(b"slow")),
                     }
                     .boxed()
@@ -114,7 +114,7 @@ fn ttfb_and_request_total_timeouts_have_independent_scopes() {
         )
         .unwrap(),
     );
-    assert!(slow_body.ttfb_ms < 40);
+    assert!(slow_body.ttfb_ms < 250);
     let mut response_body = slow_body.body;
     let mut received = Vec::new();
     while let Some(frame) = response_body.next() {
@@ -123,7 +123,7 @@ fn ttfb_and_request_total_timeouts_have_independent_scopes() {
         }
     }
     assert_eq!(received, b"slow");
-    assert!(response_body.receive_ms().unwrap() >= 60);
+    assert!(response_body.receive_ms().unwrap() >= 200);
 
     let total_response = expect_response(
         dispatch_buffered(

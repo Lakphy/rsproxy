@@ -121,7 +121,7 @@ fn downstream_h2_request_and_response_stream_with_bounded_backpressure() {
             .unwrap();
         download_stream.flush().unwrap();
     });
-    let (proxy_address, proxy_server) = spawn_proxy(state.clone(), 1);
+    let (proxy_address, proxy_server) = spawn_proxy_allowing_h2_disconnect(state.clone(), 1);
     let mut client = connect_client(proxy_address);
     connect_request(&mut client, "stream.test:443");
     let mut tls = h2_tls_client(client, &state, "stream.test");
@@ -135,9 +135,7 @@ fn downstream_h2_request_and_response_stream_with_bounded_backpressure() {
         let io = TokioIo::new(rsproxy_net::AsyncIo::new(tls).unwrap());
         let builder = hyper::client::conn::http2::Builder::new(TokioExecutor::new());
         let (mut sender, connection) = builder.handshake(io).await.unwrap();
-        let connection_task = tokio::spawn(async move {
-            let _ = connection.await;
-        });
+        let connection_task = tokio::spawn(connection);
         let (body_sender, body) = channel_request_body(2);
         let request = Request::builder()
             .method("POST")
@@ -270,8 +268,11 @@ fn downstream_h2_request_and_response_stream_with_bounded_backpressure() {
         );
         assert_eq!(response_trailers["x-origin-end"], "done");
         assert_eq!(response_trailers["x-rule-end"], "yes");
-        connection_task.abort();
-        let _ = connection_task.await;
+        tokio::time::timeout(Duration::from_secs(3), connection_task)
+            .await
+            .expect("h2 client connection should close within the shutdown deadline")
+            .expect("h2 client connection task should not panic")
+            .expect("h2 client connection should shut down cleanly after GOAWAY");
     });
 
     let observation = observation_receiver
