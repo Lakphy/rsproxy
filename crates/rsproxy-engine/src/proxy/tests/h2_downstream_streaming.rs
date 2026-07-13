@@ -33,6 +33,10 @@ fn downstream_h2_request_and_response_stream_with_bounded_backpressure() {
     let mut state = isolated_state("h2-streaming", &rules);
     state.config.body_buffer_limit = 32 * 1024;
     state.config.trace_body_limit = 1024;
+    let mut completed_sessions = state
+        .trace
+        .follow(0, 0, 2)
+        .expect("trace collector should accept a completion subscription");
     let (cert_path, key_path) = ensure_leaf_certificate(
         &state.config.storage.join("ca"),
         state.config.ca_material.as_ref().unwrap(),
@@ -288,6 +292,12 @@ fn downstream_h2_request_and_response_stream_with_bounded_backpressure() {
     );
     origin_server.join().unwrap();
     proxy_server.join().unwrap();
+
+    for _ in 0..2 {
+        completed_sessions
+            .recv_timeout(Duration::from_secs(3))
+            .expect("both streaming sessions should complete within the trace deadline");
+    }
 
     let sessions = state.trace.list(10);
     assert_eq!(sessions.len(), 2);

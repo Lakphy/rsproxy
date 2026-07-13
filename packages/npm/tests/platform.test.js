@@ -51,7 +51,7 @@ test('detects Linux libc from override, runtime report, and ldd', () => {
   assert.equal(detectLinuxLibc({
     env: {},
     versions: {},
-    report: undefined,
+    report: null,
     spawn: () => ({ stdout: '', stderr: 'musl libc' })
   }), 'musl');
 });
