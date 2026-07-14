@@ -365,6 +365,9 @@ fn windows_daemon_uses_the_authenticated_named_pipe_control_plane() {
         let port = proxy_port.to_string();
         let mut rsproxy = Command::new(env!("CARGO_BIN_EXE_rsproxy"));
         rsproxy.arg(command);
+        if command == "status" {
+            rsproxy.arg("--json");
+        }
         rsproxy.args(["--api", &pipe, "--storage"]).arg(&storage);
         if matches!(command, "start" | "run" | "restart") {
             rsproxy.args([
