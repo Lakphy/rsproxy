@@ -113,7 +113,7 @@ fn execute_configuration(root: &Path, item: &OptionClassification) {
         "{} process configuration is empty",
         item.protocol
     );
-    let help = ["command.rs", "daemon.rs"]
+    let help = ["command.rs", "daemon.rs", "daemon/args.rs"]
         .into_iter()
         .map(|file| fs::read_to_string(root.join("crates/rsproxy-cli/src/cli").join(file)).unwrap())
         .collect::<String>();

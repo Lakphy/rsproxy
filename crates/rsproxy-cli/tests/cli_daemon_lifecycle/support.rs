@@ -39,9 +39,13 @@ impl DaemonHarness {
     pub(super) fn run(&self, command: &str) -> Output {
         let proxy_port = self.proxy_port.to_string();
         let api = format!("127.0.0.1:{}", self.api_port);
+        let mut rsproxy = Command::new(env!("CARGO_BIN_EXE_rsproxy"));
+        rsproxy.arg(command);
+        if command == "status" {
+            rsproxy.arg("--json");
+        }
         command_output(
-            Command::new(env!("CARGO_BIN_EXE_rsproxy"))
-                .arg(command)
+            rsproxy
                 .args([
                     "--host",
                     "127.0.0.1",

@@ -480,8 +480,7 @@ pub fn process_executable_path(_pid: u32) -> Option<std::path::PathBuf> {
 #[cfg(unix)]
 /// Selects a Unix-domain control socket path for the given storage root.
 ///
-/// Paths up to 96 display bytes remain under `storage/run`; longer paths use a deterministic
-/// per-user name in `/tmp` to stay below common Unix socket address limits.
+/// Paths up to 96 display bytes remain under `storage/run`; longer paths use a deterministic per-user `/tmp` name.
 pub fn unix_control_socket_path(storage: &std::path::Path) -> std::path::PathBuf {
     use sha2::{Digest, Sha256};
 

@@ -97,20 +97,17 @@ impl EngineHandle {
         }
     }
 
-    /// Reissues captured request data directly to its HTTP origin over HTTP/1.1.
+    /// Reissues captured request data directly to its HTTP or HTTPS origin over HTTP/1.1.
     ///
-    /// Replay currently rejects non-`http` URLs, bypasses the rule and upstream
+    /// Replay rejects non-HTTP(S) URLs, bypasses the rule and upstream
     /// routing pipelines, and sends the captured request body prefix, which may
     /// be truncated relative to the original request. Response headers use the
-    /// configured header limits. The response is read to EOF; [`ReplayResponse::body_head`]
-    /// retains at most 64 KiB while [`ReplayResponse::response_bytes`] reports
-    /// the complete number of bytes read.
+    /// configured resolver, connect, response-head, and request-total timeouts.
+    /// The response is read to EOF; [`ReplayResponse::body_head`] retains at
+    /// most 64 KiB while [`ReplayResponse::response_bytes`] reports the complete
+    /// number of bytes read.
     pub fn replay(&self, session: &Session) -> EngineResult<ReplayResponse> {
-        crate::replay::replay_session(
-            session,
-            self.state.config.max_header_size,
-            self.state.config.max_header_count,
-        )
+        crate::replay::replay_session(session, &self.state)
     }
 }
 

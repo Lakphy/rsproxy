@@ -155,7 +155,9 @@ pub mod rsproxy_platform::process
 pub fn rsproxy_platform::process::detach_daemon(&mut std::process::Command)
 pub fn rsproxy_platform::process::force_terminate_process(u32) -> rsproxy_platform::PlatformResult<()>
 pub fn rsproxy_platform::process::parse_pid(&str) -> rsproxy_platform::PlatformResult<u32>
+pub fn rsproxy_platform::process::pid_listening_on(&str, u16) -> core::option::Option<u32>
 pub fn rsproxy_platform::process::process_alive(u32) -> bool
+pub fn rsproxy_platform::process::process_executable_path(u32) -> core::option::Option<std::path::PathBuf>
 pub fn rsproxy_platform::process::resident_kib(u32) -> core::option::Option<u64>
 pub fn rsproxy_platform::process::terminate_process(u32) -> rsproxy_platform::PlatformResult<()>
 pub fn rsproxy_platform::process::unix_control_socket_path(&std::path::Path) -> std::path::PathBuf

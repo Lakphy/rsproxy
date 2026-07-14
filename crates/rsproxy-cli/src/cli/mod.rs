@@ -3,6 +3,7 @@ pub(crate) mod ca;
 pub(crate) mod command;
 pub(crate) mod config;
 mod daemon;
+mod output;
 mod rules;
 mod system_proxy;
 mod trace;
@@ -61,7 +62,8 @@ pub fn run_parsed(cli: ParsedCli) -> CliResult<()> {
         TopLevelCommand::Status(args) => {
             api_auth::configure_client_api_auth(&args.client)?;
             let config = config::runtime_config(&args)?;
-            println!("{}", api_request("GET", &config.api, "/api/status", "")?);
+            let body = api_request("GET", &config.api, "/api/status", "")?;
+            println!("{}", output::status(&body, cli.json)?);
             Ok(())
         }
         TopLevelCommand::Rules(args) => {
@@ -82,7 +84,7 @@ pub fn run_parsed(cli: ParsedCli) -> CliResult<()> {
         }
         TopLevelCommand::Replay(args) => {
             api_auth::configure_client_api_auth(&args.client)?;
-            trace::replay_cmd(args)
+            trace::replay_cmd(args, cli.json)
         }
         TopLevelCommand::Ca(args) => ca::ca_cmd(args, cli.json),
         TopLevelCommand::Proxy(args) => system_proxy::system_proxy_cmd(args, cli.json),

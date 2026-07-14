@@ -127,28 +127,28 @@ fn offline_group_helpers_cover_file_list_cat_toggle_remove_and_load_paths() {
     std::fs::write(&rules_file, "example.test status(218)\n").unwrap();
     let api = "127.0.0.1:1";
 
-    run_rules_set("file-group", Some(&rules_file), api, &storage).unwrap();
+    run_rules_set("file-group", Some(&rules_file), api, &storage, false).unwrap();
     run_rules_cat("file-group", false, api, &storage).unwrap();
     run_rules_cat("file-group", true, api, &storage).unwrap();
     run_rules_list(false, api, &storage).unwrap();
     run_rules_list(true, api, &storage).unwrap();
 
-    run_rules_toggle("file-group", api, &storage, false).unwrap();
+    run_rules_toggle("file-group", api, &storage, false, false).unwrap();
     let disabled = load_rule_set(None, api, &storage).unwrap();
     assert!(disabled.rules.is_empty());
-    run_rules_toggle("file-group", api, &storage, true).unwrap();
+    run_rules_toggle("file-group", api, &storage, true, false).unwrap();
     let enabled = load_rule_set(None, api, &storage).unwrap();
     assert_eq!(enabled.rules.len(), 1);
 
     let from_file = load_rule_set(Some(&rules_file), api, &storage).unwrap();
     assert_eq!(from_file.rules[0].actions.len(), 1);
     let missing_file = root.join("missing.rules");
-    assert!(run_rules_set("missing", Some(&missing_file), api, &storage).is_err());
+    assert!(run_rules_set("missing", Some(&missing_file), api, &storage, false).is_err());
     assert!(load_rule_set(Some(&missing_file), api, &storage).is_err());
     assert!(run_rules_cat("absent", false, api, &storage).is_err());
-    assert!(run_rules_set("../escape", Some(&rules_file), api, &storage).is_err());
+    assert!(run_rules_set("../escape", Some(&rules_file), api, &storage, false).is_err());
 
-    run_rules_remove("file-group", api, &storage).unwrap();
-    assert!(run_rules_remove("file-group", api, &storage).is_err());
+    run_rules_remove("file-group", api, &storage, false).unwrap();
+    assert!(run_rules_remove("file-group", api, &storage, false).is_err());
     let _ = std::fs::remove_dir_all(root);
 }

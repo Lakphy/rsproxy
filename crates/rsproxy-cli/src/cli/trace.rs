@@ -2,8 +2,9 @@ use super::command::{ReplayArgs, RuntimeArgs, TraceArgs, TraceCommand, ValuesArg
 use super::config::runtime_config;
 use super::util::{percent_encode, read_stdin};
 use crate::{CliError, CliResult};
-use rsproxy_control::{api_request, api_stream_lines};
+use rsproxy_control::{api_request, api_request_with_timeout, api_stream_lines};
 use std::fs;
+use std::time::Duration;
 
 pub(super) fn trace_cmd(args: TraceArgs, json: bool) -> CliResult<()> {
     let config = runtime_config(&RuntimeArgs::from_client(args.client))?;
@@ -22,18 +23,21 @@ pub(super) fn trace_cmd(args: TraceArgs, json: bool) -> CliResult<()> {
             Ok(())
         }
         TraceCommand::Get(args) => {
-            println!(
-                "{}",
-                api_request("GET", &api, &format!("/api/sessions/{}", args.id), "")?
-            );
+            let body = api_request("GET", &api, &format!("/api/sessions/{}", args.id), "")?;
+            println!("{}", super::output::trace_detail(&body, json)?);
             Ok(())
         }
         TraceCommand::Stats(_) => {
-            println!("{}", api_request("GET", &api, "/api/trace/stats", "")?);
+            let body = api_request("GET", &api, "/api/trace/stats", "")?;
+            println!("{}", super::output::trace_stats(&body, json)?);
             Ok(())
         }
         TraceCommand::Clear(_) => {
-            println!("{}", api_request("POST", &api, "/api/trace/clear", "")?);
+            let body = api_request("POST", &api, "/api/trace/clear", "")?;
+            println!(
+                "{}",
+                super::output::mutation(&body, json, "cleared captured sessions")?
+            );
             Ok(())
         }
         TraceCommand::Follow(args) => {
@@ -170,7 +174,10 @@ pub(super) fn values_cmd(args: ValuesArgs, json: bool) -> CliResult<()> {
                 &format!("/api/values/{}", percent_encode(&args.key)),
                 &body,
             ) {
-                Ok(response) => println!("{response}"),
+                Ok(response) => println!(
+                    "{}",
+                    super::output::mutation(&response, json, &format!("saved value {}", args.key))?
+                ),
                 Err(_) => println!("saved value {} to {}", args.key, storage.display()),
             }
             Ok(())
@@ -183,7 +190,14 @@ pub(super) fn values_cmd(args: ValuesArgs, json: bool) -> CliResult<()> {
                 &format!("/api/values/{}", percent_encode(&args.key)),
                 "",
             ) {
-                Ok(response) => println!("{response}"),
+                Ok(response) => println!(
+                    "{}",
+                    super::output::mutation(
+                        &response,
+                        json,
+                        &format!("removed value {}", args.key)
+                    )?
+                ),
                 Err(_) => println!("removed value {} from {}", args.key, storage.display()),
             }
             Ok(())
@@ -191,11 +205,19 @@ pub(super) fn values_cmd(args: ValuesArgs, json: bool) -> CliResult<()> {
     }
 }
 
-pub(super) fn replay_cmd(args: ReplayArgs) -> CliResult<()> {
-    let api = runtime_config(&RuntimeArgs::from_client(args.client))?.api;
-    println!(
-        "{}",
-        api_request("POST", &api, &format!("/api/replay/{}", args.id), "")?
-    );
+pub(super) fn replay_cmd(args: ReplayArgs, json: bool) -> CliResult<()> {
+    let config = runtime_config(&RuntimeArgs::from_client(args.client))?;
+    let timeout = config
+        .engine()
+        .request_total_timeout
+        .saturating_add(Duration::from_secs(1));
+    let body = api_request_with_timeout(
+        "POST",
+        &config.api,
+        &format!("/api/replay/{}", args.id),
+        "",
+        timeout,
+    )?;
+    println!("{}", super::output::replay(&body, json)?);
     Ok(())
 }

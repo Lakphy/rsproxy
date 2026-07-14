@@ -81,6 +81,10 @@ pub(in crate::proxy) fn mitm_client_config(
     Ok(with_client_alpn(config, allow_h2))
 }
 
+pub(crate) fn replay_client_config(state: &SharedState) -> io::Result<ClientConfig> {
+    mitm_client_config(state, None, None, false)
+}
+
 fn tls_cipher_suite_id(cipher: TlsCipherSuite) -> CipherSuite {
     match cipher {
         TlsCipherSuite::Tls13Aes128GcmSha256 => CipherSuite::TLS13_AES_128_GCM_SHA256,

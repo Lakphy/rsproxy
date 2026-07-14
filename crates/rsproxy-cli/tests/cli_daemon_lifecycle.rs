@@ -305,9 +305,13 @@ fn unix_daemon_defaults_to_a_private_storage_local_control_socket() {
     let storage = unique_temp_dir("unix-default-control");
     let run = |command: &str, proxy_port: u16| {
         let port = proxy_port.to_string();
+        let mut rsproxy = Command::new(env!("CARGO_BIN_EXE_rsproxy"));
+        rsproxy.arg(command);
+        if command == "status" {
+            rsproxy.arg("--json");
+        }
         command_output(
-            Command::new(env!("CARGO_BIN_EXE_rsproxy"))
-                .arg(command)
+            rsproxy
                 .args(["--host", "127.0.0.1", "--port", &port, "--storage"])
                 .arg(&storage)
                 .args(["--no-mitm", "--trace-disk-budget", "0"]),
