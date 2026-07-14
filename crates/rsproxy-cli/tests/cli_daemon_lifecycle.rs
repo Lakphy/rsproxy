@@ -310,12 +310,19 @@ fn unix_daemon_defaults_to_a_private_storage_local_control_socket() {
         if command == "status" {
             rsproxy.arg("--json");
         }
-        command_output(
-            rsproxy
-                .args(["--host", "127.0.0.1", "--port", &port, "--storage"])
-                .arg(&storage)
-                .args(["--no-mitm", "--trace-disk-budget", "0"]),
-        )
+        rsproxy.arg("--storage").arg(&storage);
+        if matches!(command, "start" | "run" | "restart") {
+            rsproxy.args([
+                "--host",
+                "127.0.0.1",
+                "--port",
+                &port,
+                "--no-mitm",
+                "--trace-disk-budget",
+                "0",
+            ]);
+        }
+        command_output(&mut rsproxy)
     };
 
     let (proxy_port, start) = start_daemon_on_probed_port(&storage, |port| run("start", port));
@@ -356,21 +363,21 @@ fn windows_daemon_uses_the_authenticated_named_pipe_control_plane() {
     );
     let run = |command: &str, proxy_port: u16| {
         let port = proxy_port.to_string();
-        command_output(
-            Command::new(env!("CARGO_BIN_EXE_rsproxy"))
-                .arg(command)
-                .args([
-                    "--host",
-                    "127.0.0.1",
-                    "--port",
-                    &port,
-                    "--api",
-                    &pipe,
-                    "--storage",
-                ])
-                .arg(&storage)
-                .args(["--no-mitm", "--trace-disk-budget", "0"]),
-        )
+        let mut rsproxy = Command::new(env!("CARGO_BIN_EXE_rsproxy"));
+        rsproxy.arg(command);
+        rsproxy.args(["--api", &pipe, "--storage"]).arg(&storage);
+        if matches!(command, "start" | "run" | "restart") {
+            rsproxy.args([
+                "--host",
+                "127.0.0.1",
+                "--port",
+                &port,
+                "--no-mitm",
+                "--trace-disk-budget",
+                "0",
+            ]);
+        }
+        command_output(&mut rsproxy)
     };
 
     let (proxy_port, start) = start_daemon_on_probed_port(&storage, |port| run("start", port));

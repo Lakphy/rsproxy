@@ -48,6 +48,7 @@ fn help_command_exposes_the_supported_entry_points() {
         "replay",
         "ca",
         "proxy",
+        "config",
         "completions",
     ] {
         assert!(stdout.contains(command), "root help omitted {command}");

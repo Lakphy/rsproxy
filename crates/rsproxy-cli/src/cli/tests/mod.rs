@@ -51,7 +51,7 @@ fn parse_trace_list_limit(args: &[String]) -> CliResult<usize> {
     let cli = Cli::try_parse_from(argv)?;
     match cli.command {
         Some(TopLevelCommand::Trace(args)) => match args.command {
-            TraceCommand::List(args) => Ok(args.limit),
+            Some(TraceCommand::List(args)) => Ok(args.limit),
             _ => unreachable!("test trace parser selected the wrong subcommand"),
         },
         _ => unreachable!("test trace parser selected the wrong command"),

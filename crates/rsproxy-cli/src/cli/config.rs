@@ -57,6 +57,13 @@ fn default_config_path() -> PathBuf {
     default_storage().join(CONFIG_FILE_NAME)
 }
 
+/// Returns the configuration file that would be loaded for `args`, honoring an
+/// explicit `--config` and otherwise the storage-scoped default when it exists.
+/// `None` means built-in defaults are used because no file was found.
+pub(super) fn effective_config_path(args: &RuntimeArgs) -> Option<PathBuf> {
+    selected_config_path(args, Some(default_config_path()))
+}
+
 fn apply_cli_overrides(
     args: &RuntimeArgs,
     config: &mut AppConfig,

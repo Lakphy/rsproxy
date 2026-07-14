@@ -7,8 +7,9 @@ use super::ClientArgs;
 pub(crate) struct ValuesArgs {
     #[command(flatten)]
     pub(crate) client: ClientArgs,
+    /// Values subcommand. Defaults to `ls` when omitted.
     #[command(subcommand)]
-    pub(crate) command: ValuesCommand,
+    pub(crate) command: Option<ValuesCommand>,
 }
 
 #[derive(Subcommand)]
@@ -16,6 +17,7 @@ pub(crate) enum ValuesCommand {
     /// List stored value names.
     #[command(
         name = "ls",
+        visible_alias = "list",
         long_about = "List value-file names in deterministic order. The daemon is queried when available; otherwise <storage>/values is read directly.",
         after_help = "EXAMPLES:\n  rsproxy values ls\n  rsproxy values ls --json | jq -r '.[]'"
     )]
@@ -35,6 +37,7 @@ pub(crate) enum ValuesCommand {
     /// Remove one stored value.
     #[command(
         name = "rm",
+        visible_aliases = ["remove", "delete"],
         long_about = "Remove one named value from storage and notify the running daemon when reachable. This command does not prompt for confirmation.",
         after_help = "EXAMPLES:\n  rsproxy values cat api-token > api-token.bak\n  rsproxy values rm api-token"
     )]
@@ -65,8 +68,9 @@ pub(crate) struct ValueSetArgs {
 pub(crate) struct TraceArgs {
     #[command(flatten)]
     pub(crate) client: ClientArgs,
+    /// Trace subcommand. Defaults to `ls` when omitted.
     #[command(subcommand)]
-    pub(crate) command: TraceCommand,
+    pub(crate) command: Option<TraceCommand>,
 }
 
 #[derive(Subcommand)]
@@ -74,6 +78,7 @@ pub(crate) enum TraceCommand {
     /// List the newest captured sessions.
     #[command(
         name = "ls",
+        visible_alias = "list",
         long_about = "List recent captured sessions from the running daemon, newest first. Increase --limit to inspect a larger window, or use `trace follow` for a live stream.",
         after_help = "EXAMPLES:\n  rsproxy trace ls\n  rsproxy trace ls --limit 100\n  rsproxy trace ls --json | jq '.[] | {id, method, url, status}'"
     )]
@@ -108,6 +113,12 @@ pub(crate) enum TraceCommand {
         after_help = "EXAMPLES:\n  rsproxy trace export --output sessions.json\n  rsproxy trace export --har --output sessions.har\n  rsproxy trace export --har | jq '.log.entries | length'"
     )]
     Export(TraceExportArgs),
+    /// Replay a captured session by ID.
+    #[command(
+        long_about = "Ask the running daemon to replay one captured session by ID and print the replay result. This is the trace-scoped alias of the top-level `rsproxy replay`. Find session IDs with `rsproxy trace ls` or the TUI.",
+        after_help = "EXAMPLES:\n  rsproxy trace ls\n  rsproxy trace replay 42\n\nReplay sends a new outbound request and therefore can repeat side effects of the original request."
+    )]
+    Replay(TraceReplayArgs),
 }
 
 #[derive(Args)]
@@ -126,6 +137,13 @@ pub(crate) struct TraceListArgs {
 #[derive(Args)]
 pub(crate) struct TraceGetArgs {
     /// Session ID shown by `trace ls` or the TUI.
+    #[arg(value_name = "ID")]
+    pub(crate) id: String,
+}
+
+#[derive(Args)]
+pub(crate) struct TraceReplayArgs {
+    /// Captured session ID shown by `trace ls` or the TUI.
     #[arg(value_name = "ID")]
     pub(crate) id: String,
 }

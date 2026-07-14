@@ -39,12 +39,14 @@ pub(crate) enum CaCommand {
     Issue(CaIssueArgs),
     /// Add the local root CA to the operating-system trust store.
     #[command(
+        visible_alias = "trust",
         long_about = "Trust the initialized root CA through the native operating-system backend. This changes system or user trust settings and may require elevated privileges.",
         after_help = "SAFE WORKFLOW:\n  rsproxy ca install --dry-run\n  rsproxy ca install\n  rsproxy ca status\n\nOnly install a CA whose storage directory and fingerprint you recognize. Remove it later with `rsproxy ca uninstall`."
     )]
     Install(CaTrustArgs),
     /// Remove the local root CA from the operating-system trust store.
     #[command(
+        visible_alias = "untrust",
         long_about = "Remove trust for this rsproxy root CA through the native operating-system backend. Local CA files remain in <storage>/ca and may be deleted separately after rsproxy is stopped.",
         after_help = "EXAMPLES:\n  rsproxy ca uninstall --dry-run\n  rsproxy ca uninstall\n\nOn macOS, pass the same --keychain used during installation when it was not the default keychain."
     )]

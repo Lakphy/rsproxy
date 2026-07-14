@@ -20,7 +20,12 @@ pub(super) fn rules_cmd(args: RulesArgs, json: bool) -> CliResult<()> {
     let config = runtime_config(&RuntimeArgs::from_client(args.client))?;
     let api = config.api.clone();
     let storage = config.engine().storage.clone();
-    match args.command {
+    // `rsproxy rules` with no subcommand defaults to listing groups, matching
+    // the default-status behavior of `ca` and `proxy`.
+    let Some(command) = args.command else {
+        return run_rules_list(json, &api, &storage);
+    };
+    match command {
         RulesCommand::Check(args) => {
             let text = if let Some(file) = args.file {
                 fs::read_to_string(&file).map_err(|source| {

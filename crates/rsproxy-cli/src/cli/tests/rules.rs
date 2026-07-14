@@ -40,7 +40,7 @@ fn rules_request_options_are_typed_and_preserve_multi_value_order() {
     let Some(TopLevelCommand::Rules(rules)) = cli.command else {
         panic!("rules command expected");
     };
-    let RulesCommand::Test(args) = rules.command else {
+    let Some(RulesCommand::Test(args)) = rules.command else {
         panic!("rules test command expected");
     };
 
@@ -108,7 +108,7 @@ fn rules_request_url_is_not_confused_with_global_config_values() {
     let Some(TopLevelCommand::Rules(rules)) = cli.command else {
         panic!("rules command expected");
     };
-    let RulesCommand::Test(args) = rules.command else {
+    let Some(RulesCommand::Test(args)) = rules.command else {
         panic!("rules test command expected");
     };
     assert_eq!(args.url, "http://api.test/v1");

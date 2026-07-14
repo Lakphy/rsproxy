@@ -44,20 +44,20 @@ impl DaemonHarness {
         if command == "status" {
             rsproxy.arg("--json");
         }
-        command_output(
-            rsproxy
-                .args([
-                    "--host",
-                    "127.0.0.1",
-                    "--port",
-                    &proxy_port,
-                    "--api",
-                    &api,
-                    "--storage",
-                ])
-                .arg(&self.storage)
-                .args(["--no-mitm", "--trace-disk-budget", "0"]),
-        )
+        // Control/storage options apply to every command.
+        rsproxy
+            .args(["--api", &api, "--storage"])
+            .arg(&self.storage);
+        // The listener host/port is accepted by start/run/restart and by `stop`
+        // (to locate an orphaned daemon). `status` takes control args only.
+        if matches!(command, "start" | "run" | "restart" | "stop") {
+            rsproxy.args(["--host", "127.0.0.1", "--port", &proxy_port]);
+        }
+        // Runtime-tuning flags apply to the foreground/daemon start commands only.
+        if matches!(command, "start" | "run" | "restart") {
+            rsproxy.args(["--no-mitm", "--trace-disk-budget", "0"]);
+        }
+        command_output(&mut rsproxy)
     }
 
     pub(super) fn pid_path(&self) -> PathBuf {

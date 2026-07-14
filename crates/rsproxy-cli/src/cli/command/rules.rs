@@ -7,8 +7,9 @@ use super::ClientArgs;
 pub(crate) struct RulesArgs {
     #[command(flatten)]
     pub(crate) client: ClientArgs,
+    /// Rules subcommand. Defaults to `ls` when omitted.
     #[command(subcommand)]
-    pub(crate) command: RulesCommand,
+    pub(crate) command: Option<RulesCommand>,
 }
 
 #[derive(Subcommand)]
@@ -22,6 +23,7 @@ pub(crate) enum RulesCommand {
     /// List rule groups.
     #[command(
         name = "ls",
+        visible_alias = "list",
         long_about = "List rule groups in evaluation order, including enabled state and rule count. The running daemon is queried when available; otherwise groups are loaded from storage.",
         after_help = "EXAMPLES:\n  rsproxy rules ls\n  rsproxy rules ls --json | jq\n\nUse `rules cat GROUP` to inspect a group's source."
     )]
@@ -47,18 +49,21 @@ pub(crate) enum RulesCommand {
     /// Remove a rule group.
     #[command(
         name = "rm",
+        visible_aliases = ["remove", "delete"],
         long_about = "Permanently remove one named rule group from the daemon/storage. This command does not prompt for confirmation.",
         after_help = "EXAMPLES:\n  rsproxy rules cat mobile > mobile.rules.bak\n  rsproxy rules rm mobile\n\nUse `rules disable GROUP` instead when you may need the group again."
     )]
     Remove(RequiredGroupArgs),
     /// Enable a rule group.
     #[command(
+        visible_alias = "on",
         long_about = "Enable an existing rule group so it participates in rule resolution. Group ordering is unchanged.",
         after_help = "EXAMPLES:\n  rsproxy rules enable mobile\n  rsproxy rules ls"
     )]
     Enable(RequiredGroupArgs),
     /// Disable a rule group.
     #[command(
+        visible_alias = "off",
         long_about = "Disable an existing rule group without deleting its source. Disabled groups remain visible in `rules ls` and can be enabled later.",
         after_help = "EXAMPLES:\n  rsproxy rules disable mobile\n  rsproxy rules ls"
     )]

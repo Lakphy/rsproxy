@@ -34,8 +34,9 @@ inspect HTTPS traffic, initialize and trust the local CA first.",
 When finished, restore the system proxy with `rsproxy proxy off --all`, then stop the daemon with \
 `rsproxy stop`. Run `rsproxy help <COMMAND>` for command-specific examples.\n\n\
 CONFIGURATION:\n  CLI options override TOML settings, which override built-in defaults. The default config is \
-  $RSPROXY_HOME/config.toml or ~/.rsproxy/config.toml. Process logs are controlled by RSPROXY_LOG \
-  and RSPROXY_LOG_FORMAT."
+  $RSPROXY_HOME/config.toml or ~/.rsproxy/config.toml. Inspect the resolved settings with \
+  `rsproxy config show` and confirm which file is loaded with `rsproxy config path`. Process logs \
+  are controlled by RSPROXY_LOG and RSPROXY_LOG_FORMAT."
 )]
 /// Parsed top-level CLI state passed across the executable/library boundary.
 ///
@@ -67,10 +68,10 @@ pub(crate) enum TopLevelCommand {
     Start(RuntimeArgs),
     /// Stop a running daemon.
     #[command(
-        long_about = "Stop the daemon identified by the selected storage/configuration. Identity checks prevent an unrelated process from being terminated through a stale pidfile.",
+        long_about = "Stop the daemon identified by the selected storage/configuration. Identity checks prevent an unrelated process from being terminated through a stale pidfile. Accepts control/storage options plus the listener host/port used to locate an orphaned daemon; runtime tuning flags apply to `run`/`start` only.",
         after_help = "EXAMPLES:\n  Restore the system proxy, then stop rsproxy:\n    rsproxy proxy off --all\n    rsproxy stop\n\n  Stop an isolated instance:\n    rsproxy stop --storage ./tmp/rsproxy\n\nOn macOS, replace --all with the same `--service NAME` used to enable routing. Use the same `--storage` or `--config` values that were passed to `rsproxy start`."
     )]
-    Stop(RuntimeArgs),
+    Stop(StopArgs),
     /// Restart the daemon.
     #[command(
         long_about = "Stop the selected daemon if it is running, then start it with the resolved configuration. Rules and values stored on disk are preserved.",
@@ -79,10 +80,10 @@ pub(crate) enum TopLevelCommand {
     Restart(RuntimeArgs),
     /// Query daemon status.
     #[command(
-        long_about = "Query the control endpoint for daemon health, active configuration, rule/trace statistics, and runtime counters. The daemon must be running and the selected API/storage must match it.",
+        long_about = "Query the control endpoint for daemon health, active configuration, rule/trace statistics, and runtime counters. The daemon must be running and the selected API/storage must match it. Only control/storage options are accepted; runtime tuning flags apply to `run`/`start`.",
         after_help = "EXAMPLES:\n  Show status:\n    rsproxy status\n\n  Pretty-print selected fields with jq:\n    rsproxy status --json | jq '{version, proxy, rules, trace}'\n\n  Query a TCP control endpoint:\n    rsproxy status --api 127.0.0.1:8900 --api-token \"$RSPROXY_API_TOKEN\""
     )]
-    Status(RuntimeArgs),
+    Status(ClientArgs),
     /// Validate, manage, inspect, and benchmark rules.
     #[command(
         long_about = "Validate rule syntax, manage ordered rule groups, explain a simulated request, or benchmark matching. Management commands use the running daemon when available and otherwise fall back to the selected storage directory.",
@@ -98,7 +99,7 @@ pub(crate) enum TopLevelCommand {
     /// Inspect and export captured sessions.
     #[command(
         long_about = "Inspect, follow, clear, and export sessions captured by a running rsproxy daemon. Session bodies are previews bounded by the configured trace limits.",
-        after_help = "EXAMPLES:\n  rsproxy trace ls --limit 20\n  rsproxy trace get 42\n  rsproxy trace get 42 --json | jq\n  rsproxy trace follow\n  rsproxy trace export --har --output sessions.har\n\nUse `rsproxy trace stats` to inspect memory and disk-spill usage."
+        after_help = "EXAMPLES:\n  rsproxy trace ls --limit 20\n  rsproxy trace get 42\n  rsproxy trace get 42 --json | jq\n  rsproxy trace follow\n  rsproxy trace replay 42\n  rsproxy trace export --har --output sessions.har\n\nUse `rsproxy trace stats` to inspect memory and disk-spill usage."
     )]
     Trace(TraceArgs),
     /// Open the terminal user interface.
@@ -125,6 +126,12 @@ pub(crate) enum TopLevelCommand {
         after_help = "SAFE WORKFLOW:\n  rsproxy proxy status\n  rsproxy proxy on --all --dry-run\n  rsproxy proxy on --all\n  rsproxy proxy status\n\nAlways restore routing with `rsproxy proxy off --all` before deleting rsproxy state. On macOS, replace --all with `--service NAME` to change one service. Platform support uses networksetup on macOS, WinINet registry settings on Windows, and gsettings on Linux."
     )]
     Proxy(ProxyArgs),
+    /// Inspect the effective configuration and its source.
+    #[command(
+        long_about = "Show the effective runtime configuration after applying the CLI > TOML > built-in precedence, or report which configuration file would be loaded. Resolved locally without a running daemon, so it reflects what `run`/`start` would use. Running `rsproxy config` without a subcommand is equivalent to `config show`.",
+        after_help = "EXAMPLES:\n  rsproxy config show\n  rsproxy config show --json | jq '.trace'\n  rsproxy config path\n  rsproxy config show --storage ./tmp/rsproxy\n\nUse `--config FILE` to inspect a specific TOML file, or `config path` to confirm which file is in effect."
+    )]
+    Config(ConfigArgs),
     /// Generate a shell completion script.
     #[command(
         long_about = "Generate a completion script for the selected shell from the live command tree. The script is written to stdout and can be evaluated for one session or installed in the shell's completion directory.",
@@ -333,6 +340,69 @@ impl RuntimeArgs {
         }
     }
 }
+
+/// Arguments accepted by `stop`. Unlike `run`/`start`, this excludes the runtime
+/// tuning surface (trace, MITM, pools, timeouts) because stopping a daemon only
+/// needs the control/storage identity and the listener host/port used to locate
+/// an orphaned process still holding the proxy port.
+#[derive(Clone, Default, Args)]
+pub(crate) struct StopArgs {
+    #[command(flatten)]
+    pub(crate) client: ClientArgs,
+    /// Proxy listener port, used to find and reclaim an orphaned daemon holding the port.
+    #[arg(
+        short = 'p',
+        long,
+        value_name = "PORT",
+        help_heading = "Proxy listener"
+    )]
+    pub(crate) port: Option<u16>,
+    /// Proxy listener address, used to find and reclaim an orphaned daemon holding the port.
+    #[arg(long, value_name = "HOST", help_heading = "Proxy listener")]
+    pub(crate) host: Option<String>,
+}
+
+impl StopArgs {
+    pub(crate) fn into_runtime(self) -> RuntimeArgs {
+        RuntimeArgs {
+            client: self.client,
+            port: self.port,
+            host: self.host,
+            ..RuntimeArgs::default()
+        }
+    }
+}
+
+#[derive(Args)]
+pub(crate) struct ConfigArgs {
+    #[command(flatten)]
+    pub(crate) client: ClientArgs,
+    /// Config subcommand. Defaults to `show` when omitted.
+    #[command(subcommand)]
+    pub(crate) command: Option<ConfigCommand>,
+}
+
+#[derive(Subcommand)]
+pub(crate) enum ConfigCommand {
+    /// Print the effective resolved configuration.
+    #[command(
+        long_about = "Print the effective configuration after applying CLI options over TOML settings over built-in defaults. With --json, emit the same values as a structured document. This is resolved locally and does not require a running daemon.",
+        after_help = "EXAMPLES:\n  rsproxy config show\n  rsproxy config show --json | jq '{listener, control, trace}'\n  rsproxy config show --config ./config.toml"
+    )]
+    Show(ConfigShowArgs),
+    /// Print the configuration file that would be loaded.
+    #[command(
+        long_about = "Print the absolute path of the TOML file that would be loaded for the current selection, or state that built-in defaults are used when no file exists. Honors --config and --storage.",
+        after_help = "EXAMPLES:\n  rsproxy config path\n  rsproxy config path --storage ./tmp/rsproxy\n  rsproxy config path --config ./config.toml"
+    )]
+    Path(ConfigPathArgs),
+}
+
+#[derive(Args)]
+pub(crate) struct ConfigShowArgs {}
+
+#[derive(Args)]
+pub(crate) struct ConfigPathArgs {}
 
 #[derive(Args)]
 pub(crate) struct CompletionsArgs {
