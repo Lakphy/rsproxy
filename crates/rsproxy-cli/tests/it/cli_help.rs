@@ -57,6 +57,7 @@ fn help_command_exposes_the_supported_entry_points() {
     for guidance in [
         "QUICK START:",
         "rsproxy ca init",
+        "Preview CA trust changes:",
         "rsproxy proxy on --all --dry-run",
         "rsproxy proxy off --all",
         "CONFIGURATION:",
@@ -69,6 +70,20 @@ fn help_command_exposes_the_supported_entry_points() {
     let runtime = String::from_utf8(runtime.stdout).unwrap();
     assert!(runtime.contains("--watch"));
     assert!(runtime.contains("--watch-debounce-ms"));
+}
+
+#[test]
+fn trace_help_marks_json_before_piping_to_jq() {
+    for args in [&["trace", "--help"][..], &["trace", "get", "--help"][..]] {
+        let output = command_output(args);
+        assert!(output.status.success(), "{args:?}");
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        assert!(
+            stdout.contains("trace get 42 --json | jq"),
+            "{args:?}: {stdout}"
+        );
+        assert!(!stdout.contains("trace get 42 | jq"), "{args:?}: {stdout}");
+    }
 }
 
 #[test]

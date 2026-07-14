@@ -81,7 +81,7 @@ pub(crate) enum TraceCommand {
     /// Fetch one captured session by ID.
     #[command(
         long_about = "Fetch full stored details for one captured session, including headers, bounded body previews, rule matches, timings, and errors when available.",
-        after_help = "EXAMPLES:\n  rsproxy trace ls\n  rsproxy trace get 42\n  rsproxy trace get 42 | jq '._rsproxy // .'"
+        after_help = "EXAMPLES:\n  rsproxy trace ls\n  rsproxy trace get 42\n  rsproxy trace get 42 --json | jq '._rsproxy // .'"
     )]
     Get(TraceGetArgs),
     /// Stream newly captured sessions as NDJSON.

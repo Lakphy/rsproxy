@@ -3,20 +3,11 @@ use super::*;
 pub(super) fn parse_header_op(input: &str) -> Result<HeaderOp, RuleModelError> {
     let input = input.trim();
     if let Some(name) = input.strip_prefix('-') {
-        let name = name.trim().to_ascii_lowercase();
-        if name.is_empty() {
-            return Err(RuleModelError::missing(
-                "header remove operation",
-                "header remove op needs a name",
-            ));
-        }
+        let name = normalize_header_name(name)?;
         return Ok(HeaderOp::Remove { name });
     }
     if let Some((name, expression)) = header_replace_parts(input) {
-        let name = name.trim().to_ascii_lowercase();
-        if name.is_empty() {
-            return Err(RuleModelError::empty("header name", "header name is empty"));
-        }
+        let name = normalize_header_name(name)?;
         let (pattern, replacement) = parse_header_replacement(expression)?;
         return Ok(HeaderOp::Replace {
             name,
@@ -30,14 +21,45 @@ pub(super) fn parse_header_op(input: &str) -> Result<HeaderOp, RuleModelError> {
             "header op must be `name: value`, `-name`, or `name ~ /regex/replacement`",
         )
     })?;
-    let name = name.trim().to_ascii_lowercase();
-    if name.is_empty() {
-        return Err(RuleModelError::empty("header name", "header name is empty"));
-    }
+    let name = normalize_header_name(name)?;
     Ok(HeaderOp::Set {
         name,
         value: parse_value(value.trim())?,
     })
+}
+
+fn normalize_header_name(input: &str) -> Result<String, RuleModelError> {
+    let name = input.trim();
+    if name.is_empty() || !name.bytes().all(is_http_token_byte) {
+        return Err(RuleModelError::invalid(
+            "header name",
+            format!(
+                "invalid header name `{name}`; use an unquoted HTTP header name such as `x-debug`"
+            ),
+        ));
+    }
+    Ok(name.to_ascii_lowercase())
+}
+
+fn is_http_token_byte(byte: u8) -> bool {
+    byte.is_ascii_alphanumeric()
+        || matches!(
+            byte,
+            b'!' | b'#'
+                | b'$'
+                | b'%'
+                | b'&'
+                | b'\''
+                | b'*'
+                | b'+'
+                | b'-'
+                | b'.'
+                | b'^'
+                | b'_'
+                | b'`'
+                | b'|'
+                | b'~'
+        )
 }
 
 fn header_replace_parts(input: &str) -> Option<(&str, &str)> {

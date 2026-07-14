@@ -83,3 +83,26 @@ fn invalid_header_replacement_regex_is_an_action_error() {
     assert_eq!(error.code, RuleErrorCode::Action);
     assert!(error.message.contains("invalid header replacement regex"));
 }
+
+#[test]
+fn header_operations_reject_names_that_are_not_http_tokens() {
+    for action in [
+        r#"req.header("x-debug: yes")"#,
+        "res.header(bad name: yes)",
+        r#"req.header(-"x-debug")"#,
+        r#"res.header("x-debug" ~ /old/new)"#,
+        "res.trailer(bad name: yes)",
+    ] {
+        let source = format!("example.test {action}");
+        let errors = RuleSet::parse("default", &source)
+            .expect_err("invalid header names must fail while parsing the rule");
+        let error = &errors[0];
+        assert_eq!(error.code, RuleErrorCode::Action, "{action}");
+        assert!(
+            error.message.contains("invalid header name")
+                && error.message.contains("unquoted HTTP header name"),
+            "{action}: {}",
+            error.message
+        );
+    }
+}

@@ -25,10 +25,12 @@ rules, replay requests, and configure the operating-system proxy. HTTP works imm
 inspect HTTPS traffic, initialize and trust the local CA first.",
     after_help = "QUICK START:\n  \
 1. Create the local CA:       rsproxy ca init\n  \
-2. Trust it for HTTPS:        rsproxy ca install --dry-run\n                              rsproxy ca install\n  \
-3. Start the daemon:          rsproxy start\n  \
-4. Route this machine:        rsproxy proxy on --all --dry-run\n                              rsproxy proxy on --all\n  \
-5. Inspect captured traffic:  rsproxy tui\n\n\
+2. Preview CA trust changes:  rsproxy ca install --dry-run\n  \
+3. Trust it for HTTPS:        rsproxy ca install\n  \
+4. Start the daemon:          rsproxy start\n  \
+5. Preview system routing:    rsproxy proxy on --all --dry-run\n  \
+6. Route this machine:        rsproxy proxy on --all\n  \
+7. Inspect captured traffic:  rsproxy tui\n\n\
 When finished, restore the system proxy with `rsproxy proxy off --all`, then stop the daemon with \
 `rsproxy stop`. Run `rsproxy help <COMMAND>` for command-specific examples.\n\n\
 CONFIGURATION:\n  CLI options override TOML settings, which override built-in defaults. The default config is \
@@ -96,7 +98,7 @@ pub(crate) enum TopLevelCommand {
     /// Inspect and export captured sessions.
     #[command(
         long_about = "Inspect, follow, clear, and export sessions captured by a running rsproxy daemon. Session bodies are previews bounded by the configured trace limits.",
-        after_help = "EXAMPLES:\n  rsproxy trace ls --limit 20\n  rsproxy trace get 42 | jq\n  rsproxy trace follow\n  rsproxy trace export --har --output sessions.har\n\nUse `rsproxy trace stats` to inspect memory and disk-spill usage."
+        after_help = "EXAMPLES:\n  rsproxy trace ls --limit 20\n  rsproxy trace get 42\n  rsproxy trace get 42 --json | jq\n  rsproxy trace follow\n  rsproxy trace export --har --output sessions.har\n\nUse `rsproxy trace stats` to inspect memory and disk-spill usage."
     )]
     Trace(TraceArgs),
     /// Open the terminal user interface.
