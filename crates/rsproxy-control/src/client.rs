@@ -48,19 +48,37 @@ fn configured_api_token() -> Option<String> {
 /// [`ControlError::Protocol`]. Response bytes are converted to a string with
 /// invalid UTF-8 replaced lossily.
 pub fn api_request(method: &str, api: &str, path: &str, body: &str) -> ControlResult<String> {
+    api_request_with_timeout(method, api, path, body, Duration::from_secs(5))
+}
+
+/// Sends one control request with a caller-selected response timeout.
+///
+/// This is intended for bounded long-running operations such as replay. A zero
+/// timeout is rejected. Named-pipe requests rely on the server-side operation
+/// deadline because the Windows pipe adapter does not expose socket timeouts.
+pub fn api_request_with_timeout(
+    method: &str,
+    api: &str,
+    path: &str,
+    body: &str,
+    timeout: Duration,
+) -> ControlResult<String> {
+    if timeout.is_zero() {
+        return Err(ControlError::InvalidRequest(
+            "control response timeout must be greater than zero".to_string(),
+        ));
+    }
     if let Some(socket_path) = unix_api_path(api) {
-        return api_request_unix(method, api, socket_path, path, body);
+        return api_request_unix(method, api, socket_path, path, body, timeout);
     }
     if let Some(pipe_path) = windows_pipe_path(api) {
         return api_request_windows_pipe(method, api, pipe_path, path, body);
     }
     let mut stream = TcpStream::connect(api)
         .map_err(|source| ControlError::io(format!("connect {api}"), source))?;
-    stream
-        .set_read_timeout(Some(Duration::from_secs(5)))
-        .map_err(|source| {
-            ControlError::io(format!("configure control read timeout for {api}"), source)
-        })?;
+    stream.set_read_timeout(Some(timeout)).map_err(|source| {
+        ControlError::io(format!("configure control read timeout for {api}"), source)
+    })?;
     api_request_stream(&mut stream, method, api, path, body)
 }
 
@@ -221,19 +239,18 @@ fn api_request_unix(
     socket_path: &str,
     path: &str,
     body: &str,
+    timeout: Duration,
 ) -> ControlResult<String> {
     use std::os::unix::net::UnixStream;
 
     let mut stream = UnixStream::connect(socket_path)
         .map_err(|source| ControlError::io(format!("connect unix socket {socket_path}"), source))?;
-    stream
-        .set_read_timeout(Some(Duration::from_secs(5)))
-        .map_err(|source| {
-            ControlError::io(
-                format!("configure Unix control read timeout for {socket_path}"),
-                source,
-            )
-        })?;
+    stream.set_read_timeout(Some(timeout)).map_err(|source| {
+        ControlError::io(
+            format!("configure Unix control read timeout for {socket_path}"),
+            source,
+        )
+    })?;
     api_request_stream(&mut stream, method, api, path, body)
 }
 
@@ -244,6 +261,7 @@ fn api_request_unix(
     socket_path: &str,
     _path: &str,
     _body: &str,
+    _timeout: Duration,
 ) -> ControlResult<String> {
     Err(ControlError::Unsupported(format!(
         "unix control sockets are not supported on this platform: {socket_path}"

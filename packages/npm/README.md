@@ -33,8 +33,9 @@ shared launcher last. All package versions must exactly match the Cargo
 workspace version. Every Cargo package sets `publish = false`, so crates.io is
 not a fallback channel.
 
-Before the first tag release, create or authorize the public `@rsproxy` npm
-scope and add an npm automation token as the repository secret `NPM_TOKEN`.
+Publishing requires an authorized public `@rsproxy` npm scope and the repository
+secret `NPM_TOKEN`. See the [release process](../../docs/release-process.md) for
+the current credential, provenance, and recovery contracts.
 
 Run the local contracts with:
 

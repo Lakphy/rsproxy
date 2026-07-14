@@ -4,7 +4,10 @@ use super::config::runtime_config;
 use crate::app::{AppConfig, api_display, unix_api_path};
 use crate::{CliError, CliResult, DaemonConflict};
 use rsproxy_control::{self as control, ControlState, api_request, set_api_token};
-use rsproxy_platform::process::{detach_daemon, parse_pid, process_alive, terminate_process};
+use rsproxy_platform::process::{
+    detach_daemon, force_terminate_process, parse_pid, pid_listening_on, process_alive,
+    process_executable_path, terminate_process,
+};
 use std::env;
 use std::fs::{self, OpenOptions};
 use std::net::TcpListener;
@@ -12,6 +15,13 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::thread;
 use std::time::Duration;
+
+mod args;
+
+use args::append_runtime_arguments;
+
+/// Environment variable through which the npm shim advertises its pid to the native process.
+const SUPERVISOR_PID_ENV: &str = "RSPROXY_SUPERVISOR_PID";
 
 pub(super) fn run_server(args: &RuntimeArgs) -> CliResult<()> {
     let mut config = runtime_config(args)?;
@@ -42,7 +52,7 @@ pub(super) fn run_server(args: &RuntimeArgs) -> CliResult<()> {
         let _ = proxy_exit_tx.send(error);
     });
 
-    let control_exit_tx = listener_exit_tx;
+    let control_exit_tx = listener_exit_tx.clone();
     thread::spawn(move || {
         let error = match control::serve(control_listener, control_state) {
             Ok(()) => CliError::ListenerStopped {
@@ -52,6 +62,20 @@ pub(super) fn run_server(args: &RuntimeArgs) -> CliResult<()> {
         };
         let _ = control_exit_tx.send(error);
     });
+
+    // When launched by the npm shim (which cannot forward an uncatchable SIGKILL), the shim
+    // passes its pid so we exit with it instead of orphaning this process and its listener port.
+    if let Ok(raw_pid) = env::var(SUPERVISOR_PID_ENV)
+        && let Ok(supervisor_pid) = parse_pid(&raw_pid)
+    {
+        let watchdog_exit_tx = listener_exit_tx;
+        thread::spawn(move || {
+            while process_alive(supervisor_pid) {
+                thread::sleep(Duration::from_millis(500));
+            }
+            let _ = watchdog_exit_tx.send(CliError::SupervisorExited);
+        });
+    }
 
     let config_source = config
         .config_path
@@ -86,11 +110,18 @@ pub(super) fn run_server(args: &RuntimeArgs) -> CliResult<()> {
         rules_watch_debounce_ms = config.engine().rules_watch_debounce.as_millis() as u64,
         "rsproxy running"
     );
-    let error = listener_exit_rx
+    let outcome = listener_exit_rx
         .recv()
         .map_err(|source| CliError::ListenerSupervision { source })?;
-    tracing::error!(event = "daemon_listener_stopped", error = %error, "daemon listener stopped");
-    Err(error)
+    if matches!(outcome, CliError::SupervisorExited) {
+        tracing::info!(
+            event = "supervisor_exited",
+            "supervising process exited; shutting down"
+        );
+        return Ok(());
+    }
+    tracing::error!(event = "daemon_listener_stopped", error = %outcome, "daemon listener stopped");
+    Err(outcome)
 }
 
 pub(super) fn start_server(args: &RuntimeArgs) -> CliResult<()> {
@@ -138,6 +169,10 @@ pub(super) fn start_server(args: &RuntimeArgs) -> CliResult<()> {
         }
     }
 
+    // Probe only once no tracked daemon owns the pidfile, so an already-running instance still
+    // reports the clearer "already running" conflict rather than a bind error.
+    ensure_proxy_port_available(&config)?;
+
     let log_path = config.engine().storage.join("run/rsproxy.log");
     let log = OpenOptions::new()
         .create(true)
@@ -155,6 +190,9 @@ pub(super) fn start_server(args: &RuntimeArgs) -> CliResult<()> {
     command
         .stdout(Stdio::from(log))
         .stderr(Stdio::from(log_err));
+    // The detached daemon reparents to init, so it must not inherit a shim watchdog target it
+    // would immediately observe as dead.
+    command.env_remove(SUPERVISOR_PID_ENV);
     detach_daemon(&mut command);
     let mut child = command
         .spawn()
@@ -222,10 +260,7 @@ pub(super) fn stop_server(args: &RuntimeArgs) -> CliResult<()> {
     let raw_pid = match fs::read_to_string(&pid_path) {
         Ok(raw_pid) => raw_pid,
         Err(source) if source.kind() == std::io::ErrorKind::NotFound => {
-            return Err(DaemonConflict::NotRunning {
-                pid_path: pid_path.clone(),
-            }
-            .into());
+            return reclaim_orphan_or_not_running(&config, &pid_path);
         }
         Err(source) => {
             return Err(CliError::io(
@@ -272,6 +307,55 @@ pub(super) fn pid_path(config: &AppConfig) -> PathBuf {
     config.engine().storage.join("run/rsproxy.pid")
 }
 
+/// Recovers a proxy port held by an untracked rsproxy orphan (e.g. a `run` child whose npm
+/// shim was `SIGKILL`ed), since such a process writes no pidfile for `stop` to follow.
+///
+/// Refuses to touch a non-rsproxy process, and falls back to `NotRunning` when the port is free.
+fn reclaim_orphan_or_not_running(config: &AppConfig, pid_path: &Path) -> CliResult<()> {
+    let addr = format!("{}:{}", config.host, config.port);
+    let Some(pid) = pid_listening_on(&config.host, config.port) else {
+        return Err(DaemonConflict::NotRunning {
+            pid_path: pid_path.to_path_buf(),
+        }
+        .into());
+    };
+    if !process_is_rsproxy(pid) {
+        return Err(CliError::PortHeldByForeignProcess { addr, pid });
+    }
+    terminate_process(pid)?;
+    for _ in 0..50 {
+        if !process_alive(pid) {
+            println!("reclaimed {addr} (stopped orphan pid={pid})");
+            return Ok(());
+        }
+        thread::sleep(Duration::from_millis(100));
+    }
+    force_terminate_process(pid)?;
+    for _ in 0..50 {
+        if !process_alive(pid) {
+            println!("reclaimed {addr} (killed orphan pid={pid})");
+            return Ok(());
+        }
+        thread::sleep(Duration::from_millis(100));
+    }
+    Err(CliError::DaemonStopTimeout { pid })
+}
+
+/// Reports whether `pid`'s executable shares this binary's file name, used to avoid signalling
+/// an unrelated process that merely happens to hold the port.
+fn process_is_rsproxy(pid: u32) -> bool {
+    let Some(candidate) = process_executable_path(pid) else {
+        return false;
+    };
+    let Ok(current) = env::current_exe() else {
+        return false;
+    };
+    match (candidate.file_stem(), current.file_stem()) {
+        (Some(candidate), Some(expected)) => candidate == expected,
+        _ => false,
+    }
+}
+
 fn remove_runtime_files(config: &AppConfig, pid_path: &Path) {
     let _ = fs::remove_file(pid_path);
     if let Some(socket_path) = unix_api_path(&config.api) {
@@ -300,6 +384,20 @@ fn validate_daemon_addresses(config: &AppConfig) -> CliResult<()> {
     Ok(())
 }
 
+fn ensure_proxy_port_available(config: &AppConfig) -> CliResult<()> {
+    let proxy_addr = format!("{}:{}", config.host, config.port);
+    // Probe the proxy port up front so `start` surfaces `Address already in use` directly
+    // instead of forcing the user to read run/rsproxy.log after a "daemon exited" message.
+    // The daemon rebinds after this probe drops; the DaemonExited path still covers the race.
+    match TcpListener::bind(&proxy_addr) {
+        Ok(_) => Ok(()),
+        Err(source) => Err(CliError::io(
+            format!("bind proxy listener {proxy_addr}"),
+            source,
+        )),
+    }
+}
+
 fn daemon_ready(config: &AppConfig) -> bool {
     daemon_status(config).is_some_and(|status| {
         status.get("proxy").and_then(|value| value.as_str())
@@ -318,147 +416,4 @@ fn daemon_status(config: &AppConfig) -> Option<serde_json::Value> {
         && status.get("storage").and_then(|value| value.as_str())
             == Some(config.engine().storage.to_string_lossy().as_ref()))
     .then_some(status)
-}
-
-fn append_runtime_arguments(command: &mut Command, args: &RuntimeArgs) {
-    append_display(command, "--port", args.port);
-    append_string(command, "--host", args.host.as_deref());
-    append_string(command, "--api", args.client.api.as_deref());
-    append_string(command, "--api-token", args.client.api_token.as_deref());
-    append_path(command, "--storage", args.client.storage.as_deref());
-    append_path(command, "--config", args.client.config.as_deref());
-    append_flag(command, "--watch", args.watch);
-    append_display(command, "--watch-debounce-ms", args.watch_debounce_ms);
-    append_string(command, "--proxy-auth", args.proxy_auth.as_deref());
-    append_string(
-        command,
-        "--max-header-size",
-        args.max_header_size.as_deref(),
-    );
-    append_display(command, "--max-header-count", args.max_header_count);
-    append_string(
-        command,
-        "--body-buffer-limit",
-        args.body_buffer_limit.as_deref(),
-    );
-    append_string(
-        command,
-        "--trace-body-limit",
-        args.trace_body_limit.as_deref(),
-    );
-    append_string(command, "--trace-filter", args.trace_filter.as_deref());
-    append_display(command, "--trace-queue-capacity", args.trace_queue_capacity);
-    append_string(
-        command,
-        "--trace-mem-budget",
-        args.trace_mem_budget.as_deref(),
-    );
-    append_string(
-        command,
-        "--trace-segment-size",
-        args.trace_segment_size.as_deref(),
-    );
-    append_string(
-        command,
-        "--trace-disk-budget",
-        args.trace_disk_budget.as_deref(),
-    );
-    append_string(
-        command,
-        "--trace-spill-compression",
-        args.trace_spill_compression.as_deref(),
-    );
-    append_flag(command, "--no-mitm", args.no_mitm);
-    append_flag(command, "--strict-mitm", args.strict_mitm);
-    append_display(
-        command,
-        "--mitm-cert-cache-capacity",
-        args.mitm_cert_cache_capacity,
-    );
-    append_display(
-        command,
-        "--mitm-failure-cache-capacity",
-        args.mitm_failure_cache_capacity,
-    );
-    append_display(
-        command,
-        "--mitm-failure-ttl-seconds",
-        args.mitm_failure_ttl_seconds,
-    );
-    append_display(
-        command,
-        "--connect-probe-timeout-ms",
-        args.connect_probe_timeout_ms,
-    );
-    append_display(
-        command,
-        "--h1-pool-max-active-per-key",
-        args.h1_pool_max_active_per_key,
-    );
-    append_display(
-        command,
-        "--h1-pool-wait-timeout-ms",
-        args.h1_pool_wait_timeout_ms,
-    );
-    append_display(
-        command,
-        "--h2-pool-max-active-streams-per-key",
-        args.h2_pool_max_active_streams_per_key,
-    );
-    append_display(
-        command,
-        "--h2-pool-wait-timeout-ms",
-        args.h2_pool_wait_timeout_ms,
-    );
-    append_display(
-        command,
-        "--tcp-connect-timeout-ms",
-        args.tcp_connect_timeout_ms,
-    );
-    append_display(command, "--dns-timeout-ms", args.dns_timeout_ms);
-    append_display(command, "--dns-cache", args.dns_cache);
-    for server in &args.dns_server {
-        command.args(["--dns-server", server]);
-    }
-    append_display(
-        command,
-        "--client-tls-handshake-timeout-ms",
-        args.client_tls_handshake_timeout_ms,
-    );
-    append_display(
-        command,
-        "--upstream-tls-handshake-timeout-ms",
-        args.upstream_tls_handshake_timeout_ms,
-    );
-    append_display(
-        command,
-        "--upstream-ttfb-timeout-ms",
-        args.upstream_ttfb_timeout_ms,
-    );
-    append_display(command, "--request-timeout-ms", args.request_timeout_ms);
-    append_flag(command, "--no-trace-body", args.no_trace_body);
-}
-
-fn append_string(command: &mut Command, name: &str, value: Option<&str>) {
-    if let Some(value) = value {
-        command.args([name, value]);
-    }
-}
-
-fn append_path(command: &mut Command, name: &str, value: Option<&Path>) {
-    if let Some(value) = value {
-        command.arg(name).arg(value);
-    }
-}
-
-fn append_display<T: ToString>(command: &mut Command, name: &str, value: Option<T>) {
-    if let Some(value) = value {
-        command.arg(name).arg(value.to_string());
-    }
-}
-
-fn append_flag(command: &mut Command, name: &str, enabled: bool) {
-    if enabled {
-        command.arg(name);
-    }
 }

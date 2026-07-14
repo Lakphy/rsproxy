@@ -3,4 +3,6 @@
 
 const { run } = require('@rsproxy/runtime');
 
-process.exitCode = run();
+run().then((code) => {
+  process.exitCode = code;
+});

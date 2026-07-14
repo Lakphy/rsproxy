@@ -20,7 +20,12 @@ pub(super) fn rules_cmd(args: RulesArgs, json: bool) -> CliResult<()> {
     let config = runtime_config(&RuntimeArgs::from_client(args.client))?;
     let api = config.api.clone();
     let storage = config.engine().storage.clone();
-    match args.command {
+    // `rsproxy rules` with no subcommand defaults to listing groups, matching
+    // the default-status behavior of `ca` and `proxy`.
+    let Some(command) = args.command else {
+        return run_rules_list(json, &api, &storage);
+    };
+    match command {
         RulesCommand::Check(args) => {
             let text = if let Some(file) = args.file {
                 fs::read_to_string(&file).map_err(|source| {
@@ -39,12 +44,14 @@ pub(super) fn rules_cmd(args: RulesArgs, json: bool) -> CliResult<()> {
             }
             Ok(())
         }
-        RulesCommand::Set(args) => run_rules_set(&args.group, args.file.as_deref(), &api, &storage),
+        RulesCommand::Set(args) => {
+            run_rules_set(&args.group, args.file.as_deref(), &api, &storage, json)
+        }
         RulesCommand::Cat(args) => run_rules_cat(&args.group, json, &api, &storage),
-        RulesCommand::Edit(args) => run_rules_edit(&args.group, &api, &storage),
-        RulesCommand::Remove(args) => run_rules_remove(&args.group, &api, &storage),
-        RulesCommand::Enable(args) => run_rules_toggle(&args.group, &api, &storage, true),
-        RulesCommand::Disable(args) => run_rules_toggle(&args.group, &api, &storage, false),
+        RulesCommand::Edit(args) => run_rules_edit(&args.group, &api, &storage, json),
+        RulesCommand::Remove(args) => run_rules_remove(&args.group, &api, &storage, json),
+        RulesCommand::Enable(args) => run_rules_toggle(&args.group, &api, &storage, true, json),
+        RulesCommand::Disable(args) => run_rules_toggle(&args.group, &api, &storage, false, json),
         RulesCommand::List(_) => run_rules_list(json, &api, &storage),
         RulesCommand::Stats(args) => {
             let rules = load_rule_set(args.file.as_deref(), &api, &storage)?;

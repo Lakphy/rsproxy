@@ -57,3 +57,22 @@ fn unix_process_helpers_cover_detach_invalid_and_absent_processes() {
     assert_eq!(resident_kib(absent_pid), None);
     assert!(resident_kib(std::process::id()).is_some());
 }
+
+#[cfg(any(target_os = "macos", target_os = "linux", windows))]
+#[test]
+fn port_owner_resolves_to_this_process() {
+    use std::net::TcpListener;
+
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let port = listener.local_addr().unwrap().port();
+
+    assert_eq!(
+        pid_listening_on("127.0.0.1", port),
+        Some(std::process::id())
+    );
+
+    let path = process_executable_path(std::process::id()).unwrap();
+    assert!(path.file_stem().is_some());
+
+    drop(listener);
+}

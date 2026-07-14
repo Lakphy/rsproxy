@@ -1,39 +1,42 @@
 use super::command::{ReplayArgs, RuntimeArgs, TraceArgs, TraceCommand, ValuesArgs, ValuesCommand};
 use super::config::runtime_config;
 use super::util::{percent_encode, read_stdin};
+use crate::app::AppConfig;
 use crate::{CliError, CliResult};
-use rsproxy_control::{api_request, api_stream_lines};
+use rsproxy_control::{api_request, api_request_with_timeout, api_stream_lines};
 use std::fs;
+use std::time::Duration;
+
+/// Default number of recent sessions listed by `trace` with no subcommand,
+/// matching the `--limit` default of `trace ls`.
+const DEFAULT_TRACE_LIST_LIMIT: usize = 20;
 
 pub(super) fn trace_cmd(args: TraceArgs, json: bool) -> CliResult<()> {
     let config = runtime_config(&RuntimeArgs::from_client(args.client))?;
     let api = config.api.clone();
-    match args.command {
-        TraceCommand::List(args) => {
-            let endpoint = if json {
-                "/api/sessions"
-            } else {
-                "/api/sessions.txt"
-            };
-            println!(
-                "{}",
-                api_request("GET", &api, &format!("{endpoint}?limit={}", args.limit), "",)?
-            );
-            Ok(())
-        }
+    // `rsproxy trace` with no subcommand defaults to listing recent sessions,
+    // matching the default-status behavior of `ca` and `proxy`.
+    let Some(command) = args.command else {
+        return run_trace_list(&api, DEFAULT_TRACE_LIST_LIMIT, json);
+    };
+    match command {
+        TraceCommand::List(args) => run_trace_list(&api, args.limit, json),
         TraceCommand::Get(args) => {
-            println!(
-                "{}",
-                api_request("GET", &api, &format!("/api/sessions/{}", args.id), "")?
-            );
+            let body = api_request("GET", &api, &format!("/api/sessions/{}", args.id), "")?;
+            println!("{}", super::output::trace_detail(&body, json)?);
             Ok(())
         }
         TraceCommand::Stats(_) => {
-            println!("{}", api_request("GET", &api, "/api/trace/stats", "")?);
+            let body = api_request("GET", &api, "/api/trace/stats", "")?;
+            println!("{}", super::output::trace_stats(&body, json)?);
             Ok(())
         }
         TraceCommand::Clear(_) => {
-            println!("{}", api_request("POST", &api, "/api/trace/clear", "")?);
+            let body = api_request("POST", &api, "/api/trace/clear", "")?;
+            println!(
+                "{}",
+                super::output::mutation(&body, json, "cleared captured sessions")?
+            );
             Ok(())
         }
         TraceCommand::Follow(args) => {
@@ -74,55 +77,34 @@ pub(super) fn trace_cmd(args: TraceArgs, json: bool) -> CliResult<()> {
             }
             Ok(())
         }
+        TraceCommand::Replay(args) => replay_with_config(&config, &args.id, json),
     }
+}
+
+fn run_trace_list(api: &str, limit: usize, json: bool) -> CliResult<()> {
+    let endpoint = if json {
+        "/api/sessions"
+    } else {
+        "/api/sessions.txt"
+    };
+    println!(
+        "{}",
+        api_request("GET", api, &format!("{endpoint}?limit={limit}"), "")?
+    );
+    Ok(())
 }
 
 pub(super) fn values_cmd(args: ValuesArgs, json: bool) -> CliResult<()> {
     let config = runtime_config(&RuntimeArgs::from_client(args.client))?;
     let api = config.api.clone();
     let storage = config.engine().storage.clone();
-    match args.command {
-        ValuesCommand::List(_) => match api_request(
-            "GET",
-            &api,
-            if json {
-                "/api/values"
-            } else {
-                "/api/values.txt"
-            },
-            "",
-        ) {
-            Ok(body) => {
-                println!("{body}");
-                Ok(())
-            }
-            Err(_) => {
-                let dir = storage.join("values");
-                let mut names = Vec::new();
-                if let Ok(entries) = fs::read_dir(dir) {
-                    for entry in entries.flatten() {
-                        if entry.file_type().map(|ty| ty.is_file()).unwrap_or(false) {
-                            names.push(entry.file_name().to_string_lossy().into_owned());
-                        }
-                    }
-                }
-                names.sort();
-                if json {
-                    println!(
-                        "{}",
-                        serde_json::to_string(&names).map_err(|source| CliError::Json {
-                            context: "serialize value names",
-                            source,
-                        })?
-                    );
-                } else {
-                    for name in names {
-                        println!("{name}");
-                    }
-                }
-                Ok(())
-            }
-        },
+    // `rsproxy values` with no subcommand defaults to listing stored values,
+    // matching the default-status behavior of `ca` and `proxy`.
+    let Some(command) = args.command else {
+        return run_values_list(&api, &storage, json);
+    };
+    match command {
+        ValuesCommand::List(_) => run_values_list(&api, &storage, json),
         ValuesCommand::Cat(args) => {
             let value = match api_request(
                 "GET",
@@ -170,7 +152,10 @@ pub(super) fn values_cmd(args: ValuesArgs, json: bool) -> CliResult<()> {
                 &format!("/api/values/{}", percent_encode(&args.key)),
                 &body,
             ) {
-                Ok(response) => println!("{response}"),
+                Ok(response) => println!(
+                    "{}",
+                    super::output::mutation(&response, json, &format!("saved value {}", args.key))?
+                ),
                 Err(_) => println!("saved value {} to {}", args.key, storage.display()),
             }
             Ok(())
@@ -183,7 +168,14 @@ pub(super) fn values_cmd(args: ValuesArgs, json: bool) -> CliResult<()> {
                 &format!("/api/values/{}", percent_encode(&args.key)),
                 "",
             ) {
-                Ok(response) => println!("{response}"),
+                Ok(response) => println!(
+                    "{}",
+                    super::output::mutation(
+                        &response,
+                        json,
+                        &format!("removed value {}", args.key)
+                    )?
+                ),
                 Err(_) => println!("removed value {} from {}", args.key, storage.display()),
             }
             Ok(())
@@ -191,11 +183,69 @@ pub(super) fn values_cmd(args: ValuesArgs, json: bool) -> CliResult<()> {
     }
 }
 
-pub(super) fn replay_cmd(args: ReplayArgs) -> CliResult<()> {
-    let api = runtime_config(&RuntimeArgs::from_client(args.client))?.api;
-    println!(
-        "{}",
-        api_request("POST", &api, &format!("/api/replay/{}", args.id), "")?
-    );
+fn run_values_list(api: &str, storage: &std::path::Path, json: bool) -> CliResult<()> {
+    match api_request(
+        "GET",
+        api,
+        if json {
+            "/api/values"
+        } else {
+            "/api/values.txt"
+        },
+        "",
+    ) {
+        Ok(body) => {
+            println!("{body}");
+            Ok(())
+        }
+        Err(_) => {
+            let dir = storage.join("values");
+            let mut names = Vec::new();
+            if let Ok(entries) = fs::read_dir(dir) {
+                for entry in entries.flatten() {
+                    if entry.file_type().map(|ty| ty.is_file()).unwrap_or(false) {
+                        names.push(entry.file_name().to_string_lossy().into_owned());
+                    }
+                }
+            }
+            names.sort();
+            if json {
+                println!(
+                    "{}",
+                    serde_json::to_string(&names).map_err(|source| CliError::Json {
+                        context: "serialize value names",
+                        source,
+                    })?
+                );
+            } else {
+                for name in names {
+                    println!("{name}");
+                }
+            }
+            Ok(())
+        }
+    }
+}
+
+pub(super) fn replay_cmd(args: ReplayArgs, json: bool) -> CliResult<()> {
+    let config = runtime_config(&RuntimeArgs::from_client(args.client))?;
+    replay_with_config(&config, &args.id, json)
+}
+
+/// Replays one captured session against the resolved control endpoint. Shared by
+/// the top-level `replay` command and the trace-scoped `trace replay` subcommand.
+fn replay_with_config(config: &AppConfig, id: &str, json: bool) -> CliResult<()> {
+    let timeout = config
+        .engine()
+        .request_total_timeout
+        .saturating_add(Duration::from_secs(1));
+    let body = api_request_with_timeout(
+        "POST",
+        &config.api,
+        &format!("/api/replay/{id}"),
+        "",
+        timeout,
+    )?;
+    println!("{}", super::output::replay(&body, json)?);
     Ok(())
 }

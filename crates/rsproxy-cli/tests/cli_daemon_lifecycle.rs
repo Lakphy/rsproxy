@@ -115,10 +115,161 @@ fn daemon_start_fails_cleanly_when_the_proxy_listener_is_occupied() {
     );
 
     assert!(!output.status.success());
-    assert!(stderr(&output).contains("exited during start"));
+    // The bind failure is surfaced directly in the CLI error instead of only in the daemon log.
+    assert!(stderr(&output).contains("bind proxy listener"));
     assert!(!storage.join("run/rsproxy.pid").exists());
-    let log = fs::read_to_string(storage.join("run/rsproxy.log")).unwrap();
-    assert!(log.contains("bind proxy listener"));
+    let _ = fs::remove_dir_all(storage);
+}
+
+#[test]
+fn stop_reclaims_an_orphaned_run_process_holding_the_proxy_port() {
+    let storage = unique_temp_dir("daemon-orphan-reclaim");
+    let proxy_port = unused_port();
+    let mut api_port = unused_port();
+    while api_port == proxy_port {
+        api_port = unused_port();
+    }
+    let api = format!("127.0.0.1:{api_port}");
+    let proxy = proxy_port.to_string();
+
+    // A foreground `run` writes no pidfile, so a leaked instance is invisible to a pidfile-based
+    // stop; the port-owner recovery path must find and reclaim it.
+    let orphan = Command::new(env!("CARGO_BIN_EXE_rsproxy"))
+        .arg("run")
+        .args([
+            "--host",
+            "127.0.0.1",
+            "--port",
+            &proxy,
+            "--api",
+            &api,
+            "--storage",
+        ])
+        .arg(&storage)
+        .args(["--no-mitm", "--trace-disk-budget", "0"])
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+        .unwrap();
+    wait_until_listening(proxy_port);
+    assert!(
+        !storage.join("run/rsproxy.pid").exists(),
+        "run writes no pidfile"
+    );
+
+    // In production the orphan reparents to init, which reaps it once stop signals it. Here the
+    // orphan is our child, so reap it in the background — an unreaped zombie still answers
+    // `kill -0`, which would make stop believe it never exited.
+    let reaper = std::thread::spawn(move || {
+        let mut orphan = orphan;
+        let _ = orphan.wait();
+    });
+
+    let stop = command_output(
+        Command::new(env!("CARGO_BIN_EXE_rsproxy"))
+            .arg("stop")
+            .args([
+                "--host",
+                "127.0.0.1",
+                "--port",
+                &proxy,
+                "--api",
+                &api,
+                "--storage",
+            ])
+            .arg(&storage),
+    );
+    assert_success("stop reclaim", &stop);
+    assert!(stdout(&stop).contains("reclaimed"));
+    assert!(
+        TcpListener::bind(("127.0.0.1", proxy_port)).is_ok(),
+        "port freed"
+    );
+
+    reaper.join().unwrap();
+    let _ = fs::remove_dir_all(storage);
+}
+
+#[test]
+fn stop_refuses_to_reclaim_a_foreign_process_holding_the_proxy_port() {
+    let occupied = TcpListener::bind("127.0.0.1:0").unwrap();
+    let proxy_port = occupied.local_addr().unwrap().port().to_string();
+    let api = format!("127.0.0.1:{}", unused_port());
+    let storage = unique_temp_dir("daemon-foreign-port");
+
+    // The test harness itself holds the port; stop must not signal an unrelated process.
+    let output = command_output(
+        Command::new(env!("CARGO_BIN_EXE_rsproxy"))
+            .arg("stop")
+            .args([
+                "--host",
+                "127.0.0.1",
+                "--port",
+                &proxy_port,
+                "--api",
+                &api,
+                "--storage",
+            ])
+            .arg(&storage),
+    );
+
+    assert!(!output.status.success());
+    assert_eq!(output.status.code(), Some(3));
+    assert!(stderr(&output).contains("not rsproxy"));
+    assert!(occupied.local_addr().is_ok(), "listener retained");
+    let _ = fs::remove_dir_all(storage);
+}
+
+#[cfg(unix)]
+#[test]
+fn run_shuts_down_when_its_supervisor_dies() {
+    let storage = unique_temp_dir("daemon-watchdog");
+    let proxy_port = unused_port();
+    let mut api_port = unused_port();
+    while api_port == proxy_port {
+        api_port = unused_port();
+    }
+    let api = format!("127.0.0.1:{api_port}");
+    let proxy = proxy_port.to_string();
+
+    // A stand-in for the npm shim: run watches this pid and must exit when it dies, covering the
+    // uncatchable-SIGKILL case that signal forwarding alone cannot.
+    let mut supervisor = Command::new("sleep").arg("60").spawn().unwrap();
+
+    let run = Command::new(env!("CARGO_BIN_EXE_rsproxy"))
+        .arg("run")
+        .args([
+            "--host",
+            "127.0.0.1",
+            "--port",
+            &proxy,
+            "--api",
+            &api,
+            "--storage",
+        ])
+        .arg(&storage)
+        .args(["--no-mitm", "--trace-disk-budget", "0"])
+        .env("RSPROXY_SUPERVISOR_PID", supervisor.id().to_string())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+        .unwrap();
+    let run_pid = run.id();
+    let reaper = std::thread::spawn(move || {
+        let mut run = run;
+        let _ = run.wait();
+    });
+
+    wait_until_listening(proxy_port);
+    let _ = supervisor.kill();
+    let _ = supervisor.wait();
+
+    wait_for_exit(run_pid);
+    assert!(
+        TcpListener::bind(("127.0.0.1", proxy_port)).is_ok(),
+        "port freed after watchdog shutdown"
+    );
+    reaper.join().unwrap();
     let _ = fs::remove_dir_all(storage);
 }
 
@@ -154,13 +305,24 @@ fn unix_daemon_defaults_to_a_private_storage_local_control_socket() {
     let storage = unique_temp_dir("unix-default-control");
     let run = |command: &str, proxy_port: u16| {
         let port = proxy_port.to_string();
-        command_output(
-            Command::new(env!("CARGO_BIN_EXE_rsproxy"))
-                .arg(command)
-                .args(["--host", "127.0.0.1", "--port", &port, "--storage"])
-                .arg(&storage)
-                .args(["--no-mitm", "--trace-disk-budget", "0"]),
-        )
+        let mut rsproxy = Command::new(env!("CARGO_BIN_EXE_rsproxy"));
+        rsproxy.arg(command);
+        if command == "status" {
+            rsproxy.arg("--json");
+        }
+        rsproxy.arg("--storage").arg(&storage);
+        if matches!(command, "start" | "run" | "restart") {
+            rsproxy.args([
+                "--host",
+                "127.0.0.1",
+                "--port",
+                &port,
+                "--no-mitm",
+                "--trace-disk-budget",
+                "0",
+            ]);
+        }
+        command_output(&mut rsproxy)
     };
 
     let (proxy_port, start) = start_daemon_on_probed_port(&storage, |port| run("start", port));
@@ -201,21 +363,24 @@ fn windows_daemon_uses_the_authenticated_named_pipe_control_plane() {
     );
     let run = |command: &str, proxy_port: u16| {
         let port = proxy_port.to_string();
-        command_output(
-            Command::new(env!("CARGO_BIN_EXE_rsproxy"))
-                .arg(command)
-                .args([
-                    "--host",
-                    "127.0.0.1",
-                    "--port",
-                    &port,
-                    "--api",
-                    &pipe,
-                    "--storage",
-                ])
-                .arg(&storage)
-                .args(["--no-mitm", "--trace-disk-budget", "0"]),
-        )
+        let mut rsproxy = Command::new(env!("CARGO_BIN_EXE_rsproxy"));
+        rsproxy.arg(command);
+        if command == "status" {
+            rsproxy.arg("--json");
+        }
+        rsproxy.args(["--api", &pipe, "--storage"]).arg(&storage);
+        if matches!(command, "start" | "run" | "restart") {
+            rsproxy.args([
+                "--host",
+                "127.0.0.1",
+                "--port",
+                &port,
+                "--no-mitm",
+                "--trace-disk-budget",
+                "0",
+            ]);
+        }
+        command_output(&mut rsproxy)
     };
 
     let (proxy_port, start) = start_daemon_on_probed_port(&storage, |port| run("start", port));

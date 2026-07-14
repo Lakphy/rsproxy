@@ -3,6 +3,7 @@ pub(crate) mod ca;
 pub(crate) mod command;
 pub(crate) mod config;
 mod daemon;
+mod output;
 mod rules;
 mod system_proxy;
 mod trace;
@@ -11,7 +12,7 @@ mod util;
 use crate::tui;
 use crate::{CliError, CliResult, DaemonConflict};
 use clap::{CommandFactory, Parser};
-use command::{Cli, CompletionShell, TopLevelCommand};
+use command::{Cli, CompletionShell, ConfigCommand, RuntimeArgs, TopLevelCommand};
 use rsproxy_control::api_request;
 use std::io;
 
@@ -51,7 +52,7 @@ pub fn run_parsed(cli: ParsedCli) -> CliResult<()> {
     match command {
         TopLevelCommand::Run(args) => daemon::run_server(&args),
         TopLevelCommand::Start(args) => daemon::start_server(&args),
-        TopLevelCommand::Stop(args) => daemon::stop_server(&args),
+        TopLevelCommand::Stop(args) => daemon::stop_server(&args.into_runtime()),
         TopLevelCommand::Restart(args) => match daemon::stop_server(&args) {
             Ok(()) | Err(CliError::DaemonConflict(DaemonConflict::NotRunning { .. })) => {
                 daemon::start_server(&args)
@@ -59,9 +60,10 @@ pub fn run_parsed(cli: ParsedCli) -> CliResult<()> {
             Err(error) => Err(error),
         },
         TopLevelCommand::Status(args) => {
-            api_auth::configure_client_api_auth(&args.client)?;
-            let config = config::runtime_config(&args)?;
-            println!("{}", api_request("GET", &config.api, "/api/status", "")?);
+            api_auth::configure_client_api_auth(&args)?;
+            let config = config::runtime_config(&RuntimeArgs::from_client(args))?;
+            let body = api_request("GET", &config.api, "/api/status", "")?;
+            println!("{}", output::status(&body, cli.json)?);
             Ok(())
         }
         TopLevelCommand::Rules(args) => {
@@ -82,7 +84,22 @@ pub fn run_parsed(cli: ParsedCli) -> CliResult<()> {
         }
         TopLevelCommand::Replay(args) => {
             api_auth::configure_client_api_auth(&args.client)?;
-            trace::replay_cmd(args)
+            trace::replay_cmd(args, cli.json)
+        }
+        TopLevelCommand::Config(args) => {
+            let runtime = RuntimeArgs::from_client(args.client);
+            // `rsproxy config` with no subcommand defaults to `show`.
+            match args.command {
+                None | Some(ConfigCommand::Show(_)) => {
+                    let config = config::runtime_config(&runtime)?;
+                    println!("{}", output::config(&config, cli.json)?);
+                }
+                Some(ConfigCommand::Path(_)) => match config::effective_config_path(&runtime) {
+                    Some(path) => println!("{}", path.display()),
+                    None => println!("built-in defaults (no config file loaded)"),
+                },
+            }
+            Ok(())
         }
         TopLevelCommand::Ca(args) => ca::ca_cmd(args, cli.json),
         TopLevelCommand::Proxy(args) => system_proxy::system_proxy_cmd(args, cli.json),

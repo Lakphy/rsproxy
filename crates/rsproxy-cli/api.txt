@@ -50,9 +50,13 @@ pub rsproxy_cli::CliError::ListenerSupervision
 pub rsproxy_cli::CliError::ListenerSupervision::source: std::sync::mpsc::RecvError
 pub rsproxy_cli::CliError::Logging(rsproxy_cli::LoggingError)
 pub rsproxy_cli::CliError::Platform(rsproxy_platform::error::PlatformError)
+pub rsproxy_cli::CliError::PortHeldByForeignProcess
+pub rsproxy_cli::CliError::PortHeldByForeignProcess::addr: alloc::string::String
+pub rsproxy_cli::CliError::PortHeldByForeignProcess::pid: u32
 pub rsproxy_cli::CliError::RuleDiagnostics(rsproxy_cli::RuleDiagnostics)
 pub rsproxy_cli::CliError::RuleModel(rsproxy_rules::error::RuleModelError)
 pub rsproxy_cli::CliError::RuleStore(rsproxy_engine::rule_store::RuleStoreError)
+pub rsproxy_cli::CliError::SupervisorExited
 pub rsproxy_cli::CliError::Usage(alloc::string::String)
 impl rsproxy_cli::CliError
 pub const fn rsproxy_cli::CliError::code(&self) -> &'static str

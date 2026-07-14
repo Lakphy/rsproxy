@@ -17,7 +17,7 @@ edition = "2024"
 license = "MIT"
 publish = false
 rust-version = "1.88"
-version = "0.0.1"
+version = "0.0.2"
 
 [workspace.dependencies]
 aho-corasick = "1"
@@ -68,6 +68,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 webpki-roots = "1"
 windows-sys = { version = "0.61", features = [
     "Win32_Foundation",
+    "Win32_NetworkManagement_IpHelper",
     "Win32_Networking_WinInet",
     "Win32_Security",
     "Win32_Storage_FileSystem",

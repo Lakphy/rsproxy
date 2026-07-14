@@ -46,12 +46,14 @@ pub(crate) enum ProxyCommand {
     Status(ProxyStatusArgs),
     /// Route operating-system HTTP/HTTPS traffic through rsproxy.
     #[command(
+        visible_alias = "enable",
         long_about = "Configure and enable both HTTP and HTTPS proxy routing. The target defaults to the resolved rsproxy listener. On macOS, select one network service with --service or explicitly select every enabled service with --all.",
         after_help = "SAFE WORKFLOW:\n  rsproxy start\n  rsproxy proxy on --all --dry-run\n  rsproxy proxy on --all\n  rsproxy proxy status\n\nFor one macOS service, use `--service Wi-Fi` instead of `--all`. Restore routing with the matching `rsproxy proxy off` command."
     )]
     On(ProxyMutationArgs),
     /// Disable operating-system HTTP/HTTPS proxy routing.
     #[command(
+        visible_alias = "disable",
         long_about = "Disable HTTP and HTTPS proxy routing through the native platform backend. On macOS, use the same --service selection used when enabling the proxy, or --all to cover every enabled service.",
         after_help = "EXAMPLES:\n  rsproxy proxy off --all --dry-run\n  rsproxy proxy off --all\n  rsproxy proxy status\n\nFor one macOS service:\n  rsproxy proxy off --service Wi-Fi"
     )]

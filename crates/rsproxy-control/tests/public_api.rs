@@ -6,8 +6,9 @@
 
 use rsproxy_control::{
     ControlError, ControlListener, ControlOptions, ControlResult, ControlState, api_request,
-    api_token_path, bind, prepare_server_api_auth, resolve_client_api_token, serve, set_api_token,
-    unix_api_path, validate_api_token, windows_pipe_path,
+    api_request_with_timeout, api_token_path, bind, prepare_server_api_auth,
+    resolve_client_api_token, serve, set_api_token, unix_api_path, validate_api_token,
+    windows_pipe_path,
 };
 use rsproxy_engine::{EngineError, ProxyConfig, SharedState};
 use std::time::Duration;
@@ -60,6 +61,8 @@ fn public_facade_composes_an_engine_handle_with_control_options() {
     assert!(listener.endpoint().unwrap().starts_with("127.0.0.1:"));
 
     let _request: fn(&str, &str, &str, &str) -> ControlResult<String> = api_request;
+    let _timed_request: fn(&str, &str, &str, &str, Duration) -> ControlResult<String> =
+        api_request_with_timeout;
     let _bind: fn(&str) -> ControlResult<ControlListener> = bind;
     let _endpoint: fn(&ControlListener) -> ControlResult<String> = ControlListener::endpoint;
     let _serve: fn(ControlListener, ControlState) -> ControlResult<()> = serve;

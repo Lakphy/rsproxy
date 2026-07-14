@@ -29,6 +29,7 @@ pub(crate) fn run_rules_set(
     file: Option<&Path>,
     api: &str,
     storage: &Path,
+    json: bool,
 ) -> CliResult<()> {
     validate_group(group)?;
     let text = if let Some(file) = file {
@@ -37,7 +38,7 @@ pub(crate) fn run_rules_set(
     } else {
         read_stdin()?
     };
-    save_group(group, text, api, storage)
+    save_group(group, text, api, storage, json)
 }
 
 pub(crate) fn run_rules_cat(group: &str, json: bool, api: &str, storage: &Path) -> CliResult<()> {
@@ -87,9 +88,14 @@ pub(crate) fn run_rules_list(json_output: bool, api: &str, storage: &Path) -> Cl
     Ok(())
 }
 
-pub(crate) fn run_rules_remove(group: &str, api: &str, storage: &Path) -> CliResult<()> {
+pub(crate) fn run_rules_remove(
+    group: &str,
+    api: &str,
+    storage: &Path,
+    json: bool,
+) -> CliResult<()> {
     validate_group(group)?;
-    change_group(group, "DELETE", None, api, storage)
+    change_group(group, "DELETE", None, api, storage, json)
 }
 
 pub(crate) fn run_rules_toggle(
@@ -97,6 +103,7 @@ pub(crate) fn run_rules_toggle(
     api: &str,
     storage: &Path,
     enabled: bool,
+    json: bool,
 ) -> CliResult<()> {
     validate_group(group)?;
     change_group(
@@ -105,10 +112,11 @@ pub(crate) fn run_rules_toggle(
         Some(if enabled { "enable" } else { "disable" }),
         api,
         storage,
+        json,
     )
 }
 
-pub(super) fn run_rules_edit(group: &str, api: &str, storage: &Path) -> CliResult<()> {
+pub(super) fn run_rules_edit(group: &str, api: &str, storage: &Path, json: bool) -> CliResult<()> {
     validate_group(group)?;
     let existing = match api_request("GET", api, &group_api_path(group), "") {
         Ok(text) => text,
@@ -145,7 +153,7 @@ pub(super) fn run_rules_edit(group: &str, api: &str, storage: &Path) -> CliResul
     });
     let _ = fs::remove_file(&edit_path);
     edit_result?;
-    save_group(group, text_result?, api, storage)
+    save_group(group, text_result?, api, storage, json)
 }
 
 pub(crate) fn load_rule_set(file: Option<&Path>, api: &str, storage: &Path) -> CliResult<RuleSet> {
@@ -175,11 +183,15 @@ pub(crate) fn load_rule_set(file: Option<&Path>, api: &str, storage: &Path) -> C
     Ok(RuleStore::load(storage)?.snapshot().compiled.clone())
 }
 
-fn save_group(group: &str, text: String, api: &str, storage: &Path) -> CliResult<()> {
+fn save_group(group: &str, text: String, api: &str, storage: &Path, json: bool) -> CliResult<()> {
     RuleSet::parse(group, &text).map_err(RuleDiagnostics)?;
     let path = group_api_path(group);
     match api_request("POST", api, &path, &text) {
-        Ok(body) => println!("{body}"),
+        Ok(body) if json => println!("{body}"),
+        Ok(body) => println!(
+            "{}",
+            super::super::output::rule_mutation(&body, "updated", group)?
+        ),
         Err(_) => {
             RuleStore::load(storage)?.set_group(group, text)?;
             println!("saved rule group {group} to {}", storage.display());
@@ -194,6 +206,7 @@ fn change_group(
     action: Option<&str>,
     api: &str,
     storage: &Path,
+    json: bool,
 ) -> CliResult<()> {
     let mut path = group_api_path(group);
     if let Some(action) = action {
@@ -201,7 +214,19 @@ fn change_group(
         path.push_str(action);
     }
     match api_request(method, api, &path, "") {
-        Ok(body) => println!("{body}"),
+        Ok(body) if json => println!("{body}"),
+        Ok(body) => {
+            let action = match (method, action) {
+                ("DELETE", None) => "removed",
+                ("POST", Some("enable")) => "enabled",
+                ("POST", Some("disable")) => "disabled",
+                _ => "updated",
+            };
+            println!(
+                "{}",
+                super::super::output::rule_mutation(&body, action, group)?
+            );
+        }
         Err(_) => {
             let store = RuleStore::load(storage)?;
             match (method, action) {

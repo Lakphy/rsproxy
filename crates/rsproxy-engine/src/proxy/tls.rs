@@ -10,6 +10,7 @@ pub(crate) use certificates::{
     ensure_leaf_certificate, load_certs, load_certs_from_pem, load_private_key,
 };
 pub(crate) use config::initialize_upstream_roots;
+pub(crate) use config::replay_client_config;
 pub(super) use config::{
     ca_initialized, mitm_client_config, mitm_server_config, tls_client_identity,
 };

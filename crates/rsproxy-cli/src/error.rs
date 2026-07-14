@@ -105,6 +105,19 @@ pub enum CliError {
         /// Daemon process identifier that did not terminate.
         pid: u32,
     },
+    /// The foreground process observed its supervising launcher exit and shut down cleanly.
+    ///
+    /// Signalled internally through the listener channel; `run` treats it as a successful exit.
+    #[error("supervising process exited")]
+    SupervisorExited,
+    /// A configured port is held by a process that is not this rsproxy build.
+    #[error("{addr} is held by process {pid}, which is not rsproxy; stop it manually")]
+    PortHeldByForeignProcess {
+        /// Address that could not be reclaimed.
+        addr: String,
+        /// Process identifier currently holding the address.
+        pid: u32,
+    },
     /// A platform adapter returned a typed state invalid for the requested command.
     #[error("invalid platform outcome: {detail}")]
     InvalidPlatformOutcome {
@@ -138,7 +151,9 @@ impl CliError {
             Self::Logging(_) => "config_error",
             Self::DaemonExited { .. }
             | Self::DaemonReadinessTimeout { .. }
-            | Self::DaemonStopTimeout { .. } => "daemon_error",
+            | Self::DaemonStopTimeout { .. }
+            | Self::SupervisorExited => "daemon_error",
+            Self::PortHeldByForeignProcess { .. } => "daemon_conflict",
             Self::InvalidPlatformOutcome { .. } => "platform_error",
             Self::InvalidRuleOperation => "rule_error",
         }
@@ -148,7 +163,7 @@ impl CliError {
     pub const fn exit_code(&self) -> i32 {
         match self {
             Self::Usage(_) | Self::Clap(_) => 2,
-            Self::DaemonConflict(_) => 3,
+            Self::DaemonConflict(_) | Self::PortHeldByForeignProcess { .. } => 3,
             _ => 1,
         }
     }

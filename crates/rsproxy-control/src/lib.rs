@@ -18,7 +18,9 @@
 //! `/api/sessions/*` and `/api/trace/*` to trace queries and streaming export,
 //! `/api/replay/<id>` to engine replay, and `/api/ca/root.pem` to the injected
 //! root certificate. [`client::api_request`] performs one connection-closing
-//! request; [`client::api_stream_lines`] consumes newline-delimited follow data.
+//! request with the standard timeout, [`client::api_request_with_timeout`]
+//! supports bounded long operations, and [`client::api_stream_lines`] consumes
+//! newline-delimited follow data.
 
 pub mod client;
 mod error;
@@ -26,8 +28,8 @@ pub mod server;
 mod shapes;
 
 pub use client::{
-    api_request, api_stream_lines, api_token_path, prepare_server_api_auth,
-    resolve_client_api_token, set_api_token, validate_api_token,
+    api_request, api_request_with_timeout, api_stream_lines, api_token_path,
+    prepare_server_api_auth, resolve_client_api_token, set_api_token, validate_api_token,
 };
 pub use error::{ControlError, ControlResult};
 pub use server::{

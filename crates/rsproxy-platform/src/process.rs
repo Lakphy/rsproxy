@@ -276,11 +276,211 @@ pub fn resident_kib(pid: u32) -> Option<u64> {
     String::from_utf8(output.stdout).ok()?.trim().parse().ok()
 }
 
+#[cfg(target_os = "macos")]
+/// Returns the pid of the process holding a TCP listener on `host:port`, if any.
+///
+/// Uses `lsof`, which ships with macOS; returns `None` when nothing is listening or `lsof`
+/// is unavailable. This is a cold recovery path (orphan cleanup), not a hot code path.
+pub fn pid_listening_on(host: &str, port: u16) -> Option<u32> {
+    let output = Command::new("lsof")
+        .args(["-nP", &format!("-iTCP@{host}:{port}"), "-sTCP:LISTEN", "-t"])
+        .output()
+        .ok()?;
+    String::from_utf8_lossy(&output.stdout)
+        .lines()
+        .find_map(|line| line.trim().parse::<u32>().ok())
+}
+
+#[cfg(target_os = "linux")]
+/// Returns the pid of the process holding a TCP listener on `port`, if any.
+///
+/// Reads `/proc/net/tcp{,6}` for a listening socket on `port`, then scans `/proc/<pid>/fd`
+/// for the owning inode. `host` is accepted for signature parity but not matched, since only
+/// one process can hold a listener on a given port.
+pub fn pid_listening_on(_host: &str, port: u16) -> Option<u32> {
+    use std::collections::HashSet;
+
+    let inodes = listening_socket_inodes(port);
+    if inodes.is_empty() {
+        return None;
+    }
+    let targets: HashSet<String> = inodes
+        .iter()
+        .map(|inode| format!("socket:[{inode}]"))
+        .collect();
+    for entry in std::fs::read_dir("/proc").ok()?.flatten() {
+        let Some(pid) = entry
+            .file_name()
+            .to_str()
+            .and_then(|name| name.parse::<u32>().ok())
+        else {
+            continue;
+        };
+        let Ok(descriptors) = std::fs::read_dir(format!("/proc/{pid}/fd")) else {
+            continue;
+        };
+        for descriptor in descriptors.flatten() {
+            if let Ok(link) = std::fs::read_link(descriptor.path())
+                && link.to_str().is_some_and(|value| targets.contains(value))
+            {
+                return Some(pid);
+            }
+        }
+    }
+    None
+}
+
+#[cfg(target_os = "linux")]
+/// Collects the socket inodes of TCP listeners bound to `port` across IPv4 and IPv6.
+fn listening_socket_inodes(port: u16) -> Vec<u64> {
+    const LISTEN_STATE: &str = "0A";
+
+    let mut inodes = Vec::new();
+    for path in ["/proc/net/tcp", "/proc/net/tcp6"] {
+        let Ok(contents) = std::fs::read_to_string(path) else {
+            continue;
+        };
+        for line in contents.lines().skip(1) {
+            let fields: Vec<&str> = line.split_whitespace().collect();
+            if fields.len() <= 9 || fields[3] != LISTEN_STATE {
+                continue;
+            }
+            let Some((_, hex_port)) = fields[1].rsplit_once(':') else {
+                continue;
+            };
+            if u16::from_str_radix(hex_port, 16).ok() != Some(port) {
+                continue;
+            }
+            if let Ok(inode) = fields[9].parse::<u64>() {
+                inodes.push(inode);
+            }
+        }
+    }
+    inodes
+}
+
+#[cfg(windows)]
+/// Returns the pid of the process holding a TCP listener on `port`, if any.
+///
+/// Queries the IPv4 owner-pid listener table; `host` is accepted for signature parity but not
+/// matched, since only one process can hold a listener on a given port.
+pub fn pid_listening_on(_host: &str, port: u16) -> Option<u32> {
+    use windows_sys::Win32::NetworkManagement::IpHelper::{
+        GetExtendedTcpTable, MIB_TCPTABLE_OWNER_PID, TCP_TABLE_OWNER_PID_LISTENER,
+    };
+
+    // AF_INET; used as a literal to avoid pulling in the WinSock feature.
+    const AF_INET: u32 = 2;
+
+    let mut size: u32 = 0;
+    // SAFETY: a null buffer with zero size only writes the required byte count to `size`.
+    unsafe {
+        GetExtendedTcpTable(
+            std::ptr::null_mut(),
+            &mut size,
+            0,
+            AF_INET,
+            TCP_TABLE_OWNER_PID_LISTENER,
+            0,
+        );
+    }
+    if size == 0 {
+        return None;
+    }
+    let mut buffer = vec![0u8; size as usize];
+    // SAFETY: `buffer` is `size` bytes and writable for the whole call.
+    let result = unsafe {
+        GetExtendedTcpTable(
+            buffer.as_mut_ptr().cast(),
+            &mut size,
+            0,
+            AF_INET,
+            TCP_TABLE_OWNER_PID_LISTENER,
+            0,
+        )
+    };
+    if result != 0 {
+        return None;
+    }
+    // SAFETY: on success the buffer starts with a MIB_TCPTABLE_OWNER_PID header whose
+    // `dwNumEntries` bounds the trailing row array.
+    let table = unsafe { &*(buffer.as_ptr() as *const MIB_TCPTABLE_OWNER_PID) };
+    let rows =
+        unsafe { std::slice::from_raw_parts(table.table.as_ptr(), table.dwNumEntries as usize) };
+    rows.iter()
+        .find(|row| u16::from_be((row.dwLocalPort & 0xFFFF) as u16) == port)
+        .map(|row| row.dwOwningPid)
+}
+
+#[cfg(not(any(target_os = "macos", target_os = "linux", windows)))]
+/// Reports that port-owner inspection is unsupported on this target.
+pub fn pid_listening_on(_host: &str, _port: u16) -> Option<u32> {
+    None
+}
+
+#[cfg(target_os = "macos")]
+/// Returns the executable path of `pid`, or `None` when it cannot be read.
+pub fn process_executable_path(pid: u32) -> Option<std::path::PathBuf> {
+    let mut buffer = vec![0u8; libc::PROC_PIDPATHINFO_MAXSIZE as usize];
+    // SAFETY: proc_pidpath writes at most `buffer.len()` bytes into the owned buffer and
+    // returns the number written; no Rust-managed memory is aliased across the call.
+    let written =
+        unsafe { libc::proc_pidpath(pid as i32, buffer.as_mut_ptr().cast(), buffer.len() as u32) };
+    if written <= 0 {
+        return None;
+    }
+    buffer.truncate(written as usize);
+    Some(std::path::PathBuf::from(
+        String::from_utf8_lossy(&buffer).into_owned(),
+    ))
+}
+
+#[cfg(target_os = "linux")]
+/// Returns the executable path of `pid`, or `None` when it cannot be read.
+pub fn process_executable_path(pid: u32) -> Option<std::path::PathBuf> {
+    std::fs::read_link(format!("/proc/{pid}/exe")).ok()
+}
+
+#[cfg(windows)]
+/// Returns the executable path of `pid`, or `None` when it cannot be read.
+pub fn process_executable_path(pid: u32) -> Option<std::path::PathBuf> {
+    use std::os::windows::ffi::OsStringExt;
+    use windows_sys::Win32::Foundation::CloseHandle;
+    use windows_sys::Win32::System::Threading::{
+        OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION, QueryFullProcessImageNameW,
+    };
+
+    // SAFETY: OpenProcess receives scalar access flags and a numeric pid; the returned
+    // handle is checked for null and closed on every path below.
+    let handle = unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid) };
+    if handle.is_null() {
+        return None;
+    }
+    let mut buffer = vec![0u16; 32768];
+    let mut length = buffer.len() as u32;
+    // SAFETY: `handle` is valid; `buffer`/`length` describe a writable region for the call.
+    let ok = unsafe { QueryFullProcessImageNameW(handle, 0, buffer.as_mut_ptr(), &mut length) };
+    // SAFETY: `handle` is a valid owned process handle closed exactly once.
+    unsafe { CloseHandle(handle) };
+    if ok == 0 {
+        return None;
+    }
+    buffer.truncate(length as usize);
+    Some(std::path::PathBuf::from(std::ffi::OsString::from_wide(
+        &buffer,
+    )))
+}
+
+#[cfg(not(any(target_os = "macos", target_os = "linux", windows)))]
+/// Reports that executable-path inspection is unsupported on this target.
+pub fn process_executable_path(_pid: u32) -> Option<std::path::PathBuf> {
+    None
+}
+
 #[cfg(unix)]
 /// Selects a Unix-domain control socket path for the given storage root.
 ///
-/// Paths up to 96 display bytes remain under `storage/run`; longer paths use a deterministic
-/// per-user name in `/tmp` to stay below common Unix socket address limits.
+/// Paths up to 96 display bytes remain under `storage/run`; longer paths use a deterministic per-user `/tmp` name.
 pub fn unix_control_socket_path(storage: &std::path::Path) -> std::path::PathBuf {
     use sha2::{Digest, Sha256};
 

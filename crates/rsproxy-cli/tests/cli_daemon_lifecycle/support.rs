@@ -39,21 +39,25 @@ impl DaemonHarness {
     pub(super) fn run(&self, command: &str) -> Output {
         let proxy_port = self.proxy_port.to_string();
         let api = format!("127.0.0.1:{}", self.api_port);
-        command_output(
-            Command::new(env!("CARGO_BIN_EXE_rsproxy"))
-                .arg(command)
-                .args([
-                    "--host",
-                    "127.0.0.1",
-                    "--port",
-                    &proxy_port,
-                    "--api",
-                    &api,
-                    "--storage",
-                ])
-                .arg(&self.storage)
-                .args(["--no-mitm", "--trace-disk-budget", "0"]),
-        )
+        let mut rsproxy = Command::new(env!("CARGO_BIN_EXE_rsproxy"));
+        rsproxy.arg(command);
+        if command == "status" {
+            rsproxy.arg("--json");
+        }
+        // Control/storage options apply to every command.
+        rsproxy
+            .args(["--api", &api, "--storage"])
+            .arg(&self.storage);
+        // The listener host/port is accepted by start/run/restart and by `stop`
+        // (to locate an orphaned daemon). `status` takes control args only.
+        if matches!(command, "start" | "run" | "restart" | "stop") {
+            rsproxy.args(["--host", "127.0.0.1", "--port", &proxy_port]);
+        }
+        // Runtime-tuning flags apply to the foreground/daemon start commands only.
+        if matches!(command, "start" | "run" | "restart") {
+            rsproxy.args(["--no-mitm", "--trace-disk-budget", "0"]);
+        }
+        command_output(&mut rsproxy)
     }
 
     pub(super) fn pid_path(&self) -> PathBuf {
@@ -188,9 +192,12 @@ pub(super) fn start_daemon_on_probed_port(
 }
 
 fn lost_probed_port(storage: &Path, output: &Output) -> bool {
-    stderr(output).contains("exited during start")
-        && fs::read_to_string(storage.join("run/rsproxy.log"))
-            .is_ok_and(|log| log.contains("Address already in use"))
+    // `start` now surfaces a lost probe directly ("bind proxy listener ...: Address already in
+    // use") via its pre-flight check; the older daemon-exited path is kept as a fallback.
+    stderr(output).contains("Address already in use")
+        || (stderr(output).contains("exited during start")
+            && fs::read_to_string(storage.join("run/rsproxy.log"))
+                .is_ok_and(|log| log.contains("Address already in use")))
 }
 
 pub(super) fn unique_temp_dir(label: &str) -> PathBuf {
@@ -199,6 +206,17 @@ pub(super) fn unique_temp_dir(label: &str) -> PathBuf {
         .unwrap()
         .as_nanos();
     std::env::temp_dir().join(format!("rsproxy-{label}-{}-{nonce}", std::process::id()))
+}
+
+pub(super) fn wait_until_listening(port: u16) {
+    let deadline = Instant::now() + Duration::from_secs(10);
+    while Instant::now() < deadline {
+        if std::net::TcpStream::connect(("127.0.0.1", port)).is_ok() {
+            return;
+        }
+        thread::sleep(Duration::from_millis(50));
+    }
+    panic!("nothing began listening on 127.0.0.1:{port} within 10 seconds");
 }
 
 pub(super) fn wait_for_exit(pid: u32) {

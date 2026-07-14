@@ -34,15 +34,26 @@ fn exit_parse_error(error: clap::Error) -> ! {
 }
 
 fn render_runtime_error(error: &CliError, json: bool) {
+    let message = error_message(error);
     if json {
-        render_json_error(error.code(), &error.to_string());
+        render_json_error(error.code(), &message);
     } else {
         tracing::error!(event = "cli_failed", code = error.code(), error = %error, "command failed");
-        eprintln!("error: {error}");
+        eprintln!("error: {message}");
         if let Some(hint) = human_hint(error) {
             eprintln!("hint: {hint}");
         }
     }
+}
+
+fn error_message(error: &CliError) -> String {
+    let CliError::Control(rsproxy_control::ControlError::HttpStatus { body, .. }) = error else {
+        return error.to_string();
+    };
+    serde_json::from_str::<serde_json::Value>(body)
+        .ok()
+        .and_then(|value| value.get("error")?.as_str().map(str::to_string))
+        .unwrap_or_else(|| body.clone())
 }
 
 fn human_hint(error: &CliError) -> Option<&'static str> {
@@ -53,6 +64,19 @@ fn human_hint(error: &CliError) -> Option<&'static str> {
         CliError::Config(_) | CliError::Logging(_) => Some(
             "run `rsproxy run --help` to review accepted formats, defaults, and configuration precedence",
         ),
+        CliError::Control(rsproxy_control::ControlError::HttpStatus { .. }) => Some(
+            "the daemon handled the request but the operation failed; review the server error above",
+        ),
+        CliError::Control(rsproxy_control::ControlError::Io { source, .. })
+            if matches!(
+                source.kind(),
+                std::io::ErrorKind::TimedOut | std::io::ErrorKind::WouldBlock
+            ) =>
+        {
+            Some(
+                "the daemon did not finish this operation before its configured timeout; check the target and retry",
+            )
+        }
         CliError::Control(_) => Some(
             "ensure the daemon is running and that --api, --storage, and --api-token select the same instance",
         ),
@@ -85,9 +109,13 @@ fn human_hint(error: &CliError) -> Option<&'static str> {
         CliError::DaemonStopTimeout { .. } => Some(
             "check the process before taking further action; rsproxy avoids force-killing it automatically",
         ),
+        CliError::PortHeldByForeignProcess { .. } => Some(
+            "identify the process holding the port and stop it, or run rsproxy on a different --port",
+        ),
         CliError::Json { .. }
         | CliError::InvalidPlatformOutcome { .. }
-        | CliError::InvalidRuleOperation => None,
+        | CliError::InvalidRuleOperation
+        | CliError::SupervisorExited => None,
     }
 }
 
@@ -104,3 +132,6 @@ fn render_json_error(code: &str, message: &str) {
         })
     );
 }
+
+#[cfg(test)]
+mod tests;

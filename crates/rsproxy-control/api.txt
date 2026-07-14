@@ -1,6 +1,7 @@
 pub mod rsproxy_control
 pub mod rsproxy_control::client
 pub fn rsproxy_control::client::api_request(&str, &str, &str, &str) -> rsproxy_control::ControlResult<alloc::string::String>
+pub fn rsproxy_control::client::api_request_with_timeout(&str, &str, &str, &str, core::time::Duration) -> rsproxy_control::ControlResult<alloc::string::String>
 pub fn rsproxy_control::client::api_stream_lines(&str, &str, impl core::ops::function::FnMut(&str) -> bool) -> rsproxy_control::ControlResult<()>
 pub fn rsproxy_control::client::api_token_path(&std::path::Path) -> std::path::PathBuf
 pub fn rsproxy_control::client::prepare_server_api_auth(&str, &std::path::Path, &mut core::option::Option<alloc::string::String>) -> rsproxy_control::ControlResult<()>
@@ -87,6 +88,7 @@ pub fn rsproxy_control::server::ControlState::new(rsproxy_control::server::Contr
 impl core::clone::Clone for rsproxy_control::server::ControlState
 pub fn rsproxy_control::server::ControlState::clone(&self) -> rsproxy_control::server::ControlState
 pub fn rsproxy_control::api_request(&str, &str, &str, &str) -> rsproxy_control::ControlResult<alloc::string::String>
+pub fn rsproxy_control::api_request_with_timeout(&str, &str, &str, &str, core::time::Duration) -> rsproxy_control::ControlResult<alloc::string::String>
 pub fn rsproxy_control::api_stream_lines(&str, &str, impl core::ops::function::FnMut(&str) -> bool) -> rsproxy_control::ControlResult<()>
 pub fn rsproxy_control::api_token_path(&std::path::Path) -> std::path::PathBuf
 pub fn rsproxy_control::bind(&str) -> rsproxy_control::ControlResult<rsproxy_control::server::ControlListener>
