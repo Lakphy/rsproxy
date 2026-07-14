@@ -1,8 +1,10 @@
 'use strict';
 
-const { spawnSync } = require('node:child_process');
+const childProcess = require('node:child_process');
 const { constants } = require('node:os');
 const { resolveBinary } = require('./platform');
+
+const FORWARDED_SIGNALS = ['SIGTERM', 'SIGINT', 'SIGHUP', 'SIGQUIT'];
 
 function signalExitCode(signal) {
   const number = constants.signals[signal];
@@ -21,21 +23,63 @@ function run(argv = process.argv.slice(2), options = {}) {
       + '  npm install --global @rsproxy/cli\n'
       + '  bun add --global @rsproxy/cli\n'
     );
-    return 1;
+    return Promise.resolve(1);
   }
 
-  const spawn = options.spawn || spawnSync;
-  const result = spawn(native.path, argv, { stdio: 'inherit' });
-  if (result.error) {
-    process.stderr.write(
-      `rsproxy could not start ${native.packageName}: ${result.error.message}\n`
-    );
-    return 1;
-  }
-  if (result.signal) {
-    return signalExitCode(result.signal);
-  }
-  return typeof result.status === 'number' ? result.status : 1;
+  const spawn = options.spawn || childProcess.spawn;
+  // Injectable for tests so signal wiring never touches the real process object.
+  const supervisor = options.process || process;
+
+  return new Promise((resolve) => {
+    let child;
+    try {
+      child = spawn(native.path, argv, {
+        stdio: 'inherit',
+        env: { ...supervisor.env, RSPROXY_SUPERVISOR_PID: String(supervisor.pid) }
+      });
+    } catch (error) {
+      process.stderr.write(
+        `rsproxy could not start ${native.packageName}: ${error.message}\n`
+      );
+      resolve(1);
+      return;
+    }
+
+    // Async spawn keeps the event loop running, so — unlike spawnSync — the shim
+    // can relay signals to the native child instead of dying and orphaning it.
+    const forwarders = FORWARDED_SIGNALS.map((signal) => {
+      const handler = () => {
+        try {
+          child.kill(signal);
+        } catch {
+          // Child already gone; nothing to forward.
+        }
+      };
+      supervisor.on(signal, handler);
+      return [signal, handler];
+    });
+    const cleanup = () => {
+      for (const [signal, handler] of forwarders) {
+        supervisor.removeListener(signal, handler);
+      }
+    };
+
+    child.on('error', (error) => {
+      cleanup();
+      process.stderr.write(
+        `rsproxy could not start ${native.packageName}: ${error.message}\n`
+      );
+      resolve(1);
+    });
+    child.on('exit', (code, signal) => {
+      cleanup();
+      if (signal) {
+        resolve(signalExitCode(signal));
+        return;
+      }
+      resolve(typeof code === 'number' ? code : 1);
+    });
+  });
 }
 
 module.exports = { run, signalExitCode };

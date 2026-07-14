@@ -188,9 +188,12 @@ pub(super) fn start_daemon_on_probed_port(
 }
 
 fn lost_probed_port(storage: &Path, output: &Output) -> bool {
-    stderr(output).contains("exited during start")
-        && fs::read_to_string(storage.join("run/rsproxy.log"))
-            .is_ok_and(|log| log.contains("Address already in use"))
+    // `start` now surfaces a lost probe directly ("bind proxy listener ...: Address already in
+    // use") via its pre-flight check; the older daemon-exited path is kept as a fallback.
+    stderr(output).contains("Address already in use")
+        || (stderr(output).contains("exited during start")
+            && fs::read_to_string(storage.join("run/rsproxy.log"))
+                .is_ok_and(|log| log.contains("Address already in use")))
 }
 
 pub(super) fn unique_temp_dir(label: &str) -> PathBuf {
@@ -199,6 +202,17 @@ pub(super) fn unique_temp_dir(label: &str) -> PathBuf {
         .unwrap()
         .as_nanos();
     std::env::temp_dir().join(format!("rsproxy-{label}-{}-{nonce}", std::process::id()))
+}
+
+pub(super) fn wait_until_listening(port: u16) {
+    let deadline = Instant::now() + Duration::from_secs(10);
+    while Instant::now() < deadline {
+        if std::net::TcpStream::connect(("127.0.0.1", port)).is_ok() {
+            return;
+        }
+        thread::sleep(Duration::from_millis(50));
+    }
+    panic!("nothing began listening on 127.0.0.1:{port} within 10 seconds");
 }
 
 pub(super) fn wait_for_exit(pid: u32) {

@@ -85,9 +85,13 @@ fn human_hint(error: &CliError) -> Option<&'static str> {
         CliError::DaemonStopTimeout { .. } => Some(
             "check the process before taking further action; rsproxy avoids force-killing it automatically",
         ),
+        CliError::PortHeldByForeignProcess { .. } => Some(
+            "identify the process holding the port and stop it, or run rsproxy on a different --port",
+        ),
         CliError::Json { .. }
         | CliError::InvalidPlatformOutcome { .. }
-        | CliError::InvalidRuleOperation => None,
+        | CliError::InvalidRuleOperation
+        | CliError::SupervisorExited => None,
     }
 }
 
