@@ -54,12 +54,84 @@ fn help_command_exposes_the_supported_entry_points() {
     }
     assert!(stdout.contains("Usage: rsproxy"));
     assert!(stdout.contains("--version"));
+    for guidance in [
+        "QUICK START:",
+        "rsproxy ca init",
+        "rsproxy proxy on --all --dry-run",
+        "rsproxy proxy off --all",
+        "CONFIGURATION:",
+    ] {
+        assert!(stdout.contains(guidance), "root help omitted {guidance}");
+    }
 
     let runtime = command_output(&["run", "--help"]);
     assert!(runtime.status.success());
     let runtime = String::from_utf8(runtime.stdout).unwrap();
     assert!(runtime.contains("--watch"));
     assert!(runtime.contains("--watch-debounce-ms"));
+}
+
+#[test]
+fn long_help_explains_defaults_inputs_and_safe_workflows() {
+    let cases = [
+        (
+            &["run", "--help"][..],
+            &["Proxy listener:", "built-in default: 8mb", "EXAMPLES:"][..],
+        ),
+        (
+            &["rules", "test", "--help"][..],
+            &[
+                "Absolute request URL",
+                "Name: value",
+                "Simulate request metadata",
+                "network traffic",
+            ][..],
+        ),
+        (
+            &["values", "set", "--help"][..],
+            &["stdin", "--file", "EXAMPLES:"][..],
+        ),
+        (
+            &["trace", "clear", "--help"][..],
+            &["cannot be undone", "does not prompt for confirmation"][..],
+        ),
+        (
+            &["ca", "install", "--help"][..],
+            &["elevated privileges", "--dry-run", "Only install a CA"][..],
+        ),
+        (
+            &["proxy", "on", "--help"][..],
+            &["--service", "--all", "SAFE WORKFLOW:"][..],
+        ),
+    ];
+
+    for (args, expected) in cases {
+        let output = command_output(args);
+        assert!(output.status.success(), "{args:?}");
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        for needle in expected {
+            assert!(
+                stdout.contains(needle),
+                "{args:?} omitted {needle:?}; stdout={stdout:?}"
+            );
+        }
+    }
+}
+
+#[test]
+fn semantic_errors_include_a_recovery_hint_for_humans() {
+    let output = command_output(&[
+        "rules",
+        "test",
+        "https://example.test",
+        "--response-status",
+        "not-a-status",
+    ]);
+
+    assert_eq!(output.status.code(), Some(2));
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("error: response status must be numeric"));
+    assert!(stderr.contains("hint: run `rsproxy --help`"));
 }
 
 #[test]

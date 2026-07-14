@@ -1,6 +1,7 @@
 mod api;
 mod ca;
 mod config;
+mod help;
 mod rules;
 mod runtime;
 mod system_proxy;

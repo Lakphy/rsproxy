@@ -39,6 +39,55 @@ fn render_runtime_error(error: &CliError, json: bool) {
     } else {
         tracing::error!(event = "cli_failed", code = error.code(), error = %error, "command failed");
         eprintln!("error: {error}");
+        if let Some(hint) = human_hint(error) {
+            eprintln!("hint: {hint}");
+        }
+    }
+}
+
+fn human_hint(error: &CliError) -> Option<&'static str> {
+    match error {
+        CliError::Usage(_) | CliError::Clap(_) => Some(
+            "run `rsproxy --help` for the workflow overview or `rsproxy help <COMMAND>` for examples",
+        ),
+        CliError::Config(_) | CliError::Logging(_) => Some(
+            "run `rsproxy run --help` to review accepted formats, defaults, and configuration precedence",
+        ),
+        CliError::Control(_) => Some(
+            "ensure the daemon is running and that --api, --storage, and --api-token select the same instance",
+        ),
+        CliError::Engine(_)
+        | CliError::ListenerStopped { .. }
+        | CliError::ListenerSupervision { .. } => Some(
+            "retry in the foreground with `RSPROXY_LOG=rsproxy=debug rsproxy run` to see detailed diagnostics",
+        ),
+        CliError::Platform(_) | CliError::ExternalCommand { .. } => Some(
+            "preview trust or system-proxy mutations with --dry-run and verify native tool permissions",
+        ),
+        CliError::RuleModel(_) | CliError::RuleStore(_) | CliError::RuleDiagnostics(_) => Some(
+            "run `rsproxy rules check FILE` for focused diagnostics and `rsproxy help rules` for examples",
+        ),
+        CliError::Io { .. } => Some(
+            "verify that the reported path exists, is writable when required, and belongs to the selected storage",
+        ),
+        CliError::DaemonConflict(rsproxy_cli::DaemonConflict::AlreadyRunning { .. }) => {
+            Some("use `rsproxy status` to inspect it or `rsproxy restart` to apply new settings")
+        }
+        CliError::DaemonConflict(rsproxy_cli::DaemonConflict::NotRunning { .. }) => Some(
+            "start it with `rsproxy start`, or pass the same --storage/--config used by the existing instance",
+        ),
+        CliError::DaemonConflict(rsproxy_cli::DaemonConflict::IdentityMismatch { .. }) => Some(
+            "verify the pid and selected storage; rsproxy will not terminate an unverified process",
+        ),
+        CliError::DaemonExited { .. } | CliError::DaemonReadinessTimeout { .. } => {
+            Some("inspect the daemon log path shown above, then retry with `rsproxy run`")
+        }
+        CliError::DaemonStopTimeout { .. } => Some(
+            "check the process before taking further action; rsproxy avoids force-killing it automatically",
+        ),
+        CliError::Json { .. }
+        | CliError::InvalidPlatformOutcome { .. }
+        | CliError::InvalidRuleOperation => None,
     }
 }
 
