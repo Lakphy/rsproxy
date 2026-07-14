@@ -68,6 +68,8 @@ body_buffer_limit = "8mb"
 
 trace_body_limit = "64kb"
 trace_filter = "media" # headers-only, media, or full
+trace_queue_capacity = 8192
+trace_mem_budget = "256mb"
 trace_segment_size = "64mb"
 trace_disk_budget = "2gb" # 0 disables disk spill
 trace_spill_compression = "none" # or zstd[:level]
@@ -94,15 +96,16 @@ upstream_ttfb_timeout_ms = 60000
 request_timeout_ms = 360000
 ```
 
-Size fields accept a non-negative byte integer or a string with `b`, `kb`, `mb`
-or `gb`. `body_buffer_limit` is the maximum body aggregated for request- or
-response-body rules. An oversized HTTP/1 request is streamed unchanged: rules
-that do not depend on its body still apply, body conditions and mutations are
-skipped, and trace includes `request-body-rewrite-skipped-limit`. An oversized
-response is forwarded unchanged and marked `body-rewrite-skipped-limit`. Pool
-limits, this body limit, and timeout fields that represent active operations
-must be greater than zero.
-`dns_cache_seconds` and `trace_disk_budget` may be zero.
+Size fields accept a non-negative byte integer or a case-insensitive string with
+`b`, `kb`, `mb`, or `gb`. `body_buffer_limit` is the maximum body aggregated for
+request- or response-body rules. An oversized HTTP/1 request is streamed
+unchanged: rules that do not depend on its body still apply, body conditions and
+mutations are skipped, and trace includes
+`request-body-rewrite-skipped-limit`. An oversized response is forwarded
+unchanged and marked `body-rewrite-skipped-limit`. Pool limits, queue capacity,
+memory/segment/body-buffer limits, and active-operation timeouts must be greater
+than zero. `trace_body_limit`, `dns_cache_seconds`, cache capacities, and
+`trace_disk_budget` may be zero for their documented disable behavior.
 
 MITM defaults to `auto`: a CONNECT request is intercepted when the CA exists and
 neither a `bypass` rule nor a remembered client TLS failure excludes the target.
@@ -135,9 +138,9 @@ For TCP and Windows named-pipe control clients, token resolution is `--api-token
 `RSPROXY_API_TOKEN` > `api_token` in TOML > `<storage>/run/api-token`. Unix
 control sockets use peer/file permissions and ignore token settings. Windows
 defaults to `pipe:rsproxy-control`; the first pipe instance is exclusive,
-remote clients are rejected, and the local pipe still requires the storage
-token. Unix defaults to `<storage>/run/ctl.sock`; when that path would exceed
-the conservative `sun_path` limit, rsproxy deterministically uses a short
-UID+storage-hash socket under `/tmp`, still with mode 0600, and removes it on
-normal stop or failed startup. Status reports the loaded configuration path and package version but
-never returns either secret.
+remote clients are rejected, and the local pipe still requires the selected
+storage token. Unix defaults to `<storage>/run/ctl.sock`; when that path would
+exceed the conservative `sun_path` limit, rsproxy deterministically uses a
+short UID+storage-hash socket under `/tmp`, still with mode 0600, and removes it
+on normal stop or failed startup. Status reports the loaded configuration path
+and package version but never returns either secret.

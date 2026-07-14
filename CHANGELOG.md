@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Reorganized the maintained documentation around current executable
+  contracts, corrected configuration and rules scope details, and removed
+  obsolete implementation plans and dated qualification reports.
 - Hardened the release SOP with lessons from the v0.0.1 launch: a
   failure-recovery playbook (when a tag may be moved versus when a version
   is frozen), registry propagation guidance, the provenance manifest

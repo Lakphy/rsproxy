@@ -1,1 +1,0 @@
-{"schema":"rsproxy-benchmark/v1","driver":"rsproxy-rust-h1","proxy":"127.0.0.1:56279","target":"http://127.0.0.1:56276/benchmark","requests":10000,"completed_requests":10000,"concurrency":32,"elapsed_ms":263,"requests_per_second":38017.03163017031,"p50_us":710,"p99_us":2779,"max_us":26387,"response_bytes":10240000,"status_errors":0,"io_errors":0,"first_io_error":null}

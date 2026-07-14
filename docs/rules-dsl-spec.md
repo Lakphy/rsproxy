@@ -104,16 +104,12 @@ Single-action families use first-match semantics. Header, cookie, body, query,
 `delete`, `inject`, `res.merge`, `res.trailer`, and tag families are stackable.
 `skip` is retained in explain/trace and applies to actions resolved after it in rule order.
 
-The public `Action::FAMILIES` contract currently contains 46 families. The
-machine-readable action corpus declares the same required set, and its runner
-fails if the implementation list, declaration, or actually resolved families
-differ. The public value matrix additionally checks all 40 structured value
-slots against inline, template/capture, `@key`, and `<file>` sources. A second
-runtime matrix checks basic, quoted, reference, file, template, numbered/named
-capture, and invalid-reference behavior for every slot. Category-level action
-effects are covered by a strict 46-family proxy suite using real TCP/TLS
-origin, proxy, and client paths. The suite rejects missing or duplicate family
-ownership; `scripts/verify.sh actions` runs it with the two rules contracts.
+The public `Action::FAMILIES` list and machine-readable action corpus declare
+the same required set. The corpus runner fails if the implementation,
+declaration, and resolved families differ. Value-source matrices cover every
+structured value slot, and the action-effect suite assigns each family an
+executable real-network owner. `scripts/verify.sh actions` runs these contracts
+together.
 
 `host` keeps one atomic cursor per parsed rule. Each resolved request selects one
 address lazily and reuses it for trace planning, TLS policy, pool-key generation,
@@ -179,29 +175,28 @@ as matcher templates.
 
 ## Whistle Migration Contract
 
-`tests/contracts/whistle_migration.toml` records 46 supported action mappings, one
+`tests/contracts/whistle_migration.toml` records one supported action mapping
 for each public rsproxy family, plus supported syntax mappings and aliases.
 Every action mapping names documentation or unit-test evidence in the pinned
 Whistle 2.10.5 fixture and contains an rsproxy rule that must parse and resolve
 to the declared family.
 The runner rejects missing evidence, duplicate mappings, and family-set drift.
 
-The runner also parses the exact protocol and alias declarations in the fixture's
-`lib/rules/protocols.js`: all 74 canonical protocol names and 22 explicit
-alias keys must be classified as a supported action/syntax form or an explicit
+The runner also parses the exact protocol and alias declarations in the
+fixture's `lib/rules/protocols.js`: every canonical protocol and explicit alias
+must be classified as a supported action/syntax form or an explicit
 deferred/removed capability. This closes source-registry omissions; it does not
 claim behavioral parity for every uncommon option accepted by those names.
 
 `tests/contracts/whistle_options.toml` separately classifies every option
-extracted from the fixture's English `enable`, `disable`, and `delete` documents:
-56, 66, and 16 categories respectively. The runner rejects omissions and
-duplicates and parses/resolves every recipe marked `implemented`. Native
-defaults and deferred/removed behavior remain explicit. `process-config` items
-must name an option that exists in the CLI help, and the runner rejects
-milestone-scoped `deferred-m1/m2/m4` labels: behavior outside the v1 action table
-must be identified as v2 rather than left attached to a completed milestone. Documented nested
-JSON/form request deletion and JSON/JSONP response deletion are implemented and
-covered by parser, body-planning, transform, contract, and real-proxy tests.
+extracted from the fixture's English `enable`, `disable`, and `delete`
+documents. The runner rejects omissions and duplicates and parses/resolves
+every recipe marked `implemented`. Native defaults and deferred/removed
+behavior remain explicit. `process-config` items must name an option that
+exists in the CLI help; behavior outside the v1 action table must be identified
+as v2 rather than attached to a completed milestone. Documented nested
+JSON/form request deletion and JSON/JSONP response deletion are covered by
+parser, body-planning, transform, contract, and real-proxy tests.
 
 The same matrix explicitly records currently deferred or removed capabilities,
 including `pipe`, `sniCallback`, general `tpl`, write-to-file actions, request
@@ -319,6 +314,15 @@ parse errors. Regex matcher captures support `$0` for the complete match,
 
 `rsproxy rules test <url> [-X METHOD] [-H 'Name: value']... [--body TEXT|-d TEXT] [--client-ip IP] [--server-ip IP] [--response-status CODE] [--response-header 'Name: value']...` injects the same request and optional response metadata used by the proxy path. The response options work through both the authenticated control API and offline storage fallback. `rules bench` remains request-only.
 
-## Known Gaps
+## Scope and Limits
 
-This executable subset does not yet include general streaming-body transformation, bounded active-pool checkout/wait timing, WebSocket/CONNECT over h2, hardened authenticated CA-install UX for every platform, or native non-dry-run Windows/Linux system proxy mutation. Downstream HTTP/1.x keep-alive/pipelining, HTTPS h1/h2 negotiation, pooled h1/h2 upstream connections, request/response trailers in every h1/h2 direction, and binary unary gRPC echo are implemented and dogfooded.
+This document lists the complete supported v1 grammar; unknown forms fail
+validation instead of silently degrading to a broader behavior. The Whistle
+migration contract is a classified compatibility surface, not a promise that
+rsproxy accepts Whistle syntax or implements every Whistle option.
+
+Body conditions and mutations require bounded aggregation. When a body exceeds
+`body_buffer_limit`, the proxy preserves streaming, skips operations that need
+the complete body, and records the corresponding trace flag. Value files and
+`<path>` sources are trusted-rule filesystem capabilities and must not be
+accepted from untrusted rule authors.

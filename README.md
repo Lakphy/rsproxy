@@ -1,119 +1,150 @@
 # rsproxy
 
-rsproxy is a Rust workspace for a programmable HTTP/HTTPS debugging proxy. The
-workspace is split by domain rather than by deployment unit:
+rsproxy is a programmable HTTP/HTTPS debugging proxy written in Rust. It can
+intercept, inspect, rewrite, mock, trace, and replay traffic from a command-line
+interface or terminal UI.
 
-```text
-crates/
-  rsproxy-cli/    clap command tree, config composition, rendering and TUI
-  rsproxy-control/ control server/client transports, API routes and JSON/HAR shapes
-  rsproxy-engine/ proxy state, rule store and complete policy/data plane
-  rsproxy-net/    leaf crate for HTTP, DNS, async IO, deadlines and h2 transport primitives
-  rsproxy-platform/ leaf OS adapters for root CA, trust, process and system-proxy operations
-  rsproxy-rules/  rule DSL plus pinned test-only Whistle evidence fixtures
-  rsproxy-trace/  session model, in-memory store and spill persistence
-  xtask/          release-version synchronization and repository automation
-packages/npm/     shared npm/Bun launcher, native-target map and package contracts
-docs/             live design docs plus archived qualification evidence
-benches/e2e/      reproducible local proxy benchmark orchestration
-scripts/          process orchestration for coverage, fuzz, packaging and network/resource acceptance
-.github/workflows/ cross-platform CI, performance, fuzz, npm and GitHub release pipelines
-```
+## Features
 
-The CLI composition root depends on `{rsproxy-control, rsproxy-engine,
-rsproxy-platform, rsproxy-rules, rsproxy-trace}`. Below it,
-`rsproxy-control -> rsproxy-engine -> rsproxy-net`, with
-`rsproxy-engine -> {rsproxy-rules, rsproxy-trace}`,
-`rsproxy-control -> {rsproxy-rules, rsproxy-trace}`, and
-`rsproxy-trace -> rsproxy-rules`. `rsproxy-net`, `rsproxy-platform` and
-`rsproxy-rules` are leaf crates with no dependency on another rsproxy crate.
-The platform facade provides typed root-CA generation/storage/trust operations,
-process and daemon primitives, deterministic Unix control-socket paths, and
-render-neutral system-proxy dry-run plans/execution. Leaf-certificate signing
-remains engine-owned through `issue_leaf_certificate`; at daemon startup the
-CLI reads initialized root PEM through platform and injects redacted
-`CaMaterial` into `ProxyConfig`, so the engine never discovers root files from
-storage. The CLI otherwise only translates arguments/configuration and renders
-results. The control facade exposes its
-typed client, `ControlOptions`, `ControlState`, listener binding and serving;
-the engine facade exposes `ProxyConfig`, `SharedState`, `EngineHandle`,
-`RuleStore`, and `serve`. Status, rules and replay cross the control/engine
-boundary through `EngineHandle` rather than control code reaching into engine
-state.
+- HTTP/1.1, HTTP/2, HTTPS MITM, CONNECT tunnels, WebSocket, SSE, and gRPC
+- An indexed rules DSL for routing, mocking, headers, bodies, cookies, delays,
+  throttling, TLS policy, and trace control
+- Bounded in-memory trace collection with optional compressed disk spill
+- Foreground and daemon modes, JSON/NDJSON output, HAR export, and a TUI
+- Local CA management and native system-proxy integration
+- Native packages for macOS, Linux, and Windows behind one npm/Bun launcher
 
-Install the same CLI package through either supported package manager. Both use
-the npm registry, so npm and Bun resolve the same `@rsproxy/cli` artifact.
+## Install
+
+Node.js 18 or later is required by the launcher. The proxy itself runs as a
+native executable and is not compiled during installation.
 
 ```sh
 npm install --global @rsproxy/cli
 # or
 bun add --global @rsproxy/cli
+
+rsproxy --version
 ```
 
-The installed `rsproxy` command uses the package's Node 18+ shebang. A Bun-only
-environment can execute the same package with `bunx --bun @rsproxy/cli`.
-
-The distribution map covers macOS, Linux and Windows on arm64/x64, including
-both glibc and musl Linux. Only the current Apple M1 Pro macOS ARM64 package is
-executed in this local qualification round; the other package/target mappings
-are present but are not claimed as target-OS runtime verification.
-
-Build and test the workspace:
+Bun-only environments can run the same registry package with:
 
 ```sh
-cargo fmt --all -- --check
-cargo build --workspace --locked
-cargo test --workspace --all-targets --locked
-cargo clippy --workspace --all-targets --locked -- -D warnings
-cargo xtask release 0.2.0 --check
-cargo xtask check all
-npm run check:packages
-./scripts/verify.sh package
-./scripts/verify.sh all
-cargo xtask targets criterion target/performance/criterion.json
+bunx --bun @rsproxy/cli --version
 ```
 
-Lifecycle and control commands use a storage-scoped local endpoint by default:
-Unix uses a private domain socket (with a deterministic short-path fallback),
-while Windows uses an authenticated named pipe. TCP remains available through
-`--api HOST:PORT` and requires the generated or configured API token.
+Supported native targets are macOS arm64/x64, Linux arm64/x64 with glibc or
+musl, and Windows arm64/x64 with MSVC.
+
+## Quick start
+
+HTTP proxying works without a local CA:
 
 ```sh
-rsproxy start --storage ~/.rsproxy
-rsproxy status --storage ~/.rsproxy --json
+rsproxy start
+curl --proxy http://127.0.0.1:8899 http://example.com/
+rsproxy trace ls
+rsproxy stop
+```
+
+To inspect HTTPS traffic, initialize the local CA and review the trust-store
+change before applying it:
+
+```sh
+rsproxy ca init
+rsproxy ca install --dry-run
+rsproxy ca install
+rsproxy start
+```
+
+CA trust and system-proxy commands modify host operating-system state and may
+require elevated privileges. Preview system-proxy changes with `--dry-run`:
+
+```sh
+rsproxy proxy on --all --dry-run
+rsproxy proxy on --all
+rsproxy tui
+
+# Restore host state when finished.
+rsproxy proxy off --all
+rsproxy stop
+```
+
+Run `rsproxy help <COMMAND>` for command-specific options and examples.
+
+## Rules
+
+Rules are evaluated in group order and then source order. This example mocks an
+endpoint, adds a request header, and slows one response path:
+
+```text
+api.example.com/health mock("ok") res.type(text/plain)
+**.example.com req.header(x-debug-proxy: rsproxy)
+api.example.com/large throttle(res, 1MB/s)
+```
+
+Validate and install a rule group:
+
+```sh
+rsproxy rules check ./debug.rules
+rsproxy rules set default --file ./debug.rules
+rsproxy rules test https://api.example.com/health
+```
+
+See the [Rules DSL specification](docs/rules-dsl-spec.md) for the complete
+matcher, action, condition, value-source, and template contracts.
+
+## Common commands
+
+```sh
+rsproxy run                         # foreground mode
+rsproxy start                       # background daemon
+rsproxy status --json
+rsproxy rules ls
+rsproxy values ls
+rsproxy trace follow                # live NDJSON
+rsproxy trace export --har -o sessions.har
+rsproxy replay 42                   # repeats the captured request and its side effects
 rsproxy completions zsh
-rsproxy stop --storage ~/.rsproxy
+rsproxy stop
 ```
 
-Query commands support machine-readable JSON. A failed command invoked with
-`--json` writes one `rsproxy.cli.error/v1` document to stderr.
+The local control endpoint defaults to an owner-only Unix socket or an
+authenticated Windows named pipe. TCP control endpoints configured with
+`--api HOST:PORT` require an API token. Process logs always go to stderr;
+request/session trace is a separate bounded data product.
 
-Foreground process logs use `tracing` and always go to stderr. Set
-`RSPROXY_LOG` (or `RUST_LOG`) to select a filter and
-`RSPROXY_LOG_FORMAT=text|json` to select the output contract. Request/session
-Trace remains a separate bounded data product exposed by the control API.
+## Build from source
 
-`benches/e2e/benchmark.sh` is the small release smoke. Formal M5 drivers live in
-`benches/criterion/`, `benches/e2e/performance.sh`,
-`benches/e2e/whistle.sh`, and `benches/soak/`. Their versioned JSON reports are
-checked through `cargo xtask targets`; coverage is collected by
-`scripts/verify.sh coverage-report` with workspace/rules thresholds of 85%/95%.
-The Whistle comparison uses the lock under `benches/e2e/whistle-driver/` and
-installs its pinned dependency only into ignored `target/bench-deps/` state.
+The workspace requires Rust 1.88 or later.
 
-The release workflow publishes ten packages to the npm registry: eight native
-packages, `@rsproxy/runtime`, and one shared `@rsproxy/cli` entry package. After
-npm publishing succeeds, it creates a GitHub Release carrying one binary
-archive per Rust target plus a `SHA256SUMS` manifest, with notes extracted from
-`CHANGELOG.md`.
-It does not publish Cargo crates, Homebrew formulae, or other installer
-formats. Workspace and npm versions are synchronized by
-`cargo xtask release <VERSION>`; npm packaging reads the authoritative Cargo
-version through `cargo metadata`, not by parsing TOML text. The package contract
-is `scripts/verify.sh package`; current runtime qualification remains local
-macOS ARM64.
+```sh
+cargo build --release -p rsproxy-cli --bin rsproxy --locked
+cargo test --workspace --all-targets --locked
+cargo xtask check all
+```
 
-See [Architecture](docs/architecture.md), [Configuration](docs/configuration.md),
-[Testing](docs/testing.md), and the [technical design](docs/rsproxy-tech-design.md)
-before changing cross-module behavior. Historical qualification records live in
-`docs/archive/` and are not part of the active design surface.
+The resulting executable is `target/release/rsproxy` (or `rsproxy.exe` on
+Windows). See [Testing](docs/testing.md) for tool prerequisites and the complete
+verification matrix.
+
+## Documentation
+
+- [Documentation index](docs/README.md)
+- [Configuration](docs/configuration.md)
+- [Rules DSL specification](docs/rules-dsl-spec.md)
+- [Architecture](docs/architecture.md)
+- [Testing](docs/testing.md)
+- [Development and release process](docs/release-process.md)
+- [npm/Bun distribution](packages/npm/README.md)
+
+## Distribution
+
+Releases publish ten npm packages: eight platform-specific native packages,
+`@rsproxy/runtime`, and the shared `@rsproxy/cli` launcher. Version tags also
+produce eight GitHub release archives and a `SHA256SUMS` manifest. Workspace
+crates are not published to crates.io.
+
+## License
+
+[MIT](LICENSE)
