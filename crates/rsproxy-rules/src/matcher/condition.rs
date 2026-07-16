@@ -78,6 +78,9 @@ impl Condition {
             Condition::Any(conditions) => conditions
                 .iter()
                 .any(|condition| condition.matches(req, url, res, line)),
+            Condition::All(conditions) => conditions
+                .iter()
+                .all(|condition| condition.matches(req, url, res, line)),
             Condition::Not(inner) if res.is_none() && inner.depends_on_response() => false,
             Condition::Not(inner) => !inner.matches(req, url, res, line),
         }

@@ -6,6 +6,13 @@ rsproxy = "example.test host(127.0.0.1:8080)"
 expect_actions = ["host"]
 
 [[mapping]]
+id = "map-remote"
+whistle = ["host"]
+sources = ["docs/docs/rules/host.md"]
+rsproxy = "example.test map.remote(http://127.0.0.1:3000)"
+expect_actions = ["map.remote"]
+
+[[mapping]]
 id = "upstream"
 whistle = ["proxy", "http-proxy", "https-proxy", "socks"]
 sources = ["docs/docs/rules/proxy.md", "docs/docs/rules/https-proxy.md", "docs/docs/rules/socks.md", "lib/rules/protocols.js"]

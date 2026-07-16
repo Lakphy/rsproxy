@@ -248,3 +248,23 @@ expect_actions = []
 expect_rules = []
 [case.request]
 url = "http://example.test/"
+
+[[case]]
+id = "condition-all"
+spec = true
+rules = "example.test status(215) when all(method(POST), header(x-mode ~ beta))\nexample.test status(500)"
+expect_actions = ["status"]
+expect_rules = ["default:2"]
+[case.request]
+method = "POST"
+url = "http://example.test/"
+
+[[case]]
+id = "condition-not-call-form"
+spec = true
+rules = "example.test status(216) when not(method(GET))"
+expect_actions = ["status"]
+expect_rules = ["default:1"]
+[case.request]
+method = "POST"
+url = "http://example.test/"

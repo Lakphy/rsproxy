@@ -237,3 +237,72 @@ fn body_condition_matches_contains_and_regex() {
     assert!(matches!(result.actions[0].action, Action::Status(211)));
     assert_eq!(result.matched_rules[0].line, 1);
 }
+
+#[test]
+fn all_condition_requires_every_nested_condition() {
+    let rules = RuleSet::parse(
+        "default",
+        "example.com status(212) when all(method(POST), header(x-mode ~ beta))\nexample.com status(500)",
+    )
+    .unwrap();
+
+    let mut request = req("http://example.com/");
+    request.method = "POST".to_string();
+    request
+        .headers
+        .push(("x-mode".to_string(), "beta-1".to_string()));
+    let result = rules.resolve(&request);
+    assert!(matches!(result.actions[0].action, Action::Status(212)));
+    assert_eq!(result.matched_rules[0].line, 1);
+
+    // One failing nested condition falls through to the next rule.
+    request.method = "GET".to_string();
+    let result = rules.resolve(&request);
+    assert!(matches!(result.actions[0].action, Action::Status(500)));
+    assert_eq!(result.matched_rules[0].line, 2);
+}
+
+#[test]
+fn not_condition_call_form_matches_bang_prefix() {
+    let call = RuleSet::parse("default", "example.com status(213) when not(method(GET))").unwrap();
+    let bang = RuleSet::parse("default", "example.com status(213) when !method(GET)").unwrap();
+    assert_eq!(call.rules[0].conditions, bang.rules[0].conditions);
+
+    let mut request = req("http://example.com/");
+    request.method = "POST".to_string();
+    assert!(matches!(
+        call.resolve(&request).actions[0].action,
+        Action::Status(213)
+    ));
+    request.method = "GET".to_string();
+    assert!(call.resolve(&request).actions.is_empty());
+}
+
+#[test]
+fn all_and_not_nest_inside_any() {
+    let rules = RuleSet::parse(
+        "default",
+        "example.com status(214) when any(all(method(POST), header(x-a)), not(header(x-b)))",
+    )
+    .unwrap();
+    // Neither branch: GET with x-b present.
+    let mut request = req("http://example.com/");
+    request.headers.push(("x-b".to_string(), "1".to_string()));
+    assert!(rules.resolve(&request).actions.is_empty());
+    // Second branch: x-b absent.
+    let request = req("http://example.com/");
+    assert!(matches!(
+        rules.resolve(&request).actions[0].action,
+        Action::Status(214)
+    ));
+}
+
+#[test]
+fn all_condition_requires_at_least_one_argument() {
+    let errors =
+        RuleSet::parse("default", "example.com status(200) when all()").expect_err("empty all");
+    assert_eq!(errors[0].code, RuleErrorCode::Condition);
+    let errors =
+        RuleSet::parse("default", "example.com status(200) when not()").expect_err("empty not");
+    assert_eq!(errors[0].code, RuleErrorCode::Condition);
+}

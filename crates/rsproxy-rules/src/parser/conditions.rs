@@ -61,6 +61,22 @@ pub(super) fn parse_condition(input: &str) -> Result<Condition, RuleModelError> 
                 .collect::<Result<Vec<_>, _>>()
                 .map(Condition::Any)
         }
+        "all" => {
+            if args.is_empty() {
+                return Err(RuleModelError::missing(
+                    "all condition",
+                    "all requires at least one condition",
+                ));
+            }
+            args.iter()
+                .map(|arg| parse_condition(arg.trim()))
+                .collect::<Result<Vec<_>, _>>()
+                .map(Condition::All)
+        }
+        "not" => {
+            let inner = require_one(&args, "not")?;
+            Ok(Condition::Not(Box::new(parse_condition(inner)?)))
+        }
         _ => Err(RuleModelError::unsupported(
             "condition",
             format!("unknown condition `{name}`"),

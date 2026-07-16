@@ -213,6 +213,8 @@ pub enum Condition {
     },
     /// Matches when at least one nested condition matches.
     Any(Vec<Condition>),
+    /// Matches only when every nested condition matches.
+    All(Vec<Condition>),
     /// Inverts a nested condition, except absent response metadata stays non-matching.
     Not(Box<Condition>),
 }

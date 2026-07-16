@@ -101,19 +101,28 @@ rsproxy startup uninstall
 
 ## Rules
 
-Rules are evaluated in group order and then source order. This example mocks an
-endpoint, adds a request header, and slows one response path:
+Rules are evaluated in group order and then source order, and the **first
+matching rule wins each single-action family** — keep specific rules above
+broader wildcard rules. This example transparently maps a production host to a
+local dev server, mocks an endpoint, adds a request header, and slows one
+response path:
 
 ```text
+app.example.com map.remote(http://localhost:3000)
 api.example.com/health mock("ok") res.type(text/plain)
 **.example.com req.header(x-debug-proxy: rsproxy)
 api.example.com/large throttle(res, 1MB/s)
 ```
 
-Validate and install a rule group:
+`map.remote` serves the request from the target backend without a redirect —
+the browser URL never changes (the Whistle `域名 localhost:3000` / Charles Map
+Remote workflow).
+
+Validate, lint, and install a rule group:
 
 ```sh
 rsproxy rules check ./debug.rules
+rsproxy rules lint --file ./debug.rules   # detects rules shadowed by earlier broader rules
 rsproxy rules set default --file ./debug.rules
 rsproxy rules test https://api.example.com/health
 ```

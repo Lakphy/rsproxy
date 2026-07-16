@@ -9,6 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added the `map.remote(url)` action: a transparent reverse proxy (Whistle
+  `pattern target` / Charles Map Remote equivalent) that serves the request
+  from the target backend without a client-visible redirect. Targets without a
+  path keep the original path and query; explicit target paths support matcher
+  captures such as `$1`. Sessions gain a `map-remote` trace flag. (#12)
+- Added `rsproxy rules lint`, which reports later rules that can never win a
+  single-action family because an earlier, condition-free, broader rule always
+  matches first; exits non-zero when findings exist. The rules DSL spec now
+  documents first-match-wins ordering prominently. (#12)
+- Added `all(...)` and `not(...)` condition combinators alongside `any(...)`
+  and the `!` prefix. (#12)
+- Added the inline mock form
+  `mock(status=..., type=..., header=Name: value, body=...)` for one-stop
+  status/header/body mocks. (#12)
+- Added migration hints for raw Whistle operator tokens: `socks://...`,
+  `proxy://...`, `http(s)://...`, `host:port`, and `$0` now fail with the
+  equivalent rsproxy rule spelled out. (#12)
 - Added `startup install`, `startup status`, and `startup uninstall` with
   per-user macOS LaunchAgent, Windows Run-key, and Linux XDG Autostart backends.
   Login startup waits for the daemon to become ready before restoring native

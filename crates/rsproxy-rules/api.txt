@@ -11,7 +11,9 @@ pub rsproxy_rules::Action::Direct
 pub rsproxy_rules::Action::Hide
 pub rsproxy_rules::Action::Host(rsproxy_rules::HostPool)
 pub rsproxy_rules::Action::Inject(rsproxy_rules::InjectOp)
+pub rsproxy_rules::Action::MapRemote(rsproxy_rules::Value)
 pub rsproxy_rules::Action::Mock(rsproxy_rules::Value)
+pub rsproxy_rules::Action::MockInline(rsproxy_rules::MockInlineOp)
 pub rsproxy_rules::Action::MockRaw(rsproxy_rules::Value)
 pub rsproxy_rules::Action::Redirect
 pub rsproxy_rules::Action::Redirect::code: u16
@@ -85,6 +87,7 @@ impl core::fmt::Debug for rsproxy_rules::CacheOp
 pub fn rsproxy_rules::CacheOp::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::StructuralPartialEq for rsproxy_rules::CacheOp
 pub enum rsproxy_rules::Condition
+pub rsproxy_rules::Condition::All(alloc::vec::Vec<rsproxy_rules::Condition>)
 pub rsproxy_rules::Condition::Any(alloc::vec::Vec<rsproxy_rules::Condition>)
 pub rsproxy_rules::Condition::BodyContains(alloc::string::String)
 pub rsproxy_rules::Condition::BodyRegex(rsproxy_rules::RegexMatcher)
@@ -522,6 +525,22 @@ pub fn rsproxy_rules::InjectOp::eq(&self, &rsproxy_rules::InjectOp) -> bool
 impl core::fmt::Debug for rsproxy_rules::InjectOp
 pub fn rsproxy_rules::InjectOp::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::StructuralPartialEq for rsproxy_rules::InjectOp
+pub struct rsproxy_rules::LintFinding
+pub rsproxy_rules::LintFinding::families: alloc::vec::Vec<alloc::string::String>
+pub rsproxy_rules::LintFinding::group: alloc::string::String
+pub rsproxy_rules::LintFinding::line: usize
+pub rsproxy_rules::LintFinding::raw: alloc::string::String
+pub rsproxy_rules::LintFinding::shadowed_by_group: alloc::string::String
+pub rsproxy_rules::LintFinding::shadowed_by_line: usize
+pub rsproxy_rules::LintFinding::shadowed_by_raw: alloc::string::String
+impl core::clone::Clone for rsproxy_rules::LintFinding
+pub fn rsproxy_rules::LintFinding::clone(&self) -> rsproxy_rules::LintFinding
+impl core::cmp::Eq for rsproxy_rules::LintFinding
+impl core::cmp::PartialEq for rsproxy_rules::LintFinding
+pub fn rsproxy_rules::LintFinding::eq(&self, &rsproxy_rules::LintFinding) -> bool
+impl core::fmt::Debug for rsproxy_rules::LintFinding
+pub fn rsproxy_rules::LintFinding::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for rsproxy_rules::LintFinding
 pub struct rsproxy_rules::MatchedRule
 pub rsproxy_rules::MatchedRule::group: alloc::string::String
 pub rsproxy_rules::MatchedRule::line: usize
@@ -534,6 +553,18 @@ pub fn rsproxy_rules::MatchedRule::eq(&self, &rsproxy_rules::MatchedRule) -> boo
 impl core::fmt::Debug for rsproxy_rules::MatchedRule
 pub fn rsproxy_rules::MatchedRule::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::StructuralPartialEq for rsproxy_rules::MatchedRule
+pub struct rsproxy_rules::MockInlineOp
+pub rsproxy_rules::MockInlineOp::body: core::option::Option<rsproxy_rules::Value>
+pub rsproxy_rules::MockInlineOp::headers: alloc::vec::Vec<(alloc::string::String, rsproxy_rules::Value)>
+pub rsproxy_rules::MockInlineOp::status: core::option::Option<u16>
+impl core::clone::Clone for rsproxy_rules::MockInlineOp
+pub fn rsproxy_rules::MockInlineOp::clone(&self) -> rsproxy_rules::MockInlineOp
+impl core::cmp::Eq for rsproxy_rules::MockInlineOp
+impl core::cmp::PartialEq for rsproxy_rules::MockInlineOp
+pub fn rsproxy_rules::MockInlineOp::eq(&self, &rsproxy_rules::MockInlineOp) -> bool
+impl core::fmt::Debug for rsproxy_rules::MockInlineOp
+pub fn rsproxy_rules::MockInlineOp::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for rsproxy_rules::MockInlineOp
 pub struct rsproxy_rules::RegexMatcher
 pub rsproxy_rules::RegexMatcher::case_insensitive: bool
 pub rsproxy_rules::RegexMatcher::engine: rsproxy_rules::RegexEngine
@@ -661,6 +692,8 @@ pub fn rsproxy_rules::RuleSet::resolve_response(&self, &rsproxy_rules::RequestMe
 pub fn rsproxy_rules::RuleSet::resolve_response_without_request_body(&self, &rsproxy_rules::RequestMeta, &rsproxy_rules::ResponseMeta) -> rsproxy_rules::ResolveResult
 pub fn rsproxy_rules::RuleSet::resolve_without_request_body(&self, &rsproxy_rules::RequestMeta) -> rsproxy_rules::ResolveResult
 pub fn rsproxy_rules::RuleSet::stats(&self) -> rsproxy_rules::RuleSetStats
+impl rsproxy_rules::RuleSet
+pub fn rsproxy_rules::RuleSet::lint(&self) -> alloc::vec::Vec<rsproxy_rules::LintFinding>
 impl core::clone::Clone for rsproxy_rules::RuleSet
 pub fn rsproxy_rules::RuleSet::clone(&self) -> rsproxy_rules::RuleSet
 impl core::cmp::Eq for rsproxy_rules::RuleSet

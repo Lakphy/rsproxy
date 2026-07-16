@@ -10,6 +10,34 @@ pub(in crate::proxy) fn apply_url_actions(
         UrlParts::parse(full_url).map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, e))?;
     for item in actions {
         match &item.action {
+            Action::MapRemote(value) => {
+                let rendered = resolve_value_text(value, item, meta, state)?;
+                let target = UrlParts::parse(rendered.trim()).map_err(|e| {
+                    io::Error::new(
+                        io::ErrorKind::InvalidInput,
+                        format!("map.remote target `{rendered}`: {e}"),
+                    )
+                })?;
+                if target.scheme != "http" && target.scheme != "https" {
+                    return Err(io::Error::new(
+                        io::ErrorKind::InvalidInput,
+                        format!("map.remote target must use http or https: {rendered}"),
+                    ));
+                }
+                // A target without an explicit path keeps the original path
+                // and query; an explicit path (even a bare `/`) replaces both.
+                let explicit_path = rendered
+                    .trim()
+                    .split_once("://")
+                    .is_some_and(|(_, rest)| rest.contains('/') || rest.contains('?'));
+                url.scheme = target.scheme;
+                url.host = target.host;
+                url.port = target.port;
+                if explicit_path {
+                    url.path = target.path;
+                    url.query = target.query;
+                }
+            }
             Action::UrlRewrite { from, to } => {
                 let origin = url.origin_form();
                 let rewritten = match from {

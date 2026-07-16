@@ -4,6 +4,8 @@ mod conditions;
 mod delete;
 mod matcher;
 mod metadata;
+mod migration_hints;
+mod mock;
 mod syntax;
 mod tls;
 mod transforms;
@@ -12,6 +14,8 @@ use conditions::*;
 use delete::parse_delete_ops;
 use matcher::{parse_matcher, parse_regex_matcher};
 use metadata::*;
+use migration_hints::whistle_syntax_hint;
+use mock::{parse_mock, validate_map_remote_target};
 pub(super) use syntax::*;
 use tls::parse_tls_op;
 use transforms::*;
@@ -110,6 +114,9 @@ fn parse_action(input: &str) -> Result<Action, RuleModelError> {
         "hide" => return Ok(Action::Hide),
         _ => {}
     }
+    if let Some(hint) = whistle_syntax_hint(input) {
+        return Err(RuleModelError::unsupported("action", hint));
+    }
 
     let (name, args) = parse_call(input)?;
     let action = match name {
@@ -132,7 +139,12 @@ fn parse_action(input: &str) -> Result<Action, RuleModelError> {
             };
             Ok(Action::Upstream(value))
         }
-        "mock" => Ok(Action::Mock(parse_value(require_one(&args, "mock")?)?)),
+        "mock" => parse_mock(&args),
+        "map.remote" | "mapRemote" | "map_remote" | "map-remote" => {
+            let value = parse_value(require_one(&args, "map.remote")?)?;
+            validate_map_remote_target(&value)?;
+            Ok(Action::MapRemote(value))
+        }
         "mock.raw" | "mockRaw" | "mock_raw" | "mock-raw" => Ok(Action::MockRaw(parse_value(
             require_one(&args, "mock.raw")?,
         )?)),

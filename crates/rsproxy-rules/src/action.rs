@@ -26,6 +26,8 @@ pub enum Action {
     Mock(Value),
     /// Short-circuits with a raw HTTP status line, headers, and body payload.
     MockRaw(Value),
+    /// Short-circuits with a structured status/header/body combination.
+    MockInline(MockInlineOp),
     /// Short-circuits with the given HTTP response status.
     Status(u16),
     /// Short-circuits with an HTTP redirect.
@@ -75,6 +77,10 @@ pub enum Action {
     Cache(CacheOp),
     /// Constrains origin TLS or supplies a client identity for origin mTLS.
     Tls(TlsOp),
+    /// Transparently replaces the request origin (scheme, host, port, and
+    /// optionally path/query) before forwarding, without a client-visible
+    /// redirect. The Whistle `pattern target` / Charles Map Remote equivalent.
+    MapRemote(Value),
     /// Rewrites the request path and query before forwarding.
     UrlRewrite {
         /// Plain or regular-expression pattern matched against path and query.
@@ -234,6 +240,17 @@ pub struct CookieAttr {
     pub name: String,
     /// Optional attribute value; flag attributes such as `Secure` have none.
     pub value: Option<Value>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+/// Structured payload of the inline `mock(status=..., header=..., body=...)` form.
+pub struct MockInlineOp {
+    /// Response status; `None` defaults to 200.
+    pub status: Option<u16>,
+    /// Ordered response headers set on the mock response.
+    pub headers: Vec<(String, Value)>,
+    /// Optional response body; `None` sends an empty body.
+    pub body: Option<Value>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

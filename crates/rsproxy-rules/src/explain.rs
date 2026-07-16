@@ -22,6 +22,23 @@ pub(super) fn explain_action(item: &ResolvedAction, req: &RequestMeta) -> String
             format!("mock.raw(<{}>)", item.render(value, req))
         }
         Action::MockRaw(Value::Reference(value)) => format!("mock.raw(@{value})"),
+        Action::MockInline(op) => {
+            let mut parts = Vec::new();
+            if let Some(status) = op.status {
+                parts.push(format!("status={status}"));
+            }
+            for (name, value) in &op.headers {
+                parts.push(format!(
+                    "header={name}: {}",
+                    explain_value(value, item, req)
+                ));
+            }
+            if let Some(body) = &op.body {
+                parts.push(format!("body={}", explain_raw_value(body)));
+            }
+            format!("mock({})", parts.join(", "))
+        }
+        Action::MapRemote(value) => format!("map.remote({})", explain_value(value, item, req)),
         Action::Status(code) => format!("status({code})"),
         Action::Redirect { url, code } => {
             format!("redirect({}, {code})", explain_value(url, item, req))

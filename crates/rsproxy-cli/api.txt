@@ -44,6 +44,7 @@ pub rsproxy_cli::CliError::Io::source: core::io::error::Error
 pub rsproxy_cli::CliError::Json
 pub rsproxy_cli::CliError::Json::context: &'static str
 pub rsproxy_cli::CliError::Json::source: serde_json::error::Error
+pub rsproxy_cli::CliError::LintFindings(usize)
 pub rsproxy_cli::CliError::ListenerStopped
 pub rsproxy_cli::CliError::ListenerStopped::listener: &'static str
 pub rsproxy_cli::CliError::ListenerSupervision

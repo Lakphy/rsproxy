@@ -38,6 +38,9 @@ pub enum CliError {
     /// One or more rule parser diagnostics must be rendered together.
     #[error(transparent)]
     RuleDiagnostics(#[from] RuleDiagnostics),
+    /// `rules lint` reported shadowed rules; findings were already printed.
+    #[error("{0} shadowed rule(s) found")]
+    LintFindings(usize),
     /// Logging configuration was invalid.
     #[error(transparent)]
     Logging(#[from] LoggingError),
@@ -144,6 +147,7 @@ impl CliError {
             Self::Control(_) => "control_error",
             Self::Platform(_) => "platform_error",
             Self::RuleModel(_) | Self::RuleStore(_) | Self::RuleDiagnostics(_) => "rule_error",
+            Self::LintFindings(_) => "rule_error",
             Self::Io { .. } => "io_error",
             Self::Json { .. } => "json_error",
             Self::DaemonConflict(_) => "daemon_conflict",

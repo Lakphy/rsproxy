@@ -107,3 +107,60 @@ fn direct_family_overrides_a_selected_upstream_proxy() {
     assert_eq!(request.target, "/direct");
     cleanup_state(&state);
 }
+
+#[test]
+fn map_remote_family_serves_the_target_backend_transparently() {
+    // No path on the target: original path and query are preserved.
+    let origin = TestOrigin::spawn(OriginReply::ok("map-ok"));
+    let rules = format!("map-effect.test map.remote(http://{})", origin.address);
+    let state = state_with_rules("map.remote", &rules);
+
+    let origin_address = origin.address.to_string();
+    let exchange = run_exchange(&state, "GET", "http://map-effect.test/app?q=1", &[], &[]);
+    let request = origin.finish();
+
+    assert_eq!(exchange.head.status, 200);
+    assert_eq!(exchange.body.body, b"map-ok");
+    assert_eq!(request.target, "/app?q=1");
+    // The upstream Host header follows the mapped target, unlike host().
+    assert_eq!(
+        header(&request.headers, "host"),
+        Some(origin_address.as_str())
+    );
+    cleanup_state(&state);
+}
+
+#[test]
+fn map_remote_target_path_replaces_the_original_with_captures() {
+    let origin = TestOrigin::spawn(OriginReply::ok("map-path-ok"));
+    let rules = format!(
+        "/^http:\\/\\/map-path.test\\/(.*)$/ map.remote(http://{}/base/$1)",
+        origin.address
+    );
+    let state = state_with_rules("map.remote-path", &rules);
+
+    let exchange = run_exchange(&state, "GET", "http://map-path.test/js/index.js", &[], &[]);
+    let request = origin.finish();
+
+    assert_eq!(exchange.head.status, 200);
+    assert_eq!(exchange.body.body, b"map-path-ok");
+    assert_eq!(request.target, "/base/js/index.js");
+    cleanup_state(&state);
+}
+
+#[test]
+fn mock_inline_combination_short_circuits_with_status_headers_and_body() {
+    let state = state_with_rules(
+        "mock-inline",
+        "inline.test mock(status=503, type=application/json, header=X-Mock: yes, body={\"ok\":false})",
+    );
+    let exchange = run_exchange(&state, "GET", "http://inline.test/api", &[], &[]);
+    assert_eq!(exchange.head.status, 503);
+    assert_eq!(exchange.body.body, br#"{"ok":false}"#);
+    assert_eq!(header(&exchange.head.headers, "x-mock"), Some("yes"));
+    assert_eq!(
+        header(&exchange.head.headers, "content-type"),
+        Some("application/json")
+    );
+    cleanup_state(&state);
+}

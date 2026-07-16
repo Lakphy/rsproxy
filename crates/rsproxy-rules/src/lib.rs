@@ -30,6 +30,7 @@ mod action;
 mod error;
 mod explain;
 mod index;
+mod lint;
 mod matcher;
 mod matching;
 mod model;
@@ -42,10 +43,11 @@ mod template;
 pub use action::{
     Action, BodyOp, CacheDirective, CacheOp, CookieAttr, CookieOp, CorsOp, DeleteBodyPath,
     DeleteBodyPathSegment, DeleteOp, DeletePathSegment, HeaderOp, HostPool, InjectMode, InjectOp,
-    InjectTarget, Phase, QueryOp, RegexReplacePattern, TlsCipherSuite, TlsMinVersion, TlsOp,
-    UrlRewritePattern, Value, valid_value_key,
+    InjectTarget, MockInlineOp, Phase, QueryOp, RegexReplacePattern, TlsCipherSuite, TlsMinVersion,
+    TlsOp, UrlRewritePattern, Value, valid_value_key,
 };
 pub use error::{RuleError, RuleErrorCode, RuleModelError};
+pub use lint::LintFinding;
 pub use matcher::UrlParts;
 pub use model::{
     Captures, Condition, GlobMatcher, MatchedRule, Matcher, RegexEngine, RegexMatcher, RequestMeta,

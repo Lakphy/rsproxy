@@ -19,6 +19,7 @@ mod errors;
 mod explain_matrix;
 mod groups;
 mod index;
+mod lint;
 mod matching_edges;
 mod model_edges;
 mod parser_edges;

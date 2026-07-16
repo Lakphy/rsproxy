@@ -19,6 +19,14 @@ impl Action {
             | Self::ResMerge(value)
             | Self::Tag(value) => validate_value(value),
             Self::Mock(value) | Self::MockRaw(value) => validate_value(value),
+            Self::MockInline(operation) => validate_values(
+                operation
+                    .headers
+                    .iter()
+                    .map(|(_, value)| value)
+                    .chain(operation.body.as_ref()),
+            ),
+            Self::MapRemote(value) => validate_value(value),
             Self::Redirect { url, .. } => validate_value(url),
             Self::ReqHeader(operation)
             | Self::ResHeader(operation)

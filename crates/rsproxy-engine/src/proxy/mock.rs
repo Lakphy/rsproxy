@@ -30,6 +30,32 @@ pub(super) fn first_mock(
                 let bytes = resolve_value_bytes(value, item, meta, state)?;
                 return parse_raw_mock_response(&bytes).map(Some);
             }
+            Action::MockInline(op) => {
+                let status = op.status.unwrap_or(200);
+                let body = match &op.body {
+                    Some(value) => resolve_value_bytes(value, item, meta, state)?,
+                    None => Vec::new(),
+                };
+                let mut headers = Vec::new();
+                for (name, value) in &op.headers {
+                    headers.push((name.clone(), resolve_value_text(value, item, meta, state)?));
+                }
+                if !headers
+                    .iter()
+                    .any(|(name, _)| name.eq_ignore_ascii_case("content-type"))
+                {
+                    headers.push((
+                        "Content-Type".to_string(),
+                        "text/plain; charset=utf-8".to_string(),
+                    ));
+                }
+                return Ok(Some(MockResponse {
+                    status,
+                    reason: http::reason_phrase(status).to_string(),
+                    headers,
+                    body,
+                }));
+            }
             _ => {}
         }
     }

@@ -134,6 +134,13 @@ pub(super) fn handle_http_stream_inner<W: WsIo + Send>(
     if effective_url != full_url {
         session.flags.push("url-rewrite".to_string());
         session.url = effective_url.clone();
+        if resolved
+            .actions
+            .iter()
+            .any(|item| matches!(item.action, Action::MapRemote(_)))
+        {
+            session.flags.push("map-remote".to_string());
+        }
     }
     if upstream_mtls_enabled(&effective_url, &resolved.actions, &meta, state) {
         session.flags.push("upstream-mtls".to_string());

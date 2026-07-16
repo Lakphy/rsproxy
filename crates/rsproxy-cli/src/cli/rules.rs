@@ -53,6 +53,50 @@ pub(super) fn rules_cmd(args: RulesArgs, json: bool) -> CliResult<()> {
         RulesCommand::Enable(args) => run_rules_toggle(&args.group, &api, &storage, true, json),
         RulesCommand::Disable(args) => run_rules_toggle(&args.group, &api, &storage, false, json),
         RulesCommand::List(_) => run_rules_list(json, &api, &storage),
+        RulesCommand::Lint(args) => {
+            let rules = load_rule_set(args.file.as_deref(), &api, &storage)?;
+            let findings = rules.lint();
+            if json {
+                println!(
+                    "{}",
+                    serde_json::json!({
+                        "ok": findings.is_empty(),
+                        "findings": findings.iter().map(|finding| serde_json::json!({
+                            "group": finding.group,
+                            "line": finding.line,
+                            "rule": finding.raw,
+                            "shadowed_by_group": finding.shadowed_by_group,
+                            "shadowed_by_line": finding.shadowed_by_line,
+                            "shadowed_by_rule": finding.shadowed_by_raw,
+                            "families": finding.families,
+                        })).collect::<Vec<_>>(),
+                    })
+                );
+            } else if findings.is_empty() {
+                println!("ok: no shadowed rules found");
+            } else {
+                for finding in &findings {
+                    println!(
+                        "{}:{} `{}` never wins {} — shadowed by earlier broader rule {}:{} `{}`",
+                        finding.group,
+                        finding.line,
+                        finding.raw,
+                        finding.families.join(", "),
+                        finding.shadowed_by_group,
+                        finding.shadowed_by_line,
+                        finding.shadowed_by_raw,
+                    );
+                }
+                println!(
+                    "\nRules resolve first-match-wins per action family (group order, then line order; `@important` first). Move the specific rule above the broader one."
+                );
+            }
+            if findings.is_empty() {
+                Ok(())
+            } else {
+                Err(CliError::LintFindings(findings.len()))
+            }
+        }
         RulesCommand::Stats(args) => {
             let rules = load_rule_set(args.file.as_deref(), &api, &storage)?;
             let stats = rules.stats();

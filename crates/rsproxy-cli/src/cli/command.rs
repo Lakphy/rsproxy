@@ -89,7 +89,7 @@ pub(crate) enum TopLevelCommand {
     /// Validate, manage, inspect, and benchmark rules.
     #[command(
         long_about = "Validate rule syntax, manage ordered rule groups, explain a simulated request, or benchmark matching. Management commands use the running daemon when available and otherwise fall back to the selected storage directory.",
-        after_help = "COMMON WORKFLOW:\n  rsproxy rules check ./debug.rules\n  rsproxy rules set default --file ./debug.rules\n  rsproxy rules ls\n  rsproxy rules test https://api.example.com/users -H 'Accept: application/json'\n\nRun `rsproxy help rules <COMMAND>` for the input format and examples of each operation."
+        after_help = "COMMON WORKFLOW:\n  rsproxy rules check ./debug.rules\n  rsproxy rules lint --file ./debug.rules\n  rsproxy rules set default --file ./debug.rules\n  rsproxy rules ls\n  rsproxy rules test 'https://api.example.com/users?mode=debug' -H 'Accept: application/json'\n\nQuote URLs containing `?` or `&` so the shell does not expand them.\nRules resolve first-match-wins per action family (group order, then line order); keep specific rules above broader wildcard rules and confirm with `rules lint`.\n\nRun `rsproxy help rules <COMMAND>` for the input format and examples of each operation. The complete rule language reference (matchers, actions, conditions, templates) is docs/rules-dsl-spec.md in the repository."
     )]
     Rules(RulesArgs),
     /// Manage value files.

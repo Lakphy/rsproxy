@@ -68,6 +68,12 @@ pub(crate) enum RulesCommand {
         after_help = "EXAMPLES:\n  rsproxy rules disable mobile\n  rsproxy rules ls"
     )]
     Disable(RequiredGroupArgs),
+    /// Detect rules shadowed by earlier, broader rules.
+    #[command(
+        long_about = "Compile rules and report later rules that can never take effect because an earlier, condition-free rule with a broader matcher always wins their single-action family first. Rules resolve in group order then line order (first match wins per family), so a leading wildcard rule silently swallows more specific rules below it. With --file, lint that standalone file; otherwise lint enabled groups from the daemon or selected storage.",
+        after_help = "EXAMPLES:\n  rsproxy rules lint\n  rsproxy rules lint --file ./candidate.rules\n\nEXIT STATUS:\n  0 when no shadowed rules are found; 1 when findings exist.\n\nThe check is conservative: it only reports provable shadowing, so a clean run does not guarantee the ordering is correct. Put specific rules above broader wildcard rules within a group."
+    )]
+    Lint(RulesSourceArgs),
     /// Print rule index statistics.
     #[command(
         long_about = "Compile rules and report the shape of the matching indexes. With --file, inspect that standalone file; otherwise inspect enabled groups from the daemon or selected storage.",

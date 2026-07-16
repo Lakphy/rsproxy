@@ -62,7 +62,11 @@ Supported now:
 | `host(addr[, addr...])` | `host(127.0.0.1:18081, 127.0.0.1:18082)` | Connect to the next address in per-rule round-robin order while preserving the original Host header |
 | `upstream(proxy://h:p[, proxy://h:p \| https-proxy://h:p \| socks5://[user:pass@]h:p...] \| https-proxy://h:p \| socks5://[user:pass@]h:p)` | `upstream(proxy://127.0.0.1:18001, https-proxy://127.0.0.1:18443)` | Forward HTTP requests and CONNECT passthrough through another proxy; comma-separated `proxy://` / `http://` / `https-proxy://` / `socks://` / `socks5://` entries form a mixed upstream chain, including nested multiple-`https-proxy://` TLS hops |
 | `mock(value)` | `mock("hello ${host}\n")` / `mock(<mocks>)` / `mock(<a.json\|fallback.json>)` | Short-circuit with inline, `@key`, or file body; file mocks infer Content-Type, try `|`-separated candidates in order, and directory mocks append the request path (`/` -> `index.html`) |
+<!-- corpus:action-mock-inline-status-headers-body -->
+| `mock(status=..., type=..., header=..., body=...)` | `mock(status=503, type=application/json, header=X-Mock: yes, body={"ok":false})` | One-stop inline mock: combine a status (default 200), Content-Type, repeatable `header=Name: value` entries, and a body (inline, `@key`, or `<file>`) in one action |
 | `mock.raw(value)` | `mock.raw("HTTP/1.1 207 Multi-Status\r\nX-Raw: yes\r\n\r\nbody")` | Short-circuit with raw status line, headers, and body |
+<!-- corpus:action-map-remote-transparent-forward -->
+| `map.remote(url)` | `map.remote(http://localhost:3000)` / `/^https:\/\/a.test\/(.*)$/ map.remote(http://localhost:3000/$1)` | Transparent reverse proxy (Whistle `pattern target`, Charles Map Remote): the request is served by the target backend while the client-visible URL is unchanged — no 30x is sent. A target without a path keeps the original path and query; an explicit target path (captures such as `$1` supported) replaces them. The upstream `Host` header and TLS follow the target. Aliases: `mapRemote`, `map_remote`, `map-remote` |
 | `status(code)` | `status(410)` | Short-circuit with status response |
 | `redirect(url[, code])` | `redirect(https://a.test, 302)` | Short-circuit redirect |
 <!-- corpus:action-header-regex-replace -->
@@ -99,6 +103,27 @@ Supported now:
 | `tag(name)` | `tag(api:${path})` | Add `tag:<rendered>` to trace flags; templates are supported |
 | `bypass` | `bypass` | Keep CONNECT tunnels in passthrough mode instead of MITM |
 | `direct` | `direct` | Force direct origin routing for the request, overriding matched `upstream(...)` actions |
+
+### Rule ordering: first match wins
+
+**Within a snapshot, rules resolve in group order, then line order, and the
+first matching rule wins each single-action family.** This is the opposite of
+Whistle and Charles, where the more specific (or later) rule takes precedence.
+When migrating, put specific rules *above* broader wildcard rules:
+
+```text
+api.foo.test upstream(socks5://127.0.0.1:2222)   # specific first
+*.foo.test   upstream(socks5://127.0.0.1:1111)   # wildcard after
+```
+
+With the reversed order the wildcard rule silently swallows every request,
+including `api.foo.test`. `rsproxy rules lint` detects provable cases of this
+shadowing; `@important` moves a rule ahead of all non-important rules when
+reordering lines is not practical.
+
+Whistle's `pattern $0` ("leave this request alone, ignore later rules") is
+expressed as an early `direct skip()` rule: `direct` forces origin routing and
+`skip()` suppresses every later action for the matched request.
 
 Single-action families use first-match semantics. Header, cookie, body, query,
 `delete`, `inject`, `res.merge`, `res.trailer`, and tag families are stackable.
@@ -239,8 +264,12 @@ Supported now:
 | `env(name)` / `env(name=value)` | `when env(RSPROXY_MODE=dogfood)` | Process environment presence or exact value match |
 <!-- corpus:condition-any -->
 | `any(...)` | `when any(method(POST, PUT), header(x-mode ~ beta))` | Explicit OR across nested conditions |
+<!-- corpus:condition-all -->
+| `all(...)` | `when all(method(POST), header(x-mode ~ beta))` | Explicit AND across nested conditions; useful inside `any(...)` |
 <!-- corpus:condition-negated-header-presence -->
 | Negation | `when !header(authorization)` | Inverts the condition |
+<!-- corpus:condition-not-call-form -->
+| `not(...)` | `when not(method(GET))` | Call form of negation, equivalent to `!`; composes inside `any(...)`/`all(...)` |
 
 Multiple `when` clauses are ANDed. Multiple values inside one condition are
 ORed. Empty method/IP/status lists, invalid HTTP method/header tokens, empty
@@ -312,7 +341,7 @@ Malformed or unterminated templates and invalid replace regexes are `action`
 parse errors. Regex matcher captures support `$0` for the complete match,
 `$1` through `$9`, and `${name}`; glob wildcards populate `$1` through `$9`.
 
-`rsproxy rules test <url> [-X METHOD] [-H 'Name: value']... [--body TEXT|-d TEXT] [--client-ip IP] [--server-ip IP] [--response-status CODE] [--response-header 'Name: value']...` injects the same request and optional response metadata used by the proxy path. The response options work through both the authenticated control API and offline storage fallback. `rules bench` remains request-only.
+`rsproxy rules test <url> [-X METHOD] [-H 'Name: value']... [--body TEXT|-d TEXT] [--client-ip IP] [--server-ip IP] [--response-status CODE] [--response-header 'Name: value']...` injects the same request and optional response metadata used by the proxy path. The response options work through both the authenticated control API and offline storage fallback. `rules bench` remains request-only. Quote URLs containing `?` or `&` (zsh expands them as globs): `rsproxy rules test 'https://x.test/api?a=1'`.
 
 ## Scope and Limits
 

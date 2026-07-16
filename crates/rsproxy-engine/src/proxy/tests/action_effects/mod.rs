@@ -48,8 +48,15 @@ const RESPONSE_FAMILIES: &[&str] = &[
     "inject",
 ];
 
-const LOCAL_ROUTING_FAMILIES: &[&str] =
-    &["host", "upstream", "direct", "mock", "status", "redirect"];
+const LOCAL_ROUTING_FAMILIES: &[&str] = &[
+    "host",
+    "upstream",
+    "direct",
+    "mock",
+    "map.remote",
+    "status",
+    "redirect",
+];
 
 const CONTROL_FLOW_FAMILIES: &[&str] = &[
     "delay.req",

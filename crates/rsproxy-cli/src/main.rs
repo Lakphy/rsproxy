@@ -91,6 +91,9 @@ fn human_hint(error: &CliError) -> Option<&'static str> {
         CliError::RuleModel(_) | CliError::RuleStore(_) | CliError::RuleDiagnostics(_) => Some(
             "run `rsproxy rules check FILE` for focused diagnostics and `rsproxy help rules` for examples",
         ),
+        CliError::LintFindings(_) => Some(
+            "rules resolve first-match-wins per action family; move the specific rules above the broader ones",
+        ),
         CliError::Io { .. } => Some(
             "verify that the reported path exists, is writable when required, and belongs to the selected storage",
         ),

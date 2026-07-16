@@ -1,5 +1,5 @@
 required_action_families = [
-  "host", "upstream", "direct", "mock", "status", "redirect",
+  "host", "upstream", "direct", "mock", "map.remote", "status", "redirect",
   "req.header", "res.header", "res.status", "req.method", "req.cookie",
   "res.cookie", "req.ua", "req.referer", "req.auth", "req.forwarded",
   "req.type", "req.charset", "res.cors", "res.type", "res.charset",
@@ -57,6 +57,34 @@ id = "action-mock-raw"
 rules = 'example.test mock.raw("HTTP/1.1 207 Multi-Status\\r\\nX-Test: yes\\r\\n\\r\\nbody")'
 expect_actions = ["mock"]
 expect_rules = ["default:1"]
+[case.request]
+url = "http://example.test/"
+
+[[case]]
+id = "action-map-remote-transparent-forward"
+spec = true
+rules = "example.test map.remote(http://127.0.0.1:3000)"
+expect_actions = ["map.remote"]
+expect_rules = ["default:1"]
+expect_explain = ["default:1 map.remote(http://127.0.0.1:3000)"]
+[case.request]
+url = "http://example.test/app/index.js"
+
+[[case]]
+id = "action-map-remote-first-match-wins"
+rules = "example.test map.remote(http://127.0.0.1:3000)\nexample.test map.remote(http://127.0.0.1:4000)"
+expect_actions = ["map.remote"]
+expect_rules = ["default:1"]
+[case.request]
+url = "http://example.test/"
+
+[[case]]
+id = "action-mock-inline-status-headers-body"
+spec = true
+rules = "example.test mock(status=503, type=application/json, header=X-Mock: yes, body=down)"
+expect_actions = ["mock"]
+expect_rules = ["default:1"]
+expect_explain = ["default:1 mock(status=503, header=Content-Type: application/json, header=X-Mock: yes, body=down)"]
 [case.request]
 url = "http://example.test/"
 
