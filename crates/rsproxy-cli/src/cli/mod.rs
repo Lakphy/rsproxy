@@ -5,6 +5,7 @@ pub(crate) mod config;
 mod daemon;
 mod output;
 mod rules;
+mod startup;
 mod system_proxy;
 mod trace;
 mod util;
@@ -12,7 +13,7 @@ mod util;
 use crate::tui;
 use crate::{CliError, CliResult, DaemonConflict};
 use clap::{CommandFactory, Parser};
-use command::{Cli, CompletionShell, ConfigCommand, RuntimeArgs, TopLevelCommand};
+use command::{Cli, CompletionShell, ConfigCommand, RuntimeArgs, StartupCommand, TopLevelCommand};
 use rsproxy_control::api_request;
 use std::io;
 
@@ -51,11 +52,11 @@ pub fn run_parsed(cli: ParsedCli) -> CliResult<()> {
     crate::logging::init()?;
     match command {
         TopLevelCommand::Run(args) => daemon::run_server(&args),
-        TopLevelCommand::Start(args) => daemon::start_server(&args),
-        TopLevelCommand::Stop(args) => daemon::stop_server(&args.into_runtime()),
-        TopLevelCommand::Restart(args) => match daemon::stop_server(&args) {
+        TopLevelCommand::Start(args) => daemon::start_server(&args, true),
+        TopLevelCommand::Stop(args) => daemon::stop_server(&args.into_runtime(), true),
+        TopLevelCommand::Restart(args) => match daemon::stop_server(&args, true) {
             Ok(()) | Err(CliError::DaemonConflict(DaemonConflict::NotRunning { .. })) => {
-                daemon::start_server(&args)
+                daemon::start_server(&args, true)
             }
             Err(error) => Err(error),
         },
@@ -103,6 +104,12 @@ pub fn run_parsed(cli: ParsedCli) -> CliResult<()> {
         }
         TopLevelCommand::Ca(args) => ca::ca_cmd(args, cli.json),
         TopLevelCommand::Proxy(args) => system_proxy::system_proxy_cmd(args, cli.json),
+        TopLevelCommand::Startup(args) => match args.command {
+            StartupCommand::Install(args) => startup::install(args, cli.json),
+            StartupCommand::Status => startup::status(cli.json),
+            StartupCommand::Uninstall(args) => startup::uninstall(args, cli.json),
+            StartupCommand::Launch => startup::launch(cli.json),
+        },
         TopLevelCommand::Completions(_) => unreachable!("completions returned before logging"),
     }
 }

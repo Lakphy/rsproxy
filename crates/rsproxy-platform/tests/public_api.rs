@@ -9,6 +9,11 @@ use rsproxy_platform::process::{
     detach_daemon, force_terminate_process, parse_pid, process_alive, resident_kib,
     terminate_process,
 };
+use rsproxy_platform::startup::{
+    StartupPlatform, StartupRegistration, StartupStatus, current_startup_platform, install_startup,
+    remove_startup_manifest, startup_manifest_path, startup_status, uninstall_startup,
+    write_startup_manifest,
+};
 use rsproxy_platform::system_proxy::{
     ProxyAction, ProxyOptions, ProxyOutcome, ProxyPlanStep, ProxyPlatform, ProxyTarget,
     execute_system_proxy, plan_system_proxy,
@@ -79,6 +84,25 @@ fn process_facade_uses_typed_process_identifiers() {
     let _terminate: fn(u32) -> PlatformResult<()> = terminate_process;
     let _force_terminate: fn(u32) -> PlatformResult<()> = force_terminate_process;
     assert!(resident_kib(std::process::id()).is_some());
+}
+
+#[test]
+fn startup_facade_exposes_typed_registration_without_cli_types() {
+    let registration = StartupRegistration {
+        executable: std::env::current_exe().unwrap(),
+        arguments: vec!["startup".to_string(), "launch".to_string()],
+    };
+    assert!(registration.executable.is_absolute());
+    assert!(matches!(
+        current_startup_platform(),
+        StartupPlatform::Macos | StartupPlatform::Windows | StartupPlatform::Linux
+    ));
+    assert!(startup_manifest_path().unwrap().is_absolute());
+    let _install: fn(&StartupRegistration) -> PlatformResult<StartupStatus> = install_startup;
+    let _status: fn() -> PlatformResult<StartupStatus> = startup_status;
+    let _uninstall: fn() -> PlatformResult<StartupStatus> = uninstall_startup;
+    let _write_manifest: fn(&[u8]) -> PlatformResult<()> = write_startup_manifest;
+    let _remove_manifest: fn() -> PlatformResult<()> = remove_startup_manifest;
 }
 
 #[test]

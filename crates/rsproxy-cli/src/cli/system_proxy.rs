@@ -42,7 +42,7 @@ pub(super) fn proxy_platform(platform: Option<ProxyPlatformArg>) -> ProxyPlatfor
     }
 }
 
-fn default_proxy_platform() -> ProxyPlatform {
+pub(super) fn default_proxy_platform() -> ProxyPlatform {
     if cfg!(target_os = "macos") {
         ProxyPlatform::Macos
     } else if cfg!(target_os = "windows") {
@@ -50,6 +50,22 @@ fn default_proxy_platform() -> ProxyPlatform {
     } else {
         ProxyPlatform::Linux
     }
+}
+
+pub(super) fn automatic_system_proxy(
+    action: ProxyAction,
+    target: ProxyTarget,
+    service: Option<String>,
+    bypass: Option<Vec<String>>,
+) -> CliResult<Vec<String>> {
+    let options = ProxyOptions {
+        target: Some(target),
+        bypass,
+        all_services: service.is_none(),
+        service,
+    };
+    let outcome = execute_system_proxy(default_proxy_platform(), action, &options)?;
+    Ok(proxy_report_lines(&SystemProxyResult::Outcome(outcome)))
 }
 
 pub(super) fn proxy_options(
@@ -350,7 +366,11 @@ pub(super) fn proxy_target(
 }
 
 fn proxy_bypass_domains(args: &ProxyMutationArgs) -> Option<Vec<String>> {
-    args.bypass.as_ref().map(|value| {
+    parse_bypass_list(args.bypass.as_deref())
+}
+
+pub(super) fn parse_bypass_list(value: Option<&str>) -> Option<Vec<String>> {
+    value.map(|value| {
         value
             .split(',')
             .map(str::trim)

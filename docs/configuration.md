@@ -25,6 +25,46 @@ the TUI and system-proxy commands. Configuration is loaded once per command and
 is not hot-reloaded. The optional rule watcher described below reloads only the
 rules directory, not this configuration file.
 
+## Login startup and automatic system proxy
+
+`rsproxy startup install` creates a per-user native login entry and a versioned
+launcher manifest. The manifest stores only the resolved storage/config paths,
+system-proxy scope, bypass list, and last known listener target; it does not copy
+API tokens or proxy-auth credentials. At login the launcher loads the selected
+runtime configuration again, starts the background daemon, waits for readiness,
+and then enables HTTP/HTTPS system proxy routing at the listener address the
+daemon actually reports, so a daemon already running with a port override is
+routed to correctly.
+
+```sh
+rsproxy startup install --dry-run
+rsproxy startup install --config ~/.rsproxy/config.toml --start-now
+rsproxy startup status --json
+```
+
+Automatic system proxy is on by default. `--no-system-proxy` registers only the
+daemon. On macOS, omit `--service` to configure all enabled network services or
+select one explicitly with `--service NAME`. `--bypass` accepts the same
+comma-separated host/domain form as `proxy on`. Re-running `startup install`
+with a narrower scope (switching from all services to one `--service`, or
+adding `--no-system-proxy`) first disables routing under the previously
+recorded scope so no network service is left pointing at the proxy.
+
+The native backends are:
+
+- macOS: `~/Library/LaunchAgents/dev.rsproxy.autostart.plist`;
+- Windows: `HKCU\Software\Microsoft\Windows\CurrentVersion\Run\rsproxy`;
+- Linux: `$XDG_CONFIG_HOME/autostart/rsproxy.desktop`, falling back to
+  `~/.config/autostart/rsproxy.desktop`.
+
+The launcher manifest is stored in the platform's per-user configuration
+directory. `startup status` prints its exact path. Normal uninstall first turns
+off routing configured by startup and stops the selected daemon, then removes
+both artifacts. Runtime cleanup is best effort: a failed proxy restore or
+daemon stop is reported as a warning on stderr and never blocks removal of the
+login item. `startup uninstall --keep-running` intentionally leaves the current
+daemon and system proxy unchanged while preventing future login starts.
+
 ## Process logging
 
 Process diagnostics use `tracing` and are written only to stderr, so commands

@@ -5,6 +5,7 @@ use std::path::PathBuf;
 mod ca;
 mod proxy;
 mod rules;
+mod startup;
 mod trace;
 
 pub(crate) use ca::{
@@ -12,6 +13,7 @@ pub(crate) use ca::{
 };
 pub(crate) use proxy::{ProxyArgs, ProxyCommand, ProxyMutationArgs, ProxyPlatformArg};
 pub(crate) use rules::{RequestArgs, RulesArgs, RulesBenchArgs, RulesCommand, RulesTestArgs};
+pub(crate) use startup::{StartupArgs, StartupCommand, StartupInstallArgs, StartupUninstallArgs};
 pub(crate) use trace::{ReplayArgs, TraceArgs, TraceCommand, TuiArgs, ValuesArgs, ValuesCommand};
 
 #[derive(Parser)]
@@ -126,6 +128,13 @@ pub(crate) enum TopLevelCommand {
         after_help = "SAFE WORKFLOW:\n  rsproxy proxy status\n  rsproxy proxy on --all --dry-run\n  rsproxy proxy on --all\n  rsproxy proxy status\n\nAlways restore routing with `rsproxy proxy off --all` before deleting rsproxy state. On macOS, replace --all with `--service NAME` to change one service. Platform support uses networksetup on macOS, WinINet registry settings on Windows, and gsettings on Linux."
     )]
     Proxy(ProxyArgs),
+    /// Start rsproxy automatically when the current user logs in.
+    #[command(
+        visible_alias = "autostart",
+        long_about = "Install, inspect, or remove a per-user login startup entry. The generated launcher starts the rsproxy daemon, waits for readiness, and can then restore HTTP/HTTPS system-proxy routing.",
+        after_help = "SAFE WORKFLOW:\n  rsproxy startup install --dry-run\n  rsproxy startup install --start-now\n  rsproxy startup status\n  rsproxy startup uninstall\n\nRegistration uses a LaunchAgent on macOS, the current-user Run key on Windows, and XDG Autostart on Linux. Automatic system-proxy routing is enabled by default; pass --no-system-proxy to register only the daemon."
+    )]
+    Startup(StartupArgs),
     /// Inspect the effective configuration and its source.
     #[command(
         long_about = "Show the effective runtime configuration after applying the CLI > TOML > built-in precedence, or report which configuration file would be loaded. Resolved locally without a running daemon, so it reflects what `run`/`start` would use. Running `rsproxy config` without a subcommand is equivalent to `config show`.",

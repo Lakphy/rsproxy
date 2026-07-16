@@ -161,6 +161,50 @@ pub fn rsproxy_platform::process::process_executable_path(u32) -> core::option::
 pub fn rsproxy_platform::process::resident_kib(u32) -> core::option::Option<u64>
 pub fn rsproxy_platform::process::terminate_process(u32) -> rsproxy_platform::PlatformResult<()>
 pub fn rsproxy_platform::process::unix_control_socket_path(&std::path::Path) -> std::path::PathBuf
+pub mod rsproxy_platform::startup
+pub enum rsproxy_platform::startup::StartupPlatform
+pub rsproxy_platform::startup::StartupPlatform::Linux
+pub rsproxy_platform::startup::StartupPlatform::Macos
+pub rsproxy_platform::startup::StartupPlatform::Windows
+impl core::clone::Clone for rsproxy_platform::startup::StartupPlatform
+pub fn rsproxy_platform::startup::StartupPlatform::clone(&self) -> rsproxy_platform::startup::StartupPlatform
+impl core::cmp::Eq for rsproxy_platform::startup::StartupPlatform
+impl core::cmp::PartialEq for rsproxy_platform::startup::StartupPlatform
+pub fn rsproxy_platform::startup::StartupPlatform::eq(&self, &rsproxy_platform::startup::StartupPlatform) -> bool
+impl core::fmt::Debug for rsproxy_platform::startup::StartupPlatform
+pub fn rsproxy_platform::startup::StartupPlatform::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for rsproxy_platform::startup::StartupPlatform
+impl core::marker::StructuralPartialEq for rsproxy_platform::startup::StartupPlatform
+pub struct rsproxy_platform::startup::StartupRegistration
+pub rsproxy_platform::startup::StartupRegistration::arguments: alloc::vec::Vec<alloc::string::String>
+pub rsproxy_platform::startup::StartupRegistration::executable: std::path::PathBuf
+impl core::clone::Clone for rsproxy_platform::startup::StartupRegistration
+pub fn rsproxy_platform::startup::StartupRegistration::clone(&self) -> rsproxy_platform::startup::StartupRegistration
+impl core::cmp::Eq for rsproxy_platform::startup::StartupRegistration
+impl core::cmp::PartialEq for rsproxy_platform::startup::StartupRegistration
+pub fn rsproxy_platform::startup::StartupRegistration::eq(&self, &rsproxy_platform::startup::StartupRegistration) -> bool
+impl core::fmt::Debug for rsproxy_platform::startup::StartupRegistration
+pub fn rsproxy_platform::startup::StartupRegistration::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for rsproxy_platform::startup::StartupRegistration
+pub struct rsproxy_platform::startup::StartupStatus
+pub rsproxy_platform::startup::StartupStatus::installed: bool
+pub rsproxy_platform::startup::StartupStatus::location: alloc::string::String
+pub rsproxy_platform::startup::StartupStatus::platform: rsproxy_platform::startup::StartupPlatform
+impl core::clone::Clone for rsproxy_platform::startup::StartupStatus
+pub fn rsproxy_platform::startup::StartupStatus::clone(&self) -> rsproxy_platform::startup::StartupStatus
+impl core::cmp::Eq for rsproxy_platform::startup::StartupStatus
+impl core::cmp::PartialEq for rsproxy_platform::startup::StartupStatus
+pub fn rsproxy_platform::startup::StartupStatus::eq(&self, &rsproxy_platform::startup::StartupStatus) -> bool
+impl core::fmt::Debug for rsproxy_platform::startup::StartupStatus
+pub fn rsproxy_platform::startup::StartupStatus::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for rsproxy_platform::startup::StartupStatus
+pub const fn rsproxy_platform::startup::current_startup_platform() -> rsproxy_platform::startup::StartupPlatform
+pub fn rsproxy_platform::startup::install_startup(&rsproxy_platform::startup::StartupRegistration) -> rsproxy_platform::PlatformResult<rsproxy_platform::startup::StartupStatus>
+pub fn rsproxy_platform::startup::remove_startup_manifest() -> rsproxy_platform::PlatformResult<()>
+pub fn rsproxy_platform::startup::startup_manifest_path() -> rsproxy_platform::PlatformResult<std::path::PathBuf>
+pub fn rsproxy_platform::startup::startup_status() -> rsproxy_platform::PlatformResult<rsproxy_platform::startup::StartupStatus>
+pub fn rsproxy_platform::startup::uninstall_startup() -> rsproxy_platform::PlatformResult<rsproxy_platform::startup::StartupStatus>
+pub fn rsproxy_platform::startup::write_startup_manifest(&[u8]) -> rsproxy_platform::PlatformResult<()>
 pub mod rsproxy_platform::system_proxy
 pub enum rsproxy_platform::system_proxy::MacosBypassStatus
 pub rsproxy_platform::system_proxy::MacosBypassStatus::Domains(alloc::vec::Vec<alloc::string::String>)

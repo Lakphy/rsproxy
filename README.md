@@ -10,8 +10,10 @@ interface or terminal UI.
 - An indexed rules DSL for routing, mocking, headers, bodies, cookies, delays,
   throttling, TLS policy, and trace control
 - Bounded in-memory trace collection with optional compressed disk spill
-- Foreground and daemon modes, JSON/NDJSON output, HAR export, and a TUI
-- Local CA management and native system-proxy integration
+- Foreground, daemon, and per-user login-startup modes, JSON/NDJSON output,
+  HAR export, and a TUI
+- Local CA management and native system-proxy integration with automatic
+  routing restoration after login
 - Native packages for macOS, Linux, and Windows behind one npm/Bun launcher
 
 ## Install
@@ -72,6 +74,31 @@ rsproxy stop
 
 Run `rsproxy help <COMMAND>` for command-specific options and examples.
 
+## Start automatically at login
+
+Preview the native login item, then install it. Automatic HTTP/HTTPS system
+proxy routing is enabled by default and is applied only after the daemon reports
+ready:
+
+```sh
+rsproxy startup install --dry-run
+rsproxy startup install --start-now
+rsproxy startup status
+```
+
+The registration is per-user: a LaunchAgent on macOS, the current-user `Run`
+registry key on Windows, and XDG Autostart on Linux. Use `--service Wi-Fi` to
+limit automatic routing to one macOS network service, or
+`--no-system-proxy` to start only the daemon.
+
+Uninstalling restores system proxy settings and stops the selected daemon before
+removing the login item. `--keep-running` removes only future login startup.
+
+```sh
+rsproxy startup uninstall --dry-run
+rsproxy startup uninstall
+```
+
 ## Rules
 
 Rules are evaluated in group order and then source order. This example mocks an
@@ -105,6 +132,7 @@ rsproxy values ls
 rsproxy trace follow                # live NDJSON
 rsproxy trace export --har -o sessions.har
 rsproxy replay 42                   # repeats the captured request and its side effects
+rsproxy startup status
 rsproxy completions zsh
 rsproxy stop
 ```

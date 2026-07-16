@@ -124,7 +124,7 @@ pub(super) fn run_server(args: &RuntimeArgs) -> CliResult<()> {
     Err(outcome)
 }
 
-pub(super) fn start_server(args: &RuntimeArgs) -> CliResult<()> {
+pub(super) fn start_server(args: &RuntimeArgs, announce: bool) -> CliResult<()> {
     let mut config = runtime_config(args)?;
     validate_daemon_addresses(&config)?;
     prepare_server_api_auth(&mut config)?;
@@ -219,6 +219,9 @@ pub(super) fn start_server(args: &RuntimeArgs) -> CliResult<()> {
             });
         }
         if daemon_ready(&config) {
+            if !announce {
+                return Ok(());
+            }
             println!(
                 "started pid={} proxy=http://{}:{} api={} config={} api_auth={} log={}",
                 child.id(),
@@ -254,13 +257,13 @@ pub(super) fn start_server(args: &RuntimeArgs) -> CliResult<()> {
     Err(error)
 }
 
-pub(super) fn stop_server(args: &RuntimeArgs) -> CliResult<()> {
+pub(super) fn stop_server(args: &RuntimeArgs, announce: bool) -> CliResult<()> {
     let config = runtime_config(args)?;
     let pid_path = pid_path(&config);
     let raw_pid = match fs::read_to_string(&pid_path) {
         Ok(raw_pid) => raw_pid,
         Err(source) if source.kind() == std::io::ErrorKind::NotFound => {
-            return reclaim_orphan_or_not_running(&config, &pid_path);
+            return reclaim_orphan_or_not_running(&config, &pid_path, announce);
         }
         Err(source) => {
             return Err(CliError::io(
@@ -273,13 +276,17 @@ pub(super) fn stop_server(args: &RuntimeArgs) -> CliResult<()> {
         Ok(pid) => pid,
         Err(_) => {
             remove_runtime_files(&config, &pid_path);
-            println!("removed stale pidfile {}", pid_path.display());
+            if announce {
+                println!("removed stale pidfile {}", pid_path.display());
+            }
             return Ok(());
         }
     };
     if !process_alive(pid) {
         remove_runtime_files(&config, &pid_path);
-        println!("removed stale pidfile {}", pid_path.display());
+        if announce {
+            println!("removed stale pidfile {}", pid_path.display());
+        }
         return Ok(());
     }
     configure_client_api_auth(&args.client)?;
@@ -295,7 +302,9 @@ pub(super) fn stop_server(args: &RuntimeArgs) -> CliResult<()> {
     for _ in 0..50 {
         if !process_alive(pid) {
             remove_runtime_files(&config, &pid_path);
-            println!("stopped pid={pid}");
+            if announce {
+                println!("stopped pid={pid}");
+            }
             return Ok(());
         }
         thread::sleep(Duration::from_millis(100));
@@ -311,7 +320,11 @@ pub(super) fn pid_path(config: &AppConfig) -> PathBuf {
 /// shim was `SIGKILL`ed), since such a process writes no pidfile for `stop` to follow.
 ///
 /// Refuses to touch a non-rsproxy process, and falls back to `NotRunning` when the port is free.
-fn reclaim_orphan_or_not_running(config: &AppConfig, pid_path: &Path) -> CliResult<()> {
+fn reclaim_orphan_or_not_running(
+    config: &AppConfig,
+    pid_path: &Path,
+    announce: bool,
+) -> CliResult<()> {
     let addr = format!("{}:{}", config.host, config.port);
     let Some(pid) = pid_listening_on(&config.host, config.port) else {
         return Err(DaemonConflict::NotRunning {
@@ -325,7 +338,9 @@ fn reclaim_orphan_or_not_running(config: &AppConfig, pid_path: &Path) -> CliResu
     terminate_process(pid)?;
     for _ in 0..50 {
         if !process_alive(pid) {
-            println!("reclaimed {addr} (stopped orphan pid={pid})");
+            if announce {
+                println!("reclaimed {addr} (stopped orphan pid={pid})");
+            }
             return Ok(());
         }
         thread::sleep(Duration::from_millis(100));
@@ -333,7 +348,9 @@ fn reclaim_orphan_or_not_running(config: &AppConfig, pid_path: &Path) -> CliResu
     force_terminate_process(pid)?;
     for _ in 0..50 {
         if !process_alive(pid) {
-            println!("reclaimed {addr} (killed orphan pid={pid})");
+            if announce {
+                println!("reclaimed {addr} (killed orphan pid={pid})");
+            }
             return Ok(());
         }
         thread::sleep(Duration::from_millis(100));
@@ -363,7 +380,7 @@ fn remove_runtime_files(config: &AppConfig, pid_path: &Path) {
     }
 }
 
-fn validate_daemon_addresses(config: &AppConfig) -> CliResult<()> {
+pub(super) fn validate_daemon_addresses(config: &AppConfig) -> CliResult<()> {
     if config.port == 0 {
         return Err(CliError::Usage(
             "daemon mode requires a non-zero proxy port; use `run` for an ephemeral port"
@@ -407,6 +424,28 @@ fn daemon_ready(config: &AppConfig) -> bool {
 
 fn daemon_identity_matches(config: &AppConfig) -> bool {
     daemon_status(config).is_some()
+}
+
+/// Reports the proxy listener address of the running daemon selected by `args`.
+///
+/// The identity check compares only storage, so an "already running" daemon may listen on a
+/// different port than the current configuration resolves to (e.g. an earlier CLI `--port`
+/// override); callers that route traffic must use this live address, not the resolved one.
+pub(super) fn live_proxy_address(args: &RuntimeArgs) -> CliResult<(String, u16)> {
+    let config = runtime_config(args)?;
+    configure_client_api_auth(&args.client)?;
+    daemon_status(&config)
+        .and_then(|status| {
+            let proxy = status.get("proxy")?.as_str()?;
+            let (host, port) = proxy.rsplit_once(':')?;
+            Some((host.to_string(), port.parse::<u16>().ok()?))
+        })
+        .ok_or_else(|| {
+            DaemonConflict::NotRunning {
+                pid_path: pid_path(&config),
+            }
+            .into()
+        })
 }
 
 fn daemon_status(config: &AppConfig) -> Option<serde_json::Value> {

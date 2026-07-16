@@ -265,7 +265,10 @@ fn display_command_args(args: &[String]) -> String {
 }
 
 #[cfg(any(target_os = "linux", target_os = "windows"))]
-fn platform_command_output(program: &str, args: &[String]) -> PlatformResult<std::process::Output> {
+pub(crate) fn platform_command_output(
+    program: &str,
+    args: &[String],
+) -> PlatformResult<std::process::Output> {
     let label = format!("{program} {}", display_command_args(args));
     let mut child = Command::new(program)
         .args(args)

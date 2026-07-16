@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Added `startup install`, `startup status`, and `startup uninstall` with
+  per-user macOS LaunchAgent, Windows Run-key, and Linux XDG Autostart backends.
+  Login startup waits for the daemon to become ready before restoring native
+  HTTP/HTTPS system proxy routing, supports dry runs and JSON status, and safely
+  disables routing and stops the daemon during normal uninstall.
+
 ## [0.0.2] - 2026-07-14
 
 ### Added

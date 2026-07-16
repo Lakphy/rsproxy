@@ -13,7 +13,7 @@ kept behind crate boundaries.
 | `crates/rsproxy-net` | HTTP framing, downstream/upstream HTTP/2, DNS, async I/O, deadlines, and pool admission | Application configuration, rules, certificates, or trace retention |
 | `crates/rsproxy-engine` | Compose network transport, rule effects, TLS interception, tracing, replay, and rule storage | CLI parsing, control routing, or host operating-system mutation |
 | `crates/rsproxy-control` | Bind the local control transport, authenticate requests, expose API routes, and provide a client | Proxy data-plane policy or CLI rendering |
-| `crates/rsproxy-platform` | Root-CA storage/trust, process helpers, resident-memory inspection, socket naming, and system-proxy operations | Proxy traffic, rule execution, or CLI presentation |
+| `crates/rsproxy-platform` | Root-CA storage/trust, process helpers, resident-memory inspection, socket naming, login-startup registration, and system-proxy operations | Proxy traffic, rule execution, or CLI presentation |
 | `crates/rsproxy-cli` | Parse commands/configuration, compose the runtime, manage daemon lifecycle, render output, and run the TUI | Reimplement lower-layer protocol or policy logic |
 | `crates/xtask` | Repository contracts, public-API snapshots, version synchronization, and report validation | Product runtime behavior |
 | `packages/npm` | Native target mapping and the shared npm/Bun launcher | Rust compilation at installation time |
@@ -159,6 +159,13 @@ The selected storage directory contains product state:
 
 Callers should treat this layout as application-owned. Use CLI commands to
 modify rules, values, CA trust, and daemon state where possible.
+
+Per-user login registration lives in the operating system's standard startup
+location rather than `<storage>`. A small versioned startup manifest in the
+platform user-configuration directory points back to the selected storage and
+runtime config. The login entry invokes only the hidden launcher; the launcher
+starts the normal daemon, waits for readiness, and then applies system proxy
+routing, keeping startup policy out of the proxy engine.
 
 ## Repository invariants
 

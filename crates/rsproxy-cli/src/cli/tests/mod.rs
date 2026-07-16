@@ -4,6 +4,7 @@ mod config;
 mod help;
 mod rules;
 mod runtime;
+mod startup;
 mod system_proxy;
 
 use crate::CliResult;

@@ -48,6 +48,7 @@ fn help_command_exposes_the_supported_entry_points() {
         "replay",
         "ca",
         "proxy",
+        "startup",
         "config",
         "completions",
     ] {
@@ -228,6 +229,10 @@ fn every_command_help_exits_without_runtime_side_effects() {
         (&["proxy", "status", "--help"], "proxy status"),
         (&["proxy", "on", "--help"], "proxy on"),
         (&["proxy", "off", "--help"], "proxy off"),
+        (&["startup", "--help"], "rsproxy startup"),
+        (&["startup", "install", "--help"], "--start-now"),
+        (&["startup", "status", "--help"], "startup status"),
+        (&["startup", "uninstall", "--help"], "--keep-running"),
         (&["completions", "--help"], "rsproxy completions"),
         (&["help", "rules", "test"], "--response-header"),
     ];
