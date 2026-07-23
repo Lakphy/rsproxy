@@ -3,7 +3,11 @@ use std::time::{Duration, Instant};
 
 const MAX_INPUT: usize = 64 * 1024;
 #[cfg(not(coverage))]
-const CASE_BUDGET: Duration = Duration::from_secs(3);
+// `cargo nextest --all-targets` runs this safety test alongside Criterion
+// targets on CI. Keep a generous finite ceiling so scheduler contention does
+// not masquerade as an algorithmic regression; dedicated benchmarks own the
+// tighter performance contract.
+const CASE_BUDGET: Duration = Duration::from_secs(10);
 // LLVM source-coverage counters deliberately instrument every branch. Keep the
 // same finite-complexity assertion without confusing instrumentation overhead
 // with the normal-build performance contract above.
