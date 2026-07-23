@@ -39,13 +39,17 @@ fn url_parts_cover_authority_query_origin_and_port_boundaries() {
     assert!(UrlParts::parse("missing-scheme").is_err());
     assert!(UrlParts::parse("http://").is_err());
     assert!(UrlParts::parse("http://:80").is_err());
+    assert_eq!(UrlParts::parse("http://[::1]/").unwrap().host, "::1");
     for invalid in [
+        "http://bad host/",
         "http://example.test:",
         "http://example.test:0",
         "http://example.test:65536",
         "http://example.test:not-a-port",
         "http://2001:db8::1/",
         "http://[not-ipv6]/",
+        "http://[::1]suffix/",
+        "http://example].test/",
         "http://user@example.test/",
         "http://example.test/#fragment",
     ] {
@@ -53,6 +57,7 @@ fn url_parts_cover_authority_query_origin_and_port_boundaries() {
     }
 
     for valid in [
+        "#fragment",
         "/next?ok=1#section",
         "//cdn.example.test:8443/asset",
         "https://safe.test:443/path#section",
@@ -60,9 +65,13 @@ fn url_parts_cover_authority_query_origin_and_port_boundaries() {
         validate_redirect_location(valid).unwrap_or_else(|error| panic!("{valid}: {error}"));
     }
     for invalid in [
+        "",
+        "/bad path",
+        r"/bad\path",
         "//cdn.example.test:bad/asset",
         "https://safe.test:70000/",
         "javascript:alert(1)",
+        "1relative:segment",
         "relative:segment",
         "/bad%2",
     ] {

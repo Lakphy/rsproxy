@@ -7,6 +7,53 @@ fn parse_error(action_or_suffix: &str) -> RuleError {
 }
 
 #[test]
+fn low_level_parser_errors_preserve_precise_diagnostics() {
+    assert_eq!(
+        parse_rule("edges", 1, "", SyntaxProfile::Compatible)
+            .unwrap_err()
+            .code,
+        RuleErrorCode::Syntax
+    );
+    assert_eq!(
+        parse_rule(
+            "edges",
+            1,
+            "* mapRemote(http://origin.test)",
+            SyntaxProfile::CanonicalV3,
+        )
+        .unwrap_err()
+        .code,
+        RuleErrorCode::Action
+    );
+
+    for action in [
+        "req.header(x-name ~ /[/replacement)",
+        "req.cookie( ; )",
+        "req.cookie(name=value; =attribute)",
+        "res.cors(origin=*, broken)",
+        "cache(=value)",
+        "url.query(broken)",
+    ] {
+        assert_eq!(parse_error(action).code, RuleErrorCode::Action, "{action}");
+    }
+
+    let rules = RuleSet::parse("edges", "example.test req.cookie(name=value; --=kept)").unwrap();
+    let Action::ReqCookie(CookieOp::Set { attrs, .. }) = &rules.rules()[0].actions[0] else {
+        panic!("set-cookie operation expected");
+    };
+    assert_eq!(attrs[0].name, "--");
+
+    for pattern in ["[", "/unterminated", "/[/i", "/valid/g"] {
+        let action = format!("req.body.replace({pattern}, replacement)");
+        assert_eq!(
+            parse_error(&action).code,
+            RuleErrorCode::Action,
+            "{pattern}"
+        );
+    }
+}
+
+#[test]
 fn syntax_helpers_reject_malformed_calls_values_durations_and_speeds() {
     assert!(parse_call("missing").is_err());
     assert!(parse_call("call(").is_err());
