@@ -167,20 +167,15 @@ pub(super) fn read_rule_file_candidate(
     path: &str,
     meta: &RequestMeta,
     state: &SharedState,
-) -> io::Result<(Vec<u8>, String)> {
+) -> io::Result<(Vec<u8>, PathBuf)> {
     let storage_path = state.config.storage.join(path);
-    read_rule_file_path(&storage_path, meta, rule_body_limit(state))
-        .or_else(|error| {
-            if error.kind() == io::ErrorKind::NotFound {
-                read_rule_file_path(Path::new(path), meta, rule_body_limit(state))
-            } else {
-                Err(error)
-            }
-        })
-        .map(|(body, resolved)| {
-            let display = resolved.to_string_lossy().into_owned();
-            (body, display)
-        })
+    read_rule_file_path(&storage_path, meta, rule_body_limit(state)).or_else(|error| {
+        if error.kind() == io::ErrorKind::NotFound {
+            read_rule_file_path(Path::new(path), meta, rule_body_limit(state))
+        } else {
+            Err(error)
+        }
+    })
 }
 
 pub(super) fn read_rule_file_path(
@@ -242,9 +237,8 @@ fn is_safe_path_segment(segment: &str) -> bool {
     matches!(components.next(), Some(Component::Normal(_))) && components.next().is_none()
 }
 
-pub(super) fn content_type_for_path(path: &str) -> String {
-    let path = path.split(['?', '#']).next().unwrap_or(path);
-    let ext = Path::new(path)
+pub(super) fn content_type_for_path(path: &Path) -> String {
+    let ext = path
         .extension()
         .and_then(|ext| ext.to_str())
         .unwrap_or("")

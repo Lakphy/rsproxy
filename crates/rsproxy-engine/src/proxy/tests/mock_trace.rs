@@ -100,6 +100,14 @@ fn mock_file_candidates_infer_content_type() {
 }
 
 #[test]
+fn mock_content_type_preserves_windows_extended_paths() {
+    assert_eq!(
+        content_type_for_path(Path::new(r"\\?\C:\mocks\item.json")),
+        "application/json"
+    );
+}
+
+#[test]
 fn mock_file_candidate_lists_are_bounded_before_filesystem_walks() {
     let candidates = (0..=rsproxy_rules::MAX_RULE_MOCK_FILE_CANDIDATES)
         .map(|index| format!("missing-{index}.txt"))
