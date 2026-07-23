@@ -28,7 +28,7 @@ bytes = "1"
 cap-std = "4.0.2"
 clap = { version = "4.6", features = ["derive", "wrap_help"] }
 clap_complete = "4.6"
-criterion = "0.5.1"
+criterion = "0.8.2"
 crossterm = "0.29"
 fancy-regex = "0.14"
 getrandom = "0.4"
