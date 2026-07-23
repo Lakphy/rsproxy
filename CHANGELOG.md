@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-07-23
+
 ### Fixed
 
 - Fixed the regex candidate prefilter so overlapping required literals cannot
