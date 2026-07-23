@@ -36,16 +36,20 @@ fn success(output: Output) -> String {
     String::from_utf8(output.stdout).unwrap()
 }
 
-#[test]
-fn offline_cli_manages_ordered_rule_groups_end_to_end() {
-    let storage = std::env::temp_dir().join(format!(
-        "rsproxy-cli-rule-groups-{}-{}",
+fn temp_storage(label: &str) -> std::path::PathBuf {
+    std::env::temp_dir().join(format!(
+        "rsproxy-cli-{label}-{}-{}",
         std::process::id(),
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
             .as_nanos()
-    ));
+    ))
+}
+
+#[test]
+fn offline_cli_manages_ordered_rule_groups_end_to_end() {
+    let storage = temp_storage("rule-groups");
 
     success(run(
         &storage,
@@ -110,6 +114,37 @@ fn offline_cli_manages_ordered_rule_groups_end_to_end() {
     let invalid = run(&storage, &["rules", "edit", "../escape"], None);
     assert!(!invalid.status.success());
     assert!(String::from_utf8_lossy(&invalid.stderr).contains("invalid rule group name"));
+
+    let _ = std::fs::remove_dir_all(storage);
+}
+
+#[test]
+fn rules_test_keeps_sibling_regexes_when_root_path_is_optional() {
+    let storage = temp_storage("overlapping-regex");
+    success(run(
+        &storage,
+        &["rules", "set", "root"],
+        Some("@language 3\n/^https?:\\/\\/h\\.example\\.com\\/?$/ direct"),
+    ));
+    success(run(
+        &storage,
+        &["rules", "set", "asset"],
+        Some("@language 3\n/^https?:\\/\\/h\\.example\\.com\\/(.+)\\.js$/ direct"),
+    ));
+
+    let asset = success(run(
+        &storage,
+        &["rules", "test", "https://h.example.com/a.js"],
+        None,
+    ));
+    assert!(asset.contains("asset:2 direct"), "stdout: {asset}");
+
+    let root = success(run(
+        &storage,
+        &["rules", "test", "https://h.example.com/"],
+        None,
+    ));
+    assert!(root.contains("root:2 direct"), "stdout: {root}");
 
     let _ = std::fs::remove_dir_all(storage);
 }

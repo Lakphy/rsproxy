@@ -138,6 +138,55 @@ fn regex_prefilter_skips_only_when_required_literal_is_missing() {
 }
 
 #[test]
+fn regex_prefilter_keeps_rules_with_overlapping_required_literals() {
+    let root_patterns = [
+        r"/^https?:\/\/h\.example\.com\/?$/",
+        r"/^https?:\/\/h\.example\.com$/",
+        r"/^https?:\/\/h\.example\.com\/*$/",
+    ];
+    let asset_rule = "@language 3\n/^https?:\\/\\/h\\.example\\.com\\/(.+)\\.js$/ direct";
+
+    for root_pattern in root_patterns {
+        let root_rule = format!("@language 3\n{root_pattern} direct");
+        for groups in [
+            [("root", root_rule.as_str()), ("asset", asset_rule)],
+            [("asset", asset_rule), ("root", root_rule.as_str())],
+        ] {
+            let rules = RuleSet::parse_versioned_groups(groups).unwrap();
+            let request = req("https://h.example.com/a.js");
+            let url = UrlParts::parse(&request.url).unwrap();
+            let candidates = rules.candidate_rule_indices(Some(&url), &request.url);
+
+            assert_eq!(rules.stats().prefilter_rules, 2);
+            assert_eq!(candidates.len(), 2, "root pattern: {root_pattern}");
+
+            let result = rules.resolve(&request);
+            assert_eq!(result.actions.len(), 1, "root pattern: {root_pattern}");
+            assert_eq!(result.matched_rules[0].group.as_ref(), "asset");
+
+            let root_result = rules.resolve(&req("https://h.example.com"));
+            assert_eq!(root_result.actions.len(), 1, "root pattern: {root_pattern}");
+            assert_eq!(root_result.matched_rules[0].group.as_ref(), "root");
+        }
+    }
+
+    let partial_overlap = RuleSet::parse(
+        "overlap",
+        "/abc/ req.header(x-abc: yes)\n/bcd/ req.header(x-bcd: yes)",
+    )
+    .unwrap();
+    let request = req("https://example.test/abcd");
+    let url = UrlParts::parse(&request.url).unwrap();
+    assert_eq!(
+        partial_overlap
+            .candidate_rule_indices(Some(&url), &request.url)
+            .len(),
+        2
+    );
+    assert_eq!(partial_overlap.resolve(&request).actions.len(), 2);
+}
+
+#[test]
 fn aho_prefilter_maps_one_literal_to_multiple_rules() {
     let rules = RuleSet::parse(
         "default",

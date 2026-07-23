@@ -108,6 +108,11 @@ fn rules_language_help_is_indexed_searchable_machine_readable_and_runtime_free()
     assert!(search.contains("condition.res.header"));
     assert!(search.contains("action.res.header"));
 
+    let regex = command_output(&["rules", "help", "matcher.regex"]);
+    assert!(regex.status.success());
+    let regex = String::from_utf8(regex.stdout).unwrap();
+    assert!(regex.contains("bare-host or root pattern cannot suppress a sibling path regex"));
+
     let json = command_output(&["rules", "help", "action.tls", "--json"]);
     assert!(json.status.success());
     let json: serde_json::Value = serde_json::from_slice(&json.stdout).unwrap();

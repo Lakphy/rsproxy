@@ -42,7 +42,8 @@ pub(super) const TOPICS: &[Topic] = &[
         [
             "Rust regex is preferred for linear matching.",
             "Lookaround and backreferences fall back to fancy-regex with a hard backtrack limit.",
-            "Only the i flag is supported; captures expose $0, $1..$9, and named values."
+            "Only the i flag is supported; captures expose $0, $1..$9, and named values.",
+            "Regex rules are evaluated independently; a bare-host or root pattern cannot suppress a sibling path regex, even when their required literals overlap."
         ],
         ["regex", "regexp"],
         ["concept.templates", "concept.limits"]

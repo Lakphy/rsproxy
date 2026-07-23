@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Fixed the regex candidate prefilter so overlapping required literals cannot
+  make a bare-host or optional-root regex suppress sibling path regexes for the
+  same host, including across rule groups. (#14)
+
 ## [0.1.1] - 2026-07-23
 
 ### Added

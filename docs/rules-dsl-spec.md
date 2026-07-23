@@ -84,7 +84,7 @@ Malformed/zero ports, broken bracketed IPv6 authorities, empty schemes, and
 exact values that are not URLs return a `matcher` error instead of degrading to
 a broader host-only match.
 
-Rule sets are compiled with exact-domain and suffix-domain buckets, plus a global bucket for port, negated, wildcard, and complex regex rules. Simple regexes with a conservative required literal are indexed by an Aho-Corasick multi-literal prefilter and only enter the candidate set when that literal is found. `rsproxy rules stats` reports the compiled index shape, and `rsproxy rules bench --url URL` reports local p50/p99/max resolver timing.
+Rule sets are compiled with exact-domain and suffix-domain buckets, plus a global bucket for port, negated, wildcard, and complex regex rules. Simple regexes with a conservative required literal are indexed by an Aho-Corasick multi-literal prefilter and only enter the candidate set when that literal is found. The prefilter collects overlapping literal matches so candidate generation remains a superset of full matcher results, including when one rule's required literal is a prefix of another's. `rsproxy rules stats` reports the compiled index shape, and `rsproxy rules bench --url URL` reports local p50/p99/max resolver timing.
 
 ## Actions
 

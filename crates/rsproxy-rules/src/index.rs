@@ -73,9 +73,16 @@ impl RuleIndex {
         };
         let mut out = Vec::new();
         let mut seen = HashSet::new();
-        for mat in prefilter.find_iter(raw_url) {
+        // A candidate prefilter must be a semantic superset of full regex
+        // matching. Required literals can overlap (for example, a host literal
+        // and the same host plus `/`), so skipping overlaps would create false
+        // negatives for every rule attached to the longer literal.
+        for mat in prefilter.find_overlapping_iter(raw_url) {
             if let Some(rules) = self.prefilter_literal_rules.get(mat.pattern().as_usize()) {
                 extend_unique(&mut out, &mut seen, rules);
+                if seen.len() == self.prefilter_rule_ids.len() {
+                    break;
+                }
             }
         }
         out
