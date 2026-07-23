@@ -1,6 +1,6 @@
 {
   "name": "@rsproxy/runtime",
-  "version": "0.0.2",
+  "version": "0.1.0",
   "description": "Platform resolver and native process launcher for rsproxy",
   "license": "MIT",
   "repository": {
@@ -19,14 +19,14 @@
     "LICENSE"
   ],
   "optionalDependencies": {
-    "@rsproxy/darwin-arm64": "0.0.2",
-    "@rsproxy/darwin-x64": "0.0.2",
-    "@rsproxy/linux-arm64-gnu": "0.0.2",
-    "@rsproxy/linux-arm64-musl": "0.0.2",
-    "@rsproxy/linux-x64-gnu": "0.0.2",
-    "@rsproxy/linux-x64-musl": "0.0.2",
-    "@rsproxy/win32-arm64-msvc": "0.0.2",
-    "@rsproxy/win32-x64-msvc": "0.0.2"
+    "@rsproxy/darwin-arm64": "0.1.0",
+    "@rsproxy/darwin-x64": "0.1.0",
+    "@rsproxy/linux-arm64-gnu": "0.1.0",
+    "@rsproxy/linux-arm64-musl": "0.1.0",
+    "@rsproxy/linux-x64-gnu": "0.1.0",
+    "@rsproxy/linux-x64-musl": "0.1.0",
+    "@rsproxy/win32-arm64-msvc": "0.1.0",
+    "@rsproxy/win32-x64-msvc": "0.1.0"
   },
   "publishConfig": {
     "access": "public"
