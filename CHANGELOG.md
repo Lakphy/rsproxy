@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-07-23
+
+### Added
+
+- Added first-class `ws://` and `wss://` targets to `map.remote`, including
+  capture-based path remaps. WebSocket requests now expose logical WS schemes to
+  rules while reusing normalized HTTP(S) transport, Upgrade forwarding, Host
+  rewriting, and TLS behavior. Static scheme prefixes in templated targets are
+  validated at parse time. (#13)
+- Added non-fatal `https-mitm-unavailable` environment warnings to `rules test`
+  and `rules lint` when a relevant `map.remote` rule cannot inspect HTTPS/WSS
+  because MITM is disabled or the selected CA is uninitialized. JSON output
+  exposes warnings separately from lint findings. (#13)
+- Added searchable `concept.scripting` help and an architecture contract for a
+  future capability-limited sandbox; arbitrary `script://`/`resScript://` host
+  code remains intentionally unsupported. (#13)
+
 ## [0.1.0] - 2026-07-23
 
 ### Added
