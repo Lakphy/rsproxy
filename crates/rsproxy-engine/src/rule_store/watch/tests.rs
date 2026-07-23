@@ -50,19 +50,22 @@ fn disk_reload_is_atomic_and_skips_unchanged_snapshots() {
     let storage = temp_storage("reload");
     let store = RuleStore::load(&storage).unwrap();
     store
-        .set_group("default", "example.test status(201)".to_string())
+        .set_group(
+            "default",
+            "@language 3\nexample.test status(201)".to_string(),
+        )
         .unwrap();
     let original = store.snapshot();
     let path = storage.join("rules/default.rules");
 
-    fs::write(&path, "example.test unknown()").unwrap();
+    fs::write(&path, "@language 3\nexample.test unknown()").unwrap();
     assert!(matches!(
         store.reload_from_disk(),
         Err(RuleStoreError::Parse(_))
     ));
     assert!(Arc::ptr_eq(&original, &store.snapshot()));
 
-    fs::write(&path, "example.test status(202)").unwrap();
+    fs::write(&path, "@language 3\nexample.test status(202)").unwrap();
     assert!(store.reload_from_disk().unwrap());
     assert_eq!(resolved_status(&store), 202);
     let current = store.snapshot();
@@ -77,22 +80,25 @@ fn watcher_debounces_changes_recovers_from_invalid_rules_and_stops_cleanly() {
     let storage = temp_storage("events");
     let store = RuleStore::load(&storage).unwrap();
     store
-        .set_group("default", "example.test status(201)".to_string())
+        .set_group(
+            "default",
+            "@language 3\nexample.test status(201)".to_string(),
+        )
         .unwrap();
     let handle = store.watch(Duration::from_millis(30)).unwrap();
     let path = storage.join("rules/default.rules");
 
-    fs::write(&path, "example.test status(202)").unwrap();
+    fs::write(&path, "@language 3\nexample.test status(202)").unwrap();
     wait_until("valid rule reload", || resolved_status(&store) == 202);
 
-    fs::write(&path, "example.test unknown()").unwrap();
+    fs::write(&path, "@language 3\nexample.test unknown()").unwrap();
     wait_until("invalid rule failure", || {
         store.watch_status().failures >= 1
     });
     assert_eq!(resolved_status(&store), 202);
     assert!(store.watch_status().last_error.is_some());
 
-    fs::write(&path, "example.test status(203)").unwrap();
+    fs::write(&path, "@language 3\nexample.test status(203)").unwrap();
     wait_until("watcher recovery", || resolved_status(&store) == 203);
     let status = store.watch_status();
     assert!(status.events >= 3);

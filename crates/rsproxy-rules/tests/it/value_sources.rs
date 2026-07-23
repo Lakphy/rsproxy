@@ -12,7 +12,7 @@ fn parser_preserves_structured_value_sources_across_action_categories() {
         ),
     )
     .unwrap();
-    let actions = &rules.rules[0].actions;
+    let actions = &rules.rules()[0].actions;
 
     assert!(matches!(
         &actions[0],
@@ -84,6 +84,11 @@ fn parser_rejects_invalid_reference_keys_and_empty_file_paths() {
             .message
             .contains("file value path must not be empty")
     );
+
+    let errors = RuleSet::parse("default", "example.test tag(<bad\0path>)")
+        .expect_err("NUL in a file path must fail before filesystem access");
+    assert_eq!(errors[0].code, RuleErrorCode::Action);
+    assert!(errors[0].message.contains("must not contain NUL"));
 }
 
 #[test]

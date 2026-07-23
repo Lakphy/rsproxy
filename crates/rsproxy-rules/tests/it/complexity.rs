@@ -2,7 +2,13 @@ use crate::fuzz_harness;
 use std::time::{Duration, Instant};
 
 const MAX_INPUT: usize = 64 * 1024;
+#[cfg(not(coverage))]
 const CASE_BUDGET: Duration = Duration::from_secs(3);
+// LLVM source-coverage counters deliberately instrument every branch. Keep the
+// same finite-complexity assertion without confusing instrumentation overhead
+// with the normal-build performance contract above.
+#[cfg(coverage)]
+const CASE_BUDGET: Duration = Duration::from_secs(15);
 
 #[test]
 fn max_size_parse_resolve_inputs_stay_within_a_finite_complexity_budget() {
@@ -11,6 +17,7 @@ fn max_size_parse_resolve_inputs_stay_within_a_finite_complexity_budget() {
         ("many-rules", many_rules()),
         ("malformed-delimiters", malformed_delimiters()),
         ("fancy-backtrack", fancy_backtrack()),
+        ("long-glob", long_glob()),
     ];
 
     for (name, input) in cases {
@@ -83,4 +90,12 @@ fn fancy_backtrack() -> String {
     let url_prefix = "http://example.test/";
     let tail = "a".repeat(MAX_INPUT - source.len() - separator.len() - url_prefix.len());
     format!("{source}{separator}{url_prefix}{tail}")
+}
+
+fn long_glob() -> String {
+    let repeated = "a".repeat(24 * 1024);
+    let source = format!("example.test/{repeated}*tail status(204)");
+    let separator = "\n---request-url---\n";
+    let request = format!("http://example.test/{repeated}captured-tail");
+    format!("{source}{separator}{request}")
 }

@@ -72,7 +72,7 @@ fn dispatches_status_and_rules_without_changing_route_contracts() {
         serde_json::Value::Null
     );
 
-    let rules = b"example.test status(209)";
+    let rules = b"@language 3\nexample.test status(209)";
     let mut set = Vec::new();
     dispatch(
         &mut set,
@@ -88,12 +88,16 @@ fn dispatches_status_and_rules_without_changing_route_contracts() {
 
     let mut get = Vec::new();
     dispatch(&mut get, &request("GET", "/api/rules/default", &[]), &state).unwrap();
-    assert_eq!(response_body(&get), "example.test status(209)");
+    assert_eq!(response_body(&get), "@language 3\nexample.test status(209)");
 
     let mut invalid = Vec::new();
     dispatch(
         &mut invalid,
-        &request("POST", "/api/rules/default", b"example.test unknown()"),
+        &request(
+            "POST",
+            "/api/rules/default",
+            b"@language 3\nexample.test unknown()",
+        ),
         &state,
     )
     .unwrap();
@@ -122,7 +126,7 @@ fn dispatches_status_and_rules_without_changing_route_contracts() {
     let invalid_json: serde_json::Value = serde_json::from_str(response_body(&invalid)).unwrap();
     assert_eq!(invalid_json["errors"][0]["code"], "action");
     assert_eq!(invalid_json["errors"][0]["group"], "default");
-    assert_eq!(invalid_json["errors"][0]["line"], 1);
+    assert_eq!(invalid_json["errors"][0]["line"], 2);
     assert_eq!(
         state
             .engine
@@ -131,7 +135,7 @@ fn dispatches_status_and_rules_without_changing_route_contracts() {
             .group("default")
             .unwrap()
             .text,
-        "example.test status(209)"
+        "@language 3\nexample.test status(209)"
     );
 
     let _ = fs::remove_dir_all(&state.options.storage);
@@ -194,7 +198,7 @@ fn live_session_route_streams_collector_broadcasts_and_observes_disconnects() {
 #[test]
 fn rules_test_route_accepts_and_validates_response_context() {
     let state = test_state();
-    let rule = b"example.test res.header(x-template: ${statusCode}|${resH.x-origin})";
+    let rule = b"@language 3\nexample.test res.header(x-template: ${statusCode}|${resH.x-origin})";
     let mut set = Vec::new();
     dispatch(
         &mut set,
@@ -216,7 +220,7 @@ fn rules_test_route_accepts_and_validates_response_context() {
     .unwrap();
     assert_eq!(
         response_body(&explained),
-        "default:1 res.header(x-template: 202|upstream)\n"
+        "default:2 res.header(x-template: 202|upstream)\n"
     );
 
     let mut invalid = Vec::new();
@@ -243,8 +247,14 @@ fn rules_test_route_accepts_and_validates_response_context() {
 fn named_rule_group_routes_publish_one_ordered_snapshot() {
     let state = test_state();
     for (path, text) in [
-        ("/api/rules/default", "example.test status(201)"),
-        ("/api/rules/override", "example.test status(202) @important"),
+        (
+            "/api/rules/default",
+            "@language 3\nexample.test status(201)",
+        ),
+        (
+            "/api/rules/override",
+            "@language 3\nexample.test status(202) @important",
+        ),
     ] {
         let mut response = Vec::new();
         dispatch(
@@ -303,7 +313,10 @@ fn named_rule_group_routes_publish_one_ordered_snapshot() {
     .unwrap();
     let exported: serde_json::Value = serde_json::from_str(response_body(&export)).unwrap();
     assert_eq!(exported[1]["enabled"], false);
-    assert_eq!(exported[1]["text"], "example.test status(202) @important");
+    assert_eq!(
+        exported[1]["text"],
+        "@language 3\nexample.test status(202) @important"
+    );
 
     let mut remove = Vec::new();
     dispatch(

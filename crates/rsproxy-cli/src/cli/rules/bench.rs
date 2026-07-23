@@ -46,6 +46,8 @@ pub(super) fn run_rules_bench(
                 "global_rules": stats.global_rules,
                 "prefilter_literals": stats.prefilter_literals,
                 "prefilter_rules": stats.prefilter_rules,
+                "compiled_globs": stats.compiled_globs,
+                "compiled_body_literals": stats.compiled_body_literals,
                 "matched_actions": matched_actions,
                 "p50_ns": p50_ns,
                 "p99_ns": p99_ns,
@@ -60,6 +62,8 @@ pub(super) fn run_rules_bench(
         println!("global_rules={}", stats.global_rules);
         println!("prefilter_literals={}", stats.prefilter_literals);
         println!("prefilter_rules={}", stats.prefilter_rules);
+        println!("compiled_globs={}", stats.compiled_globs);
+        println!("compiled_body_literals={}", stats.compiled_body_literals);
         println!("matched_actions={matched_actions}");
         println!("p50_ns={p50_ns}");
         println!("p99_ns={p99_ns}");

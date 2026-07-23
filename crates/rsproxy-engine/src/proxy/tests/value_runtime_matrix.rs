@@ -33,8 +33,8 @@ fn every_value_slot_resolves_all_runtime_source_and_capture_forms() {
             expected: "plain",
         },
         RuntimeSource {
-            syntax: r#""quoted value""#,
-            expected: "quoted value",
+            syntax: r#""quoted-value""#,
+            expected: "quoted-value",
         },
         RuntimeSource {
             syntax: "@shared",
@@ -97,4 +97,40 @@ fn every_value_slot_rejects_an_invalid_reference_key() {
             slot.name
         );
     }
+}
+
+#[test]
+fn external_value_reads_reject_one_byte_beyond_the_public_limit() {
+    let storage = std::env::temp_dir().join(format!(
+        "rsproxy-value-limit-{}-{}",
+        std::process::id(),
+        rsproxy_trace::now_millis()
+    ));
+    fs::create_dir_all(storage.join("values")).unwrap();
+    let oversized = vec![b'x'; rsproxy_rules::MAX_RULE_EXTERNAL_VALUE_BYTES + 1];
+    fs::write(storage.join("values/large"), &oversized).unwrap();
+    fs::write(storage.join("large.txt"), &oversized).unwrap();
+    let mut state = test_state();
+    state.config.storage = storage.clone();
+    let request = meta("http://example.test/");
+
+    for syntax in ["@large", "<large.txt>"] {
+        let rules = RuleSet::parse("limit", &format!("example.test tag({syntax})")).unwrap();
+        let resolved = rules.resolve(&request);
+        let item = &resolved.actions[0];
+        let Action::Tag(value) = &item.action else {
+            panic!("expected tag action");
+        };
+        let error = resolve_value_bytes(value, item, &request, &state).unwrap_err();
+        assert_eq!(error.kind(), io::ErrorKind::InvalidData, "{syntax}");
+        assert!(error.to_string().contains("8388608-byte limit"), "{syntax}");
+    }
+
+    let rules = RuleSet::parse("limit", "example.test mock(<large.txt>)").unwrap();
+    let resolved = rules.resolve(&request);
+    let error = first_mock(&resolved.actions, &request, &state).unwrap_err();
+    assert_eq!(error.kind(), io::ErrorKind::InvalidData);
+    assert!(error.to_string().contains("8388608-byte limit"));
+
+    let _ = fs::remove_dir_all(storage);
 }

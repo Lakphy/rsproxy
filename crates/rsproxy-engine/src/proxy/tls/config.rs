@@ -123,8 +123,8 @@ pub(in crate::proxy) fn tls_client_identity(
     let (Some(client_cert), Some(client_key)) = (&op.client_cert, &op.client_key) else {
         return Ok(None);
     };
-    let cert_path = resolve_tls_file_path(&item.render(client_cert, meta), state);
-    let key_path = resolve_tls_file_path(&item.render(client_key, meta), state);
+    let cert_path = resolve_tls_file_path(&render_rule_path(client_cert, item, meta)?, state);
+    let key_path = resolve_tls_file_path(&render_rule_path(client_key, item, meta)?, state);
     let certs = load_certs(&cert_path).map_err(|err| {
         io::Error::new(
             err.kind(),

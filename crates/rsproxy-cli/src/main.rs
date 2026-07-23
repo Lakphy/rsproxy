@@ -13,7 +13,12 @@ fn main() {
     };
     let json = cli.json;
     if let Err(error) = rsproxy_cli::run_parsed(cli) {
-        render_runtime_error(&error, json);
+        if !matches!(
+            error,
+            CliError::LintFindings(_) | CliError::LintIncomplete { .. }
+        ) {
+            render_runtime_error(&error, json);
+        }
         std::process::exit(error.exit_code());
     }
 }
@@ -89,9 +94,9 @@ fn human_hint(error: &CliError) -> Option<&'static str> {
             "preview trust or system-proxy mutations with --dry-run and verify native tool permissions",
         ),
         CliError::RuleModel(_) | CliError::RuleStore(_) | CliError::RuleDiagnostics(_) => Some(
-            "run `rsproxy rules check FILE` for focused diagnostics and `rsproxy help rules` for examples",
+            "run `rsproxy rules check FILE` for focused diagnostics and `rsproxy rules help` for the language reference",
         ),
-        CliError::LintFindings(_) => Some(
+        CliError::LintFindings(_) | CliError::LintIncomplete { .. } => Some(
             "rules resolve first-match-wins per action family; move the specific rules above the broader ones",
         ),
         CliError::Io { .. } => Some(

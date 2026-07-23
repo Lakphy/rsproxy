@@ -1,9 +1,13 @@
 use super::*;
+use rsproxy_rules::{
+    MAX_RULE_GROUP_NAME_BYTES, MAX_RULE_GROUPS_PER_SNAPSHOT, MAX_RULE_SNAPSHOT_SOURCE_BYTES,
+};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
 const MANIFEST_VERSION: u32 = 1;
 const MANIFEST_FILE: &str = "groups.toml";
+const MAX_RULE_MANIFEST_BYTES: usize = 1024 * 1024;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -21,14 +25,20 @@ struct ManifestGroup {
 
 pub(super) fn load_snapshot(rules_dir: &Path) -> Result<RuleSnapshot, RuleStoreError> {
     let manifest_path = rules_dir.join(MANIFEST_FILE);
+    let mut source_bytes = 0usize;
     let mut groups = if manifest_path.is_file() {
-        load_manifest_groups(rules_dir, &manifest_path)?
+        load_manifest_groups(rules_dir, &manifest_path, &mut source_bytes)?
     } else {
-        discover_groups(rules_dir)?
+        discover_groups(rules_dir, &mut source_bytes)?
     };
-    append_unlisted_groups(rules_dir, &mut groups)?;
+    append_unlisted_groups(rules_dir, &mut groups, &mut source_bytes)?;
     if !groups.iter().any(|group| group.name == "default") {
-        let text = read_group_text(rules_dir, "default")?.unwrap_or_default();
+        if groups.len() == MAX_RULE_GROUPS_PER_SNAPSHOT {
+            return Err(RuleStoreError::Invalid(format!(
+                "stored rules exceed the {MAX_RULE_GROUPS_PER_SNAPSHOT}-group limit"
+            )));
+        }
+        let text = read_group_text(rules_dir, "default", &mut source_bytes)?.unwrap_or_default();
         groups.insert(
             0,
             RuleGroup {
@@ -44,15 +54,23 @@ pub(super) fn load_snapshot(rules_dir: &Path) -> Result<RuleSnapshot, RuleStoreE
 fn load_manifest_groups(
     rules_dir: &Path,
     manifest_path: &Path,
+    source_bytes: &mut usize,
 ) -> Result<Vec<RuleGroup>, RuleStoreError> {
-    let text = fs::read_to_string(manifest_path)
-        .map_err(|source| io_error("read groups manifest", source))?;
+    let text = read_utf8_file_bounded(manifest_path, MAX_RULE_MANIFEST_BYTES, "groups manifest")?
+        .ok_or_else(|| {
+        RuleStoreError::Invalid("groups manifest disappeared while reading".to_string())
+    })?;
     let manifest: RuleManifest = toml::from_str(&text)
         .map_err(|error| RuleStoreError::Invalid(format!("invalid groups manifest: {error}")))?;
     if manifest.version != MANIFEST_VERSION {
         return Err(RuleStoreError::Invalid(format!(
             "unsupported groups manifest version {}",
             manifest.version
+        )));
+    }
+    if manifest.groups.len() > MAX_RULE_GROUPS_PER_SNAPSHOT {
+        return Err(RuleStoreError::Invalid(format!(
+            "groups manifest exceeds the {MAX_RULE_GROUPS_PER_SNAPSHOT}-group limit"
         )));
     }
     let mut seen = HashSet::new();
@@ -65,7 +83,7 @@ fn load_manifest_groups(
                 entry.name
             )));
         }
-        let text = read_group_text(rules_dir, &entry.name)?.ok_or_else(|| {
+        let text = read_group_text(rules_dir, &entry.name, source_bytes)?.ok_or_else(|| {
             RuleStoreError::Invalid(format!(
                 "groups manifest references missing rule group `{}`",
                 entry.name
@@ -80,24 +98,27 @@ fn load_manifest_groups(
     Ok(groups)
 }
 
-fn discover_groups(rules_dir: &Path) -> Result<Vec<RuleGroup>, RuleStoreError> {
+fn discover_groups(
+    rules_dir: &Path,
+    source_bytes: &mut usize,
+) -> Result<Vec<RuleGroup>, RuleStoreError> {
     let mut names = discover_group_names(rules_dir)?;
     names.sort_by_key(|name| (name != "default", name.clone()));
-    names
-        .into_iter()
-        .map(|name| {
-            Ok(RuleGroup {
-                text: read_group_text(rules_dir, &name)?.unwrap_or_default(),
-                name,
-                enabled: true,
-            })
-        })
-        .collect()
+    let mut groups = Vec::with_capacity(names.len());
+    for name in names {
+        groups.push(RuleGroup {
+            text: read_group_text(rules_dir, &name, source_bytes)?.unwrap_or_default(),
+            name,
+            enabled: true,
+        });
+    }
+    Ok(groups)
 }
 
 fn append_unlisted_groups(
     rules_dir: &Path,
     groups: &mut Vec<RuleGroup>,
+    source_bytes: &mut usize,
 ) -> Result<(), RuleStoreError> {
     let listed = groups
         .iter()
@@ -107,8 +128,13 @@ fn append_unlisted_groups(
         if listed.contains(&name) {
             continue;
         }
+        if groups.len() == MAX_RULE_GROUPS_PER_SNAPSHOT {
+            return Err(RuleStoreError::Invalid(format!(
+                "stored rules exceed the {MAX_RULE_GROUPS_PER_SNAPSHOT}-group limit"
+            )));
+        }
         groups.push(RuleGroup {
-            text: read_group_text(rules_dir, &name)?.unwrap_or_default(),
+            text: read_group_text(rules_dir, &name, source_bytes)?.unwrap_or_default(),
             name,
             enabled: true,
         });
@@ -140,19 +166,61 @@ fn discover_group_names(rules_dir: &Path) -> Result<Vec<String>, RuleStoreError>
             continue;
         };
         validate_group_name(name)?;
+        if names.len() == MAX_RULE_GROUPS_PER_SNAPSHOT {
+            return Err(RuleStoreError::Invalid(format!(
+                "rules directory exceeds the {MAX_RULE_GROUPS_PER_SNAPSHOT}-group limit"
+            )));
+        }
         names.push(name.to_string());
     }
     names.sort();
     Ok(names)
 }
 
-fn read_group_text(rules_dir: &Path, name: &str) -> Result<Option<String>, RuleStoreError> {
-    match fs::read_to_string(group_path(rules_dir, name)) {
-        Ok(text) => Ok(Some(text)),
-        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(None),
-        Err(source) => Err(io_error("read rule group", source)),
-    }
+fn read_group_text(
+    rules_dir: &Path,
+    name: &str,
+    source_bytes: &mut usize,
+) -> Result<Option<String>, RuleStoreError> {
+    let remaining = MAX_RULE_SNAPSHOT_SOURCE_BYTES.saturating_sub(*source_bytes);
+    let Some(text) = read_utf8_file_bounded(
+        &group_path(rules_dir, name),
+        remaining,
+        &format!("rule group `{name}`"),
+    )?
+    else {
+        return Ok(None);
+    };
+    *source_bytes += text.len();
+    Ok(Some(text))
 }
+
+fn read_utf8_file_bounded(
+    path: &Path,
+    limit: usize,
+    label: &str,
+) -> Result<Option<String>, RuleStoreError> {
+    let bytes = match crate::bounded_io::read_file(path, limit, label) {
+        Ok(bytes) => bytes,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(None),
+        // The only InvalidData a raw bounded read produces is the limit check.
+        Err(error) if error.kind() == io::ErrorKind::InvalidData => {
+            return Err(RuleStoreError::Invalid(error.to_string()));
+        }
+        Err(source) => return Err(io_error(&format!("read {label}"), source)),
+    };
+    let text = String::from_utf8(bytes).map_err(|source| {
+        io_error(
+            &format!("read {label}"),
+            io::Error::new(io::ErrorKind::InvalidData, source),
+        )
+    })?;
+    Ok(Some(text))
+}
+
+#[cfg(test)]
+#[path = "storage/tests.rs"]
+mod tests;
 
 pub(super) fn persist_manifest(
     rules_dir: &Path,
@@ -206,14 +274,14 @@ pub(super) fn group_path(rules_dir: &Path, name: &str) -> PathBuf {
 
 pub(super) fn validate_group_name(name: &str) -> Result<(), RuleStoreError> {
     if name.is_empty()
-        || name.len() > 128
+        || name.len() > MAX_RULE_GROUP_NAME_BYTES
         || name.starts_with('.')
         || !name
             .bytes()
             .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b'-'))
     {
         return Err(RuleStoreError::Invalid(format!(
-            "invalid rule group name `{name}`; use 1-128 ASCII letters, digits, dot, underscore, or hyphen"
+            "invalid rule group name `{name}`; use 1-{MAX_RULE_GROUP_NAME_BYTES} ASCII letters, digits, dot, underscore, or hyphen"
         )));
     }
     Ok(())

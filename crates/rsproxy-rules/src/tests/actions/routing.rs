@@ -8,7 +8,7 @@ fn host_accepts_an_ordered_address_pool() {
     )
     .unwrap();
 
-    let Action::Host(pool) = &rules.rules[0].actions[0] else {
+    let Action::Host(pool) = &rules.rules()[0].actions[0] else {
         panic!("expected host action");
     };
     assert_eq!(
@@ -83,11 +83,14 @@ fn map_remote_parses_aliases_and_resolves_as_single_family() {
         "example.test map-remote(http://127.0.0.1:3000)",
     ] {
         let rules = RuleSet::parse("default", source).unwrap();
-        let Action::MapRemote(value) = &rules.rules[0].actions[0] else {
+        let Action::MapRemote(value) = &rules.rules()[0].actions[0] else {
             panic!("expected map.remote action for `{source}`");
         };
         assert_eq!(value, &Value::inline("http://127.0.0.1:3000"));
-        assert_eq!(rules.rules[0].actions[0].family(), "map.remote");
+        assert_eq!(
+            rules.rules()[0].actions[0].family(),
+            ActionFamily::MapRemote
+        );
     }
 }
 
@@ -134,7 +137,7 @@ fn mock_inline_form_parses_status_headers_and_body() {
         r#"example.test mock(status=503, type=application/json, header=X-Mock: yes, body={"ok":false})"#,
     )
     .unwrap();
-    let Action::MockInline(op) = &rules.rules[0].actions[0] else {
+    let Action::MockInline(op) = &rules.rules()[0].actions[0] else {
         panic!("expected inline mock action");
     };
     assert_eq!(op.status, Some(503));
@@ -145,19 +148,19 @@ fn mock_inline_form_parses_status_headers_and_body() {
                 "Content-Type".to_string(),
                 Value::inline("application/json")
             ),
-            ("X-Mock".to_string(), Value::inline("yes")),
+            ("x-mock".to_string(), Value::inline("yes")),
         ]
     );
     assert_eq!(op.body, Some(Value::inline(r#"{"ok":false}"#)));
-    assert_eq!(rules.rules[0].actions[0].family(), "mock");
+    assert_eq!(rules.rules()[0].actions[0].family(), ActionFamily::Mock);
 }
 
 #[test]
 fn mock_single_argument_form_is_unchanged() {
     let rules = RuleSet::parse("default", "example.test mock(\"a=b\")").unwrap();
-    assert!(matches!(&rules.rules[0].actions[0], Action::Mock(_)));
+    assert!(matches!(&rules.rules()[0].actions[0], Action::Mock(_)));
     let rules = RuleSet::parse("default", "example.test mock(<mocks/a.json>)").unwrap();
-    assert!(matches!(&rules.rules[0].actions[0], Action::Mock(_)));
+    assert!(matches!(&rules.rules()[0].actions[0], Action::Mock(_)));
 }
 
 #[test]
@@ -165,12 +168,41 @@ fn mock_inline_rejects_unknown_keys_and_bad_status() {
     for source in [
         "example.test mock(status=abc)",
         "example.test mock(status=99)",
+        "example.test mock(status=600)",
         "example.test mock(status=200, weird=1)",
         "example.test mock(status=200, header=NoColon)",
+        "example.test mock(status=200, header=Bad Name: value)",
     ] {
         let errors = RuleSet::parse("default", source).expect_err("invalid inline mock");
         assert_eq!(errors[0].code, RuleErrorCode::Action);
     }
+}
+
+#[test]
+fn final_response_statuses_and_redirects_use_strict_protocol_ranges() {
+    for source in [
+        "example.test status(100)",
+        "example.test res.status(199)",
+        "example.test mock(status=101)",
+        "example.test mock(status=204, body=forbidden)",
+        "example.test mock(status=205, body=forbidden)",
+        "example.test redirect(/next, 300)",
+        "example.test redirect(/next, 304)",
+        "example.test redirect(/next, 399)",
+    ] {
+        assert!(RuleSet::parse("strict", source).is_err(), "{source}");
+    }
+
+    for code in REDIRECT_STATUSES {
+        RuleSet::parse("strict", &format!("example.test redirect(/next, {code})")).unwrap();
+    }
+    RuleSet::parse("strict", "example.test mock(status=204)").unwrap();
+    RuleSet::parse("strict", "example.test mock(status=205)").unwrap();
+    RuleSet::parse(
+        "strict",
+        "example.test res.header(x-interim: yes) when status(100)",
+    )
+    .unwrap();
 }
 
 #[test]

@@ -1,55 +1,101 @@
 use super::*;
+use crate::model::{CompiledMatcherResources, GlobId};
 
 impl Matcher {
+    #[cfg(test)]
     pub(crate) fn matches(&self, url: &UrlParts, raw_url: &str) -> Option<Captures> {
+        let globs = CompiledGlobSet::for_matcher(self);
+        let resources = bind_matcher_resources(self, &globs);
+        self.matches_compiled(url, raw_url, &globs, &resources)
+    }
+
+    pub(crate) fn matches_compiled(
+        &self,
+        url: &UrlParts,
+        raw_url: &str,
+        globs: &CompiledGlobSet,
+        resources: &CompiledMatcherResources,
+    ) -> Option<Captures> {
         match self {
             Matcher::ExactUrl(expected) => exact_url_matches(expected, url).then(Captures::default),
-            Matcher::Glob(glob) => glob.matches(url),
+            Matcher::Glob(glob) => glob.matches_compiled(url, globs, resources),
             Matcher::Port(port) => (url.effective_port() == Some(*port)).then(Captures::default),
             Matcher::Regex(regex) => regex.matches(raw_url),
-            Matcher::Not(inner) => inner
-                .matches(url, raw_url)
-                .is_none()
-                .then(Captures::default),
+            Matcher::Not(inner) => {
+                let CompiledMatcherResources::Not(inner_resources) = resources else {
+                    return None;
+                };
+                inner
+                    .matches_compiled(url, raw_url, globs, inner_resources)
+                    .is_none()
+                    .then(Captures::default)
+            }
         }
     }
 }
 
 impl GlobMatcher {
-    pub(super) fn matches(&self, url: &UrlParts) -> Option<Captures> {
+    fn matches_compiled(
+        &self,
+        url: &UrlParts,
+        globs: &CompiledGlobSet,
+        resources: &CompiledMatcherResources,
+    ) -> Option<Captures> {
+        let CompiledMatcherResources::Glob {
+            host,
+            port: port_id,
+            path: path_id,
+            query: query_id,
+        } = resources
+        else {
+            return None;
+        };
         if let Some(scheme) = &self.scheme
             && !scheme.eq_ignore_ascii_case(&url.scheme)
         {
             return None;
         }
-        if !host_matches(&self.host, &url.host) {
+        if !globs.host_matches_id(&self.host, &url.host, *host) {
             return None;
         }
-        if let Some(port_pat) = &self.port {
+        if self.port.is_some() {
             let port = url.effective_port()?.to_string();
-            if !glob_match(port_pat, &port, '.') {
+            if !resources_match(*port_id, &port, globs) {
                 return None;
             }
         }
 
         let mut captures = Captures::default();
         if let Some(path_pat) = &self.path {
-            if path_pat.contains('*') {
-                if !glob_match_with_captures(path_pat, &url.path, '/', &mut captures) {
+            if glob_syntax_is_active(path_pat) {
+                if !resources_match_with_captures(*path_id, &url.path, globs, &mut captures) {
                     return None;
                 }
             } else if !path_prefix_matches(path_pat, &url.path) {
                 return None;
             }
         }
-        if let Some(query_pat) = &self.query {
+        if self.query.is_some() {
             let query = url.query.as_deref().unwrap_or("");
-            if !glob_match_with_captures(query_pat, query, '&', &mut captures) {
+            if !resources_match_with_captures(*query_id, query, globs, &mut captures) {
                 return None;
             }
         }
         Some(captures)
     }
+}
+
+fn resources_match(id: Option<GlobId>, text: &str, globs: &CompiledGlobSet) -> bool {
+    id.is_some_and(|id| globs.glob_match_id(id, text))
+}
+
+fn resources_match_with_captures(
+    id: Option<GlobId>,
+    text: &str,
+    globs: &CompiledGlobSet,
+    captures: &mut Captures,
+) -> bool {
+    id.is_some_and(|id| globs.glob_match_with_captures_id(id, text, captures))
 }
 
 impl RegexMatcher {
@@ -62,25 +108,12 @@ impl RegexMatcher {
 
     fn matches_linear(&self, regex: &LinearRegex, raw_url: &str) -> Option<Captures> {
         let captures = regex.captures(raw_url)?;
-        let mut out = Captures {
-            whole: captures.get(0).map(|matched| matched.as_str().to_string()),
-            ..Captures::default()
-        };
-        for idx in 1..captures.len().min(10) {
-            out.insert_index(
-                captures
-                    .get(idx)
-                    .map(|matched| matched.as_str().to_string())
-                    .unwrap_or_default(),
-            );
-        }
-        for name in regex.capture_names().flatten() {
-            if let Some(value) = captures.name(name) {
-                out.named
-                    .insert(name.to_string(), value.as_str().to_string());
-            }
-        }
-        Some(out)
+        Some(collect_captures(
+            captures.len(),
+            |idx| captures.get(idx).map(|matched| matched.as_str()),
+            regex.capture_names().flatten(),
+            |name| captures.name(name).map(|matched| matched.as_str()),
+        ))
     }
 
     fn matches_fancy(&self, regex: &FancyRegex, raw_url: &str) -> Option<Captures> {
@@ -90,24 +123,34 @@ impl RegexMatcher {
             Err(FancyError::RuntimeError(RuntimeError::BacktrackLimitExceeded)) => return None,
             Err(_) => return None,
         };
-        let mut out = Captures {
-            whole: captures.get(0).map(|matched| matched.as_str().to_string()),
-            ..Captures::default()
-        };
-        for idx in 1..captures.len().min(10) {
-            out.insert_index(
-                captures
-                    .get(idx)
-                    .map(|matched| matched.as_str().to_string())
-                    .unwrap_or_default(),
-            );
-        }
-        for name in regex.capture_names().flatten() {
-            if let Some(value) = captures.name(name) {
-                out.named
-                    .insert(name.to_string(), value.as_str().to_string());
-            }
-        }
-        Some(out)
+        Some(collect_captures(
+            captures.len(),
+            |idx| captures.get(idx).map(|matched| matched.as_str()),
+            regex.capture_names().flatten(),
+            |name| captures.name(name).map(|matched| matched.as_str()),
+        ))
     }
+}
+
+/// Builds [`Captures`] from any regex engine's whole/indexed/named accessors,
+/// keeping the public `$1`-`$9` numbered-capture limit.
+fn collect_captures<'t>(
+    count: usize,
+    get_index: impl Fn(usize) -> Option<&'t str>,
+    names: impl Iterator<Item = &'t str>,
+    get_name: impl Fn(&str) -> Option<&'t str>,
+) -> Captures {
+    let mut out = Captures {
+        whole: get_index(0).map(Arc::from),
+        ..Captures::default()
+    };
+    for idx in 1..count.min(10) {
+        out.insert_index(get_index(idx).map(str::to_string).unwrap_or_default());
+    }
+    for name in names {
+        if let Some(value) = get_name(name) {
+            Arc::make_mut(&mut out.named).insert(name.to_string(), Arc::from(value));
+        }
+    }
+    out
 }

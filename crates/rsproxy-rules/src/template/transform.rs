@@ -22,9 +22,10 @@ struct ReplaceTransform {
     replacement: String,
 }
 
-pub(super) fn apply_replace_transform(
+pub(super) fn apply_replace_transform_bounded(
     expression: &str,
     resolve: impl FnOnce(&str) -> String,
+    limit: usize,
 ) -> Option<Result<String, RuleModelError>> {
     let parsed = match parse_replace_transform(expression) {
         Ok(Some(parsed)) => parsed,
@@ -32,11 +33,12 @@ pub(super) fn apply_replace_transform(
         Err(error) => return Some(Err(error)),
     };
     let value = resolve(&parsed.variable);
-    Some(replace_cached(
+    Some(replace_cached_bounded(
         &value,
         &parsed.pattern,
         parsed.case_insensitive,
         &parsed.replacement,
+        limit,
     ))
 }
 
@@ -144,41 +146,47 @@ fn replace_separator(arguments: &str) -> Result<(usize, bool, usize), RuleModelE
     ))
 }
 
-fn replace_cached(
+fn replace_cached_bounded(
     input: &str,
     pattern: &str,
     case_insensitive: bool,
     replacement: &str,
+    limit: usize,
 ) -> Result<String, RuleModelError> {
     REGEX_CACHE.with(|cache| {
         let mut cache = cache.borrow_mut();
-        if let Some(index) = cache.iter().position(|entry| {
+        let entry = if let Some(index) = cache.iter().position(|entry| {
             entry.pattern == pattern && entry.case_insensitive == case_insensitive
         }) {
-            let entry = cache
+            cache
                 .remove(index)
-                .expect("located template regex cache entry must still exist");
-            let output = entry.regex.replace_all(input, replacement).into_owned();
-            cache.push_back(entry);
-            return Ok(output);
-        }
-        let regex = RegexBuilder::new(pattern)
-            .case_insensitive(case_insensitive)
-            .build()
-            .map_err(|source| RuleModelError::InvalidRegex {
-                context: "invalid template replace regex",
-                source: Box::new(source),
-            })?;
-        let output = regex.replace_all(input, replacement).into_owned();
-        if cache.len() == REGEX_CACHE_CAPACITY {
-            cache.pop_front();
-        }
-        cache.push_back(CachedRegex {
-            pattern: pattern.to_string(),
-            case_insensitive,
-            regex,
-        });
-        Ok(output)
+                .expect("located template regex cache entry must still exist")
+        } else {
+            let regex = RegexBuilder::new(pattern)
+                .case_insensitive(case_insensitive)
+                .build()
+                .map_err(|source| RuleModelError::InvalidRegex {
+                    context: "invalid template replace regex",
+                    source: Box::new(source),
+                })?;
+            if cache.len() == REGEX_CACHE_CAPACITY {
+                cache.pop_front();
+            }
+            CachedRegex {
+                pattern: pattern.to_string(),
+                case_insensitive,
+                regex,
+            }
+        };
+        let output = crate::bounded_replace::regex_replace_all(
+            &entry.regex,
+            input,
+            replacement,
+            limit,
+            "template replacement",
+        );
+        cache.push_back(entry);
+        output
     })
 }
 

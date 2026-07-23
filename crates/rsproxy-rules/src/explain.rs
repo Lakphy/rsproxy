@@ -12,14 +12,16 @@ pub(super) fn explain_action(item: &ResolvedAction, req: &RequestMeta) -> String
                 .join(", ")
         ),
         Action::Upstream(value) => format!("upstream({})", explain_value(value, item, req)),
-        Action::Mock(Value::Inline(value)) => format!("mock({})", item.render(value, req)),
-        Action::Mock(Value::File(value)) => format!("mock(<{}>)", item.render(value, req)),
+        Action::Mock(Value::Inline(value)) => format!("mock({})", explain_render(item, value, req)),
+        Action::Mock(Value::File(value)) => {
+            format!("mock(<{}>)", explain_render(item, value, req))
+        }
         Action::Mock(Value::Reference(value)) => format!("mock(@{value})"),
         Action::MockRaw(Value::Inline(value)) => {
-            format!("mock.raw({})", item.render(value, req))
+            format!("mock.raw({})", explain_render(item, value, req))
         }
         Action::MockRaw(Value::File(value)) => {
-            format!("mock.raw(<{}>)", item.render(value, req))
+            format!("mock.raw(<{}>)", explain_render(item, value, req))
         }
         Action::MockRaw(Value::Reference(value)) => format!("mock.raw(@{value})"),
         Action::MockInline(op) => {
@@ -113,7 +115,14 @@ pub(super) fn explain_action(item: &ResolvedAction, req: &RequestMeta) -> String
         Action::Hide => "hide".to_string(),
         Action::Tag(value) => format!("tag({})", explain_value(value, item, req)),
         Action::Skip(families) if families.is_empty() => "skip()".to_string(),
-        Action::Skip(families) => format!("skip({})", families.join(", ")),
+        Action::Skip(families) => format!(
+            "skip({})",
+            families
+                .iter()
+                .map(ActionFamily::as_str)
+                .collect::<Vec<_>>()
+                .join(", ")
+        ),
         other => format!("{other:?}"),
     }
 }
@@ -250,8 +259,8 @@ fn explain_cache_op(op: &CacheOp, item: &ResolvedAction, req: &RequestMeta) -> S
 fn explain_tls_op(op: &TlsOp, item: &ResolvedAction, req: &RequestMeta) -> String {
     let mut parts = Vec::new();
     if let (Some(cert), Some(key)) = (&op.client_cert, &op.client_key) {
-        parts.push(format!("client-cert={}", item.render(cert, req)));
-        parts.push(format!("client-key={}", item.render(key, req)));
+        parts.push(format!("client-cert={}", explain_render(item, cert, req)));
+        parts.push(format!("client-key={}", explain_render(item, key, req)));
     }
     if let Some(min_version) = op.min_version {
         parts.push(format!("min={}", min_version.as_str()));
@@ -271,16 +280,22 @@ fn explain_tls_op(op: &TlsOp, item: &ResolvedAction, req: &RequestMeta) -> Strin
 
 fn explain_body_op(op: &BodyOp, item: &ResolvedAction, req: &RequestMeta) -> String {
     match op {
-        BodyOp::Set(Value::Inline(value)) => format!("set({})", item.render(value, req)),
+        BodyOp::Set(Value::Inline(value)) => format!("set({})", explain_render(item, value, req)),
         BodyOp::Prepend(Value::Inline(value)) => {
-            format!("prepend({})", item.render(value, req))
+            format!("prepend({})", explain_render(item, value, req))
         }
-        BodyOp::Append(Value::Inline(value)) => format!("append({})", item.render(value, req)),
-        BodyOp::Set(Value::File(value)) => format!("set(<{}>)", item.render(value, req)),
+        BodyOp::Append(Value::Inline(value)) => {
+            format!("append({})", explain_render(item, value, req))
+        }
+        BodyOp::Set(Value::File(value)) => {
+            format!("set(<{}>)", explain_render(item, value, req))
+        }
         BodyOp::Prepend(Value::File(value)) => {
-            format!("prepend(<{}>)", item.render(value, req))
+            format!("prepend(<{}>)", explain_render(item, value, req))
         }
-        BodyOp::Append(Value::File(value)) => format!("append(<{}>)", item.render(value, req)),
+        BodyOp::Append(Value::File(value)) => {
+            format!("append(<{}>)", explain_render(item, value, req))
+        }
         BodyOp::Set(Value::Reference(value)) => format!("set(@{value})"),
         BodyOp::Prepend(Value::Reference(value)) => format!("prepend(@{value})"),
         BodyOp::Append(Value::Reference(value)) => format!("append(@{value})"),
@@ -293,7 +308,7 @@ fn explain_body_op(op: &BodyOp, item: &ResolvedAction, req: &RequestMeta) -> Str
 
 fn explain_value(value: &Value, item: &ResolvedAction, req: &RequestMeta) -> String {
     match value {
-        Value::Inline(value) => item.render(value, req),
+        Value::Inline(value) => explain_render(item, value, req),
         Value::File(_) | Value::Reference(_) => explain_raw_value(value),
     }
 }
@@ -304,4 +319,37 @@ fn explain_raw_value(value: &Value) -> String {
         Value::File(value) => format!("<{value}>"),
         Value::Reference(value) => format!("@{value}"),
     }
+}
+
+fn explain_render(item: &ResolvedAction, value: &str, req: &RequestMeta) -> String {
+    item.render_bounded(value, req, MAX_RULE_EXPLAIN_VALUE_BYTES)
+        .unwrap_or_else(|_| format!("<render-limit:{MAX_RULE_EXPLAIN_VALUE_BYTES}>"))
+}
+
+pub(super) fn explain_result(result: ResolveResult, req: &RequestMeta) -> String {
+    if result.actions.is_empty() {
+        return "no matched actions".to_string();
+    }
+
+    let marker = format!("... explanation truncated at {MAX_RULE_EXPLAIN_BYTES} bytes\n");
+    let content_limit = MAX_RULE_EXPLAIN_BYTES.saturating_sub(marker.len());
+    let mut out = String::new();
+    for item in &result.actions {
+        let line = format!(
+            "{}:{} {}\n",
+            item.rule.group,
+            item.rule.line,
+            explain_action(item, req)
+        );
+        if out
+            .len()
+            .checked_add(line.len())
+            .is_none_or(|length| length > content_limit)
+        {
+            out.push_str(&marker);
+            break;
+        }
+        out.push_str(&line);
+    }
+    out
 }

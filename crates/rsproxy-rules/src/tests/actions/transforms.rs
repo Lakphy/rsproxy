@@ -8,7 +8,7 @@ fn parses_mock_raw_and_keeps_mock_family_first_match() {
         )
         .unwrap();
     assert!(matches!(
-        rules.rules[0].actions[0],
+        rules.rules()[0].actions[0],
         Action::MockRaw(Value::Inline(_))
     ));
 
@@ -29,32 +29,35 @@ fn parses_url_query_and_body_actions() {
             "example.com url.query(a=1, -b) req.body.prepend(\"pre-\") req.body.replace(/foo-(\\d+)/, bar-$1) res.body.append(@tail) res.body.replace(/hello/i, bye) inject(html, \"<!--${path}-->\", prepend) res.status(299)",
         )
         .unwrap();
-    assert!(matches!(rules.rules[0].actions[0], Action::UrlQuery(_)));
+    assert!(matches!(rules.rules()[0].actions[0], Action::UrlQuery(_)));
     assert!(matches!(
-        rules.rules[0].actions[1],
+        rules.rules()[0].actions[1],
         Action::ReqBody(BodyOp::Prepend(_))
     ));
     assert!(matches!(
-        rules.rules[0].actions[2],
+        rules.rules()[0].actions[2],
         Action::ReqBody(BodyOp::Replace { .. })
     ));
     assert!(matches!(
-        rules.rules[0].actions[3],
+        rules.rules()[0].actions[3],
         Action::ResBody(BodyOp::Append(Value::Reference(_)))
     ));
     assert!(matches!(
-        rules.rules[0].actions[4],
+        rules.rules()[0].actions[4],
         Action::ResBody(BodyOp::Replace { .. })
     ));
     assert!(matches!(
-        rules.rules[0].actions[5],
+        rules.rules()[0].actions[5],
         Action::Inject(InjectOp {
             target: InjectTarget::Html,
             mode: InjectMode::Prepend,
             ..
         })
     ));
-    assert!(matches!(rules.rules[0].actions[6], Action::ResStatus(299)));
+    assert!(matches!(
+        rules.rules()[0].actions[6],
+        Action::ResStatus(299)
+    ));
 
     let request = req("http://example.com/items");
     assert_eq!(
@@ -73,7 +76,7 @@ fn parses_typed_delete_properties_and_explains_the_canonical_form() {
         r#"example.com delete(pathname.0, pathname.last, urlParams.drop, reqHeaders.x-old, resHeaders.x-old, reqBody, reqBody.user.token, reqBody.items[1].secret, reqBody.meta.a\.b, resBody, resBody.payload[0].secret, reqType, resCharset, reqCookies.sid, resCookies.sid, trailer.x-old)"#,
     )
     .unwrap();
-    let Action::Delete(operations) = &rules.rules[0].actions[0] else {
+    let Action::Delete(operations) = &rules.rules()[0].actions[0] else {
         panic!("expected delete action");
     };
     assert_eq!(
@@ -147,7 +150,7 @@ fn delete_body_paths_decode_documented_special_character_escapes() {
         r#"example.com delete(reqBody.\n\ \.p.test\|\&test, reqBody.a\,b)"#,
     )
     .unwrap();
-    let Action::Delete(operations) = &rules.rules[0].actions[0] else {
+    let Action::Delete(operations) = &rules.rules()[0].actions[0] else {
         panic!("expected delete action");
     };
 
@@ -180,7 +183,7 @@ fn parses_url_rewrite_regex_without_consuming_replacement_captures() {
     )
     .unwrap();
     assert!(matches!(
-        &rules.rules[0].actions[0],
+        &rules.rules()[0].actions[0],
         Action::UrlRewrite {
             from: UrlRewritePattern::Regex(pattern),
             to,
@@ -202,7 +205,7 @@ fn parses_res_merge_json_with_commas_and_templates() {
     )
     .unwrap();
     assert!(matches!(
-        &rules.rules[0].actions[0],
+        &rules.rules()[0].actions[0],
         Action::ResMerge(value)
             if value.as_inline() == Some(r#"{"ok":true,"user":"$1","nested":{"source":"${host}"}}"#)
     ));
@@ -223,12 +226,12 @@ fn parses_res_trailer_as_stackable_response_action() {
     )
     .unwrap();
     assert!(matches!(
-        &rules.rules[0].actions[0],
+        &rules.rules()[0].actions[0],
         Action::ResTrailer(HeaderOp::Set { name, value })
             if name == "x-job" && value.as_inline() == Some("$1")
     ));
     assert!(matches!(
-        &rules.rules[0].actions[1],
+        &rules.rules()[0].actions[1],
         Action::ResTrailer(HeaderOp::Set { name, value })
             if name == "x-source" && value.as_inline() == Some("${host}")
     ));
@@ -239,4 +242,32 @@ fn parses_res_trailer_as_stackable_response_action() {
         "default:1 res.trailer(x-job: 42)\ndefault:1 res.trailer(x-source: example.com)\n"
     );
     assert_eq!(rules.resolve(&request).actions.len(), 2);
+}
+
+#[test]
+fn response_trailer_actions_reject_fields_that_control_message_semantics() {
+    for name in [
+        "content-length",
+        "transfer-encoding",
+        "trailer",
+        "host",
+        "cache-control",
+    ] {
+        let errors = RuleSet::parse(
+            "trailers",
+            &format!("example.test res.trailer({name}: unsafe)"),
+        )
+        .unwrap_err();
+        assert_eq!(errors[0].code, RuleErrorCode::Action, "{name}");
+        assert!(
+            errors[0].message.contains("forbidden in a trailer section"),
+            "{name}"
+        );
+
+        // Removal is safe and remains useful for stripping an upstream field.
+        RuleSet::parse("trailers", &format!("example.test res.trailer(-{name})"))
+            .unwrap_or_else(|errors| panic!("{name}: {errors:?}"));
+    }
+
+    RuleSet::parse("trailers", "example.test res.trailer(grpc-status: 0)").unwrap();
 }

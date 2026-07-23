@@ -129,7 +129,7 @@ fn har_entry(session: &Session) -> JsonValue {
             "flags": session.flags,
             "error": session.error,
             "rules": session.matched_rules.iter().map(|rule| json!({
-                "group": rule.group,
+                "group": rule.group.as_ref(),
                 "line": rule.line,
                 "raw": rsproxy_rules::redact_secrets(&rule.raw),
             })).collect::<Vec<_>>(),

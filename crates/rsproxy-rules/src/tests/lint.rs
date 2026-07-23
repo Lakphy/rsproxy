@@ -10,12 +10,44 @@ fn lint_reports_specific_rule_shadowed_by_earlier_wildcard() {
     let findings = rules.lint();
     assert_eq!(findings.len(), 1);
     let finding = &findings[0];
-    assert_eq!((finding.group.as_str(), finding.line), ("default", 2));
+    assert_eq!((finding.group.as_ref(), finding.line), ("default", 2));
     assert_eq!(
-        (finding.shadowed_by_group.as_str(), finding.shadowed_by_line),
+        (finding.shadowed_by_group.as_ref(), finding.shadowed_by_line),
         ("default", 1)
     );
     assert_eq!(finding.families, vec!["upstream".to_string()]);
+}
+
+#[test]
+fn lint_report_marks_the_comparison_budget_as_incomplete() {
+    let source = (0..1415)
+        .map(|index| format!("=http://host-{index}.test/ status(200)"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let rules = RuleSet::parse("budget", &source).unwrap();
+    let report = rules.lint_report();
+    assert!(!report.complete);
+    assert_eq!(report.comparisons, MAX_RULE_LINT_COMPARISONS);
+    assert!(report.comparison_bytes <= MAX_RULE_LINT_COMPARISON_BYTES);
+    assert!(report.findings.is_empty());
+}
+
+#[test]
+fn lint_report_marks_the_comparison_byte_budget_as_incomplete() {
+    let padding = "x".repeat(60_000);
+    let source = (0..70)
+        .map(|index| format!("=http://host-{index:02}.test/{padding} status(200)"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let rules = RuleSet::parse("byte-budget", &source).unwrap();
+    let report = rules.lint_report();
+    assert!(!report.complete);
+    assert!(report.comparisons < MAX_RULE_LINT_COMPARISONS);
+    assert!(report.comparison_bytes <= MAX_RULE_LINT_COMPARISON_BYTES);
+    assert!(
+        report.comparison_bytes > MAX_RULE_LINT_COMPARISON_BYTES - 2 * MAX_RULE_SOURCE_LINE_BYTES
+    );
+    assert!(report.findings.is_empty());
 }
 
 #[test]
@@ -36,6 +68,33 @@ fn lint_reports_global_wildcard_shadowing_later_rules() {
     let findings = rules.lint();
     assert_eq!(findings.len(), 1);
     assert_eq!(findings[0].line, 2);
+}
+
+#[test]
+fn lint_costs_non_glob_matcher_variants_without_claiming_subsumption() {
+    let rules = RuleSet::parse(
+        "variants",
+        ":80 status(200)\n/example\\.test/ status(201)\n!private.example.test status(202)",
+    )
+    .unwrap();
+    let report = rules.lint_report();
+    assert!(report.complete);
+    assert_eq!(report.comparisons, 3);
+    assert!(report.comparison_bytes > 0);
+    assert!(report.findings.is_empty());
+}
+
+#[test]
+fn lint_proves_nested_double_star_host_subsumption() {
+    let rules = RuleSet::parse(
+        "nested-host",
+        "**.example.test status(503)\n*.api.example.test status(200)",
+    )
+    .unwrap();
+    let findings = rules.lint();
+    assert_eq!(findings.len(), 1);
+    assert_eq!(findings[0].line, 2);
+    assert_eq!(findings[0].shadowed_by_line, 1);
 }
 
 #[test]
@@ -76,6 +135,17 @@ fn lint_skips_conditional_and_disabled_and_stackable_rules() {
 }
 
 #[test]
+fn lint_does_not_treat_actions_suppressed_by_skip_as_shadowing() {
+    let rules = RuleSet::parse(
+        "default",
+        "*.test skip(host) host(one.test)\napi.test host(two.test)",
+    )
+    .unwrap();
+
+    assert!(rules.lint().is_empty());
+}
+
+#[test]
 fn lint_honors_important_reordering() {
     // The later rule is @important, so it resolves first and is not shadowed.
     let rules = RuleSet::parse(
@@ -111,8 +181,8 @@ fn lint_spans_groups_in_group_order() {
     .unwrap();
     let findings = rules.lint();
     assert_eq!(findings.len(), 1);
-    assert_eq!(findings[0].group, "second");
-    assert_eq!(findings[0].shadowed_by_group, "first");
+    assert_eq!(findings[0].group.as_ref(), "second");
+    assert_eq!(findings[0].shadowed_by_group.as_ref(), "first");
 }
 
 #[test]

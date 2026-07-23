@@ -153,7 +153,7 @@ pub(super) fn estimate_session_bytes(session: &Session) -> usize {
             session
                 .matched_rules
                 .iter()
-                .map(|rule| rule.group.capacity().saturating_add(rule.raw.capacity()))
+                .map(|rule| rule.group.len().saturating_add(rule.raw.len()))
                 .sum::<usize>(),
         )
         .saturating_add(vector_storage_bytes::<FrameRecord>(

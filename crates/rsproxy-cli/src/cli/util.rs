@@ -1,13 +1,45 @@
 use crate::{CliError, CliResult, ConfigError};
 use rsproxy_trace::TraceSpillCompression;
 use std::io::{self, Read};
+use std::path::Path;
 
-pub(super) fn read_stdin() -> CliResult<String> {
-    let mut input = String::new();
-    io::stdin()
-        .read_to_string(&mut input)
-        .map_err(|source| CliError::io("read stdin", source))?;
-    Ok(input)
+pub(super) fn read_stdin_bounded(limit: usize, label: &str) -> CliResult<String> {
+    read_utf8_bounded(io::stdin().lock(), limit, label, "read stdin")
+}
+
+pub(super) fn read_utf8_file_bounded(path: &Path, limit: usize, label: &str) -> CliResult<String> {
+    let file = std::fs::File::open(path)
+        .map_err(|source| CliError::io(format!("read {label} {}", path.display()), source))?;
+    read_utf8_bounded(
+        file,
+        limit,
+        label,
+        &format!("read {label} {}", path.display()),
+    )
+}
+
+fn read_utf8_bounded(
+    reader: impl Read,
+    limit: usize,
+    label: &str,
+    io_context: &str,
+) -> CliResult<String> {
+    let mut bytes = Vec::with_capacity(limit.min(64 * 1024));
+    reader
+        .take(limit.saturating_add(1) as u64)
+        .read_to_end(&mut bytes)
+        .map_err(|source| CliError::io(io_context, source))?;
+    if bytes.len() > limit {
+        return Err(CliError::Usage(format!(
+            "{label} exceeds the {limit}-byte limit"
+        )));
+    }
+    String::from_utf8(bytes).map_err(|source| {
+        CliError::io(
+            io_context,
+            io::Error::new(io::ErrorKind::InvalidData, source),
+        )
+    })
 }
 
 pub(super) fn parse_size(input: &str) -> Result<usize, ConfigError> {
@@ -75,3 +107,6 @@ pub(super) fn percent_encode(input: &str) -> String {
     }
     out
 }
+
+#[cfg(test)]
+mod tests;

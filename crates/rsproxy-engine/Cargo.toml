@@ -14,12 +14,14 @@ test-support = []
 [dependencies]
 arc-swap.workspace = true
 bytes.workspace = true
+cap-std.workspace = true
 http-body.workspace = true
 http-body-util.workspace = true
 hyper.workspace = true
 hyper-util.workspace = true
 notify.workspace = true
 rcgen.workspace = true
+rsproxy-http.workspace = true
 rsproxy-net.workspace = true
 rsproxy-rules.workspace = true
 rsproxy-trace.workspace = true

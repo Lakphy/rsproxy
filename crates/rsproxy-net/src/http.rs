@@ -13,7 +13,8 @@ pub use request::{
 #[cfg(test)]
 use response::write_response_with_connection;
 pub use response::{
-    header, reason_phrase, remove_header, set_header, write_response, write_response_head,
+    header, reason_phrase, remove_header, response_can_send_content, response_has_framed_body,
+    set_header, status_can_send_content, write_response, write_response_head,
     write_response_head_with_connection, write_response_with_version_and_connection,
 };
 

@@ -32,9 +32,7 @@ impl<R: Read> H1BodyStream<R> {
         max_header_count: usize,
         receive_started: Instant,
     ) -> io::Result<Self> {
-        let body_allowed = !method.eq_ignore_ascii_case("HEAD")
-            && !(100..200).contains(&status)
-            && !matches!(status, 204 | 304);
+        let body_allowed = http::response_has_framed_body(method, status);
         let state = if !body_allowed {
             BodyState::Empty
         } else if has_chunked_transfer_encoding(headers) {
@@ -46,6 +44,11 @@ impl<R: Read> H1BodyStream<R> {
                     "invalid response content-length",
                 )
             })?)
+        } else if status == 205 {
+            // A conforming 205 without explicit framing has no content. We do
+            // consume explicitly framed malformed content so a persistent
+            // upstream connection stays synchronized.
+            BodyState::Empty
         } else {
             BodyState::CloseDelimited
         };

@@ -1,24 +1,79 @@
 use super::*;
 
-pub(super) fn parse_condition(input: &str) -> Result<Condition, RuleModelError> {
-    if let Some(rest) = input.strip_prefix('!') {
-        return Ok(Condition::Not(Box::new(parse_condition(rest)?)));
+pub(crate) fn condition_node_count(condition: &Condition) -> usize {
+    let mut count = 0usize;
+    condition.for_each_node(&mut |_| count += 1);
+    count
+}
+
+pub(crate) fn body_condition_count(condition: &Condition) -> usize {
+    let mut count = 0usize;
+    condition.for_each_node(&mut |node| {
+        if matches!(node, Condition::BodyContains(_) | Condition::BodyRegex(_)) {
+            count += 1;
+        }
+    });
+    count
+}
+
+pub(super) fn parse_condition(
+    input: &str,
+    profile: SyntaxProfile,
+) -> Result<Condition, RuleModelError> {
+    parse_condition_at_depth(input, 0, profile)
+}
+
+fn parse_condition_at_depth(
+    input: &str,
+    depth: usize,
+    profile: SyntaxProfile,
+) -> Result<Condition, RuleModelError> {
+    if depth > MAX_PARSE_NESTING {
+        return Err(RuleModelError::limit(
+            "condition nesting",
+            format!("condition nesting exceeds {MAX_PARSE_NESTING} levels"),
+        ));
     }
-    let (name, args) = parse_call(input)?;
+    if let Some(rest) = input.strip_prefix('!') {
+        return Ok(Condition::Not(Box::new(parse_condition_at_depth(
+            rest,
+            depth + 1,
+            profile,
+        )?)));
+    }
+    let (input_name, args) = parse_call(input)?;
+    let name = match profile {
+        SyntaxProfile::Compatible => canonical_condition_name(input_name),
+        SyntaxProfile::CanonicalV3 => language::canonical_v3_condition_name(input_name),
+    };
+    let Some(name) = name else {
+        if profile == SyntaxProfile::CanonicalV3
+            && let Some(canonical) = canonical_condition_name(input_name)
+        {
+            return Err(RuleModelError::unsupported(
+                "condition",
+                format!(
+                    "v3 accepts canonical condition names only; replace `{input_name}` with `{canonical}`"
+                ),
+            ));
+        }
+        return Err(RuleModelError::unsupported(
+            "condition",
+            format!("unknown condition `{input_name}`"),
+        ));
+    };
     match name {
         "method" => parse_method_condition(&args).map(Condition::Method),
-        "host" => Ok(Condition::Host(unquote(require_one(&args, "host")?))),
+        "host" => {
+            let pattern = unquote(require_one(&args, "host")?);
+            validate_glob_pattern(&pattern, '.', "host condition glob")?;
+            Ok(Condition::Host(pattern))
+        }
         "url" => parse_url_condition(require_one(&args, "url")?).map(Condition::Url),
-        "ip" | "clientIp" | "client_ip" | "client-ip" => {
-            parse_ip_patterns(&args, "clientIp").map(Condition::ClientIp)
-        }
-        "serverIp" | "server_ip" | "server-ip" => {
-            parse_ip_patterns(&args, "serverIp").map(Condition::ServerIp)
-        }
+        "client.ip" => parse_ip_patterns(&args, "client.ip").map(Condition::ClientIp),
+        "server.ip" => parse_ip_patterns(&args, "server.ip").map(Condition::ServerIp),
         "header" => parse_header_condition(require_one(&args, "header")?, false),
-        "res.header" | "resHeader" | "res_header" | "res-header" => {
-            parse_header_condition(require_one(&args, "res.header")?, true)
-        }
+        "res.header" => parse_header_condition(require_one(&args, "res.header")?, true),
         "body" => parse_body_condition(require_one(&args, "body")?),
         "status" => parse_status_condition(&args).map(Condition::Status),
         "chance" => {
@@ -57,7 +112,7 @@ pub(super) fn parse_condition(input: &str) -> Result<Condition, RuleModelError> 
                 ));
             }
             args.iter()
-                .map(|arg| parse_condition(arg.trim()))
+                .map(|arg| parse_condition_at_depth(arg.trim(), depth + 1, profile))
                 .collect::<Result<Vec<_>, _>>()
                 .map(Condition::Any)
         }
@@ -69,13 +124,17 @@ pub(super) fn parse_condition(input: &str) -> Result<Condition, RuleModelError> 
                 ));
             }
             args.iter()
-                .map(|arg| parse_condition(arg.trim()))
+                .map(|arg| parse_condition_at_depth(arg.trim(), depth + 1, profile))
                 .collect::<Result<Vec<_>, _>>()
                 .map(Condition::All)
         }
         "not" => {
             let inner = require_one(&args, "not")?;
-            Ok(Condition::Not(Box::new(parse_condition(inner)?)))
+            Ok(Condition::Not(Box::new(parse_condition_at_depth(
+                inner,
+                depth + 1,
+                profile,
+            )?)))
         }
         _ => Err(RuleModelError::unsupported(
             "condition",
@@ -124,6 +183,7 @@ fn parse_ip_patterns(args: &[&str], name: &str) -> Result<Vec<String>, RuleModel
                     format!("{name} patterns must be non-empty"),
                 ))
             } else {
+                validate_glob_pattern(value, '\0', "IP condition glob")?;
                 Ok(value.to_string())
             }
         })
@@ -172,14 +232,13 @@ fn parse_status_condition(args: &[&str]) -> Result<Vec<u16>, RuleModelError> {
                     source,
                 )
             })?;
-            if (100..=999).contains(&status) {
-                Ok(status)
-            } else {
-                Err(RuleModelError::constraint(
-                    "status condition",
-                    format!("invalid status condition `{value}`"),
-                ))
-            }
+            validate_status_range(
+                status,
+                MIN_HTTP_STATUS..=MAX_HTTP_STATUS,
+                "status condition",
+                "100..599",
+            )?;
+            Ok(status)
         })
         .collect()
 }
@@ -197,35 +256,18 @@ fn validate_header_name(input: &str) -> Result<String, RuleModelError> {
 }
 
 fn validate_env_name(name: &str) -> Result<(), RuleModelError> {
-    if name.is_empty() || name.chars().any(char::is_control) {
+    if name.is_empty()
+        || name.contains('=')
+        || name.contains('\0')
+        || name.chars().any(char::is_whitespace)
+    {
         Err(RuleModelError::invalid(
             "environment condition name",
-            "env condition name is empty or contains control characters",
+            "env condition name is empty or contains `=`, NUL, or whitespace",
         ))
     } else {
         Ok(())
     }
-}
-
-fn is_http_token_byte(byte: u8) -> bool {
-    byte.is_ascii_alphanumeric()
-        || matches!(
-            byte,
-            b'!' | b'#'
-                | b'$'
-                | b'%'
-                | b'&'
-                | b'\''
-                | b'*'
-                | b'+'
-                | b'-'
-                | b'.'
-                | b'^'
-                | b'_'
-                | b'`'
-                | b'|'
-                | b'~'
-        )
 }
 
 fn parse_url_condition(input: &str) -> Result<UrlCondition, RuleModelError> {
@@ -233,7 +275,9 @@ fn parse_url_condition(input: &str) -> Result<UrlCondition, RuleModelError> {
     if input.starts_with('/') && regex_literal_end(input).is_some() {
         parse_regex_matcher(input).map(UrlCondition::Regex)
     } else {
-        Ok(UrlCondition::Glob(unquote(input)))
+        let pattern = unquote(input);
+        validate_glob_pattern(&pattern, '\0', "URL condition glob")?;
+        Ok(UrlCondition::Glob(pattern))
     }
 }
 

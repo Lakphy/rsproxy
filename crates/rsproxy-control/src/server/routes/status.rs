@@ -121,7 +121,7 @@ pub(super) fn get<W: Write + ?Sized>(stream: &mut W, state: &ControlState) -> st
         config_path,
         config.body_buffer_limit,
         rsproxy_trace::now_millis().saturating_sub(status.started_ms),
-        rules.compiled.rules.len(),
+        rules.compiled.rules().len(),
         rule_groups,
         rule_watch,
         mitm,

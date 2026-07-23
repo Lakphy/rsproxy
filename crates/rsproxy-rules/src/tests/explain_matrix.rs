@@ -4,9 +4,9 @@ fn resolved(action: Action) -> ResolvedAction {
     ResolvedAction {
         action,
         rule: MatchedRule {
-            group: "explain".to_string(),
+            group: "explain".into(),
             line: 7,
-            raw: "fixture".to_string(),
+            raw: "fixture".into(),
         },
         captures: Captures::default(),
         response: None,
@@ -332,13 +332,14 @@ fn explain_covers_tls_url_body_delete_and_control_variants() {
     assert_eq!(explain(Action::Direct), "direct");
     assert_eq!(explain(Action::Bypass), "bypass");
     assert_eq!(explain(Action::Hide), "hide");
-    assert_eq!(explain(Action::Skip(Vec::new())), "skip()");
+    assert_eq!(explain(Action::Skip(ActionFamilySet::EMPTY)), "skip()");
     assert_eq!(
-        explain(Action::Skip(vec![
-            "cache".to_string(),
-            "res.header".to_string()
-        ])),
-        "skip(cache, res.header)"
+        explain(Action::Skip(
+            [ActionFamily::Cache, ActionFamily::ResHeader]
+                .into_iter()
+                .collect()
+        )),
+        "skip(res.header, cache)"
     );
     assert_eq!(explain(Action::Attachment(None)), "Attachment(None)");
     assert!(

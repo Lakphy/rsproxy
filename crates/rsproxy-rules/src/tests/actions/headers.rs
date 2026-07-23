@@ -12,7 +12,7 @@ fn header_regex_replacement_parses_and_replaces_capture_groups() {
         name,
         pattern,
         replacement,
-    }) = &rules.rules[0].actions[0]
+    }) = &rules.rules()[0].actions[0]
     else {
         panic!("expected request header replacement");
     };
@@ -34,7 +34,7 @@ fn header_regex_replacement_supports_escaped_slashes() {
         pattern,
         replacement,
         ..
-    }) = &rules.rules[0].actions[0]
+    }) = &rules.rules()[0].actions[0]
     else {
         panic!("expected response header replacement");
     };
@@ -50,7 +50,7 @@ fn header_regex_replacement_supports_escaped_slashes() {
 fn header_set_value_may_contain_a_tilde() {
     let rules = RuleSet::parse("default", "example.test req.header(x-note: a~b)").unwrap();
     assert!(matches!(
-        &rules.rules[0].actions[0],
+        &rules.rules()[0].actions[0],
         Action::ReqHeader(HeaderOp::Set { name, value })
             if name == "x-note" && value.as_inline() == Some("a~b")
     ));
@@ -67,7 +67,7 @@ fn header_operations_preserve_commas_inside_the_single_operation() {
         pattern,
         replacement,
         ..
-    }) = &rules.rules[0].actions[0]
+    }) = &rules.rules()[0].actions[0]
     else {
         panic!("expected request header replacement");
     };
@@ -81,7 +81,7 @@ fn invalid_header_replacement_regex_is_an_action_error() {
         .expect_err("invalid regex should fail while parsing the rule");
     let error = &errors[0];
     assert_eq!(error.code, RuleErrorCode::Action);
-    assert!(error.message.contains("invalid header replacement regex"));
+    assert!(error.message.contains("unclosed `[`"));
 }
 
 #[test]

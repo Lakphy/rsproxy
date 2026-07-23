@@ -253,6 +253,85 @@ fn referenced_regex_url_replacement_preserves_regex_captures() {
 }
 
 #[test]
+fn url_rewrite_rejects_plain_replacement_amplification() {
+    let mut state = test_state();
+    state.config.max_header_size = 30;
+    let request_meta = meta("http://example.test/aaaa");
+    let rules = RuleSet::parse("limit", "example.test url.rewrite(a, xxxxxxxxxx)").unwrap();
+    let actions = rules.resolve(&request_meta).actions;
+    let error = apply_url_actions(&request_meta.url, &request_meta, &actions, &state).unwrap_err();
+    assert_eq!(error.kind(), io::ErrorKind::InvalidData);
+    assert!(error.to_string().contains("rewritten URL"));
+}
+
+#[test]
+fn url_rewrite_rejects_rendered_whitespace_and_control_characters() {
+    let request_meta = meta("http://example.test/old");
+    for replacement in [r#""/new path""#, r#""/new\r\nInjected""#] {
+        let rules = RuleSet::parse(
+            "security",
+            &format!("example.test url.rewrite(/old, {replacement})"),
+        )
+        .unwrap();
+        let actions = rules.resolve(&request_meta).actions;
+        let error = apply_url_actions(&request_meta.url, &request_meta, &actions, &test_state())
+            .expect_err("invalid rewritten request targets must be rejected");
+        assert_eq!(error.kind(), io::ErrorKind::InvalidData);
+        assert!(error.to_string().contains("rewritten URL"));
+    }
+}
+
+#[test]
+fn redirect_locations_reject_header_injection_and_unsafe_schemes() {
+    let request = meta("http://example.test/");
+    let state = test_state();
+    for location in [
+        "https://safe.test/\r\nX-Injected: yes",
+        "https://safe.test/has space",
+        "javascript:alert(1)",
+        "data:text/plain,redirect",
+    ] {
+        let actions = vec![resolved(Action::Redirect {
+            url: Value::inline(location),
+            code: 302,
+        })];
+        let error = first_redirect(&actions, &request, &state)
+            .expect_err("unsafe redirect locations must be rejected");
+        assert_eq!(error.kind(), io::ErrorKind::InvalidInput);
+    }
+
+    for location in [
+        "/next?ok=1",
+        "//cdn.example.test/asset",
+        "https://safe.test/",
+    ] {
+        let actions = vec![resolved(Action::Redirect {
+            url: Value::inline(location),
+            code: 307,
+        })];
+        assert_eq!(
+            first_redirect(&actions, &request, &state).unwrap(),
+            Some((location.to_string(), 307))
+        );
+    }
+}
+
+#[test]
+fn rendered_upstream_chains_reject_the_first_hop_beyond_the_limit() {
+    let chain = (0..=rsproxy_rules::MAX_RULE_UPSTREAM_HOPS)
+        .map(|index| format!("proxy://proxy-{index}.test:8080"))
+        .collect::<Vec<_>>()
+        .join(",");
+    let rules = RuleSet::parse("limit", &format!("example.test upstream({chain})")).unwrap();
+    let request = meta("http://example.test/");
+    let actions = rules.resolve(&request).actions;
+    let url = UrlParts::parse(&request.url).unwrap();
+    let error = upstream_route(&url, &actions, &request, &test_state()).unwrap_err();
+    assert_eq!(error.kind(), io::ErrorKind::InvalidInput);
+    assert!(error.to_string().contains("32-hop limit"));
+}
+
+#[test]
 fn mock_sources_render_text_and_preserve_binary_files() {
     let (state, storage) = state_with_storage("mock");
     write_storage(&storage, "values/mock-text", b"hello ${kind} $2 at ${path}");

@@ -33,7 +33,7 @@ fn host_pool_is_balanced_under_concurrent_selection() {
         "origin.test host(a.test:80, b.test:80, c.test:80)",
     )
     .unwrap();
-    let Action::Host(pool) = &rules.rules[0].actions[0] else {
+    let Action::Host(pool) = &rules.rules()[0].actions[0] else {
         panic!("expected host action");
     };
     let pool = pool.clone();

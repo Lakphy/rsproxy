@@ -36,3 +36,17 @@ fn pem_errors_are_invalid_data_and_retain_the_parser_source() {
     assert_eq!(missing.kind(), io::ErrorKind::InvalidData);
     assert!(missing.source().is_some());
 }
+
+#[test]
+fn pem_file_loader_rejects_one_byte_beyond_the_public_limit() {
+    let path = std::env::temp_dir().join(format!(
+        "rsproxy-pem-limit-{}-{}",
+        std::process::id(),
+        rsproxy_trace::now_millis()
+    ));
+    fs::write(&path, vec![b' '; rsproxy_rules::MAX_RULE_TLS_PEM_BYTES + 1]).unwrap();
+    let error = load_certs(&path).unwrap_err();
+    assert_eq!(error.kind(), io::ErrorKind::InvalidData);
+    assert!(error.to_string().contains("1048576-byte limit"));
+    let _ = fs::remove_file(path);
+}

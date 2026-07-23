@@ -13,11 +13,13 @@ test-support = []
 [dependencies]
 bytes.workspace = true
 hickory-resolver.workspace = true
+http.workspace = true
 http-body.workspace = true
 http-body-util.workspace = true
 hyper.workspace = true
 hyper-util.workspace = true
 rustls.workspace = true
+rsproxy-http.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
 

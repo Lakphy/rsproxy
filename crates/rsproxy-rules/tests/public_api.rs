@@ -9,6 +9,9 @@ use rsproxy_rules::{
 fn public_rules_api_parses_and_resolves_a_request() {
     let rules =
         RuleSet::parse("integration", "api.example.test status(201)").expect("rule should parse");
+    assert!(!rules.is_empty());
+    assert_eq!(rules.rules().len(), 1);
+    assert!(rules.version() > 0);
     let request = RequestMeta {
         method: "GET".to_string(),
         url: "http://api.example.test/items".to_string(),
@@ -49,4 +52,20 @@ fn public_model_constructors_use_rule_model_error() {
             ..
         })
     ));
+}
+
+#[test]
+fn public_lint_report_exposes_bounded_completeness_metadata() {
+    let rules = RuleSet::parse(
+        "integration",
+        "*.example.test status(503)\napi.example.test status(200)",
+    )
+    .unwrap();
+    let report = rules.lint_report();
+    assert!(report.complete);
+    assert_eq!(report.findings.len(), 1);
+    assert_eq!(report.comparisons, 1);
+    assert!(report.comparison_bytes > 0);
+    assert_eq!(rsproxy_rules::MAX_RULE_LINT_COMPARISONS, 1_000_000);
+    assert_eq!(rsproxy_rules::MAX_RULE_LINT_COMPARISON_BYTES, 268_435_456);
 }

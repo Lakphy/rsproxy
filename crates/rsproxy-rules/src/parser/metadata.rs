@@ -28,7 +28,21 @@ pub(super) fn parse_header_op(input: &str) -> Result<HeaderOp, RuleModelError> {
     })
 }
 
-fn normalize_header_name(input: &str) -> Result<String, RuleModelError> {
+pub(super) fn validate_trailer_op(operation: &HeaderOp) -> Result<(), RuleModelError> {
+    let name = match operation {
+        HeaderOp::Remove { .. } => return Ok(()),
+        HeaderOp::Set { name, .. } | HeaderOp::Replace { name, .. } => name,
+    };
+    if rsproxy_http::is_forbidden_trailer_name(name) {
+        return Err(RuleModelError::constraint(
+            "response trailer",
+            format!("HTTP field `{name}` is forbidden in a trailer section"),
+        ));
+    }
+    Ok(())
+}
+
+pub(super) fn normalize_header_name(input: &str) -> Result<String, RuleModelError> {
     let name = input.trim();
     if name.is_empty() || !name.bytes().all(is_http_token_byte) {
         return Err(RuleModelError::invalid(
@@ -39,27 +53,6 @@ fn normalize_header_name(input: &str) -> Result<String, RuleModelError> {
         ));
     }
     Ok(name.to_ascii_lowercase())
-}
-
-fn is_http_token_byte(byte: u8) -> bool {
-    byte.is_ascii_alphanumeric()
-        || matches!(
-            byte,
-            b'!' | b'#'
-                | b'$'
-                | b'%'
-                | b'&'
-                | b'\''
-                | b'*'
-                | b'+'
-                | b'-'
-                | b'.'
-                | b'^'
-                | b'_'
-                | b'`'
-                | b'|'
-                | b'~'
-        )
 }
 
 fn header_replace_parts(input: &str) -> Option<(&str, &str)> {

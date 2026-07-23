@@ -4,7 +4,7 @@ use super::super::*;
 fn header_action_accepts_spaces() {
     let rules = RuleSet::parse("default", "example.com res.header(x-name: hello world)").unwrap();
     assert!(matches!(
-        rules.rules[0].actions[0],
+        rules.rules()[0].actions[0],
         Action::ResHeader(HeaderOp::Set { .. })
     ));
 }
@@ -15,31 +15,37 @@ fn parses_header_cookie_cache_throttle_and_upstream_actions() {
             "example.com upstream(proxy://127.0.0.1:18888) url.rewrite(/old,/new) req.cookie(sid=1) req.ua(rsproxy) req.auth(user:pass) req.forwarded(${clientIp}) res.cookie(token=2) res.cors(*) res.type(text/plain) res.charset(utf-8) cache(off) attachment(file.txt) throttle(res, 1KB/s)",
         )
         .unwrap();
-    assert!(matches!(rules.rules[0].actions[0], Action::Upstream(_)));
+    assert!(matches!(rules.rules()[0].actions[0], Action::Upstream(_)));
     assert!(matches!(
-        rules.rules[0].actions[1],
+        rules.rules()[0].actions[1],
         Action::UrlRewrite {
             from: UrlRewritePattern::Plain(_),
             ..
         }
     ));
     assert!(matches!(
-        rules.rules[0].actions[2],
+        rules.rules()[0].actions[2],
         Action::ReqCookie(CookieOp::Set { .. })
     ));
-    assert!(matches!(rules.rules[0].actions[4], Action::ReqAuth(_)));
-    assert!(matches!(rules.rules[0].actions[5], Action::ReqForwarded(_)));
+    assert!(matches!(rules.rules()[0].actions[4], Action::ReqAuth(_)));
     assert!(matches!(
-        &rules.rules[0].actions[7],
+        rules.rules()[0].actions[5],
+        Action::ReqForwarded(_)
+    ));
+    assert!(matches!(
+        &rules.rules()[0].actions[7],
         Action::ResCors(CorsOp { origin, .. }) if origin.as_inline() == Some("*")
     ));
     assert!(matches!(
-        rules.rules[0].actions[10],
+        rules.rules()[0].actions[10],
         Action::Cache(CacheOp::Off)
     ));
-    assert!(matches!(rules.rules[0].actions[11], Action::Attachment(_)));
     assert!(matches!(
-        rules.rules[0].actions[12],
+        rules.rules()[0].actions[11],
+        Action::Attachment(_)
+    ));
+    assert!(matches!(
+        rules.rules()[0].actions[12],
         Action::Throttle {
             phase: Phase::Res,
             bytes_per_sec: 1024
@@ -54,7 +60,7 @@ fn parses_res_cookie_with_set_cookie_attributes() {
     )
     .unwrap();
     assert!(matches!(
-        &rules.rules[0].actions[0],
+        &rules.rules()[0].actions[0],
         Action::ResCookie(CookieOp::Set { name, value, attrs })
             if name == "token"
                 && value.as_inline() == Some("$1")
@@ -86,7 +92,7 @@ fn parses_advanced_cache_directives() {
         )
         .unwrap();
     assert!(matches!(
-        &rules.rules[0].actions[0],
+        &rules.rules()[0].actions[0],
         Action::Cache(CacheOp::Directives(directives))
             if directives.len() == 5
                 && directives[0] == CacheDirective { name: "public".to_string(), value: None }
@@ -109,7 +115,7 @@ fn parses_detailed_res_cors_options() {
         )
         .unwrap();
     assert!(matches!(
-        &rules.rules[0].actions[0],
+        &rules.rules()[0].actions[0],
         Action::ResCors(CorsOp {
             origin,
             methods: Some(methods),

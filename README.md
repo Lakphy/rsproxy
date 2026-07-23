@@ -73,6 +73,10 @@ rsproxy stop
 ```
 
 Run `rsproxy help <COMMAND>` for command-specific options and examples.
+The rule language has its own full offline index: run `rsproxy rules help`,
+query `rsproxy rules help action.req.header`, or search with
+`rsproxy rules help --search 'response header'`. JSON output includes the rule
+language compatibility version and parser-authoritative DSL spellings.
 
 ## Start automatically at login
 
@@ -108,6 +112,7 @@ local dev server, mocks an endpoint, adds a request header, and slows one
 response path:
 
 ```text
+@language 3
 app.example.com map.remote(http://localhost:3000)
 api.example.com/health mock("ok") res.type(text/plain)
 **.example.com req.header(x-debug-proxy: rsproxy)
@@ -122,13 +127,17 @@ Validate, lint, and install a rule group:
 
 ```sh
 rsproxy rules check ./debug.rules
-rsproxy rules lint --file ./debug.rules   # detects rules shadowed by earlier broader rules
+rsproxy rules lint --file ./debug.rules   # detects provable ordering and same-rule conflicts
 rsproxy rules set default --file ./debug.rules
 rsproxy rules test https://api.example.com/health
 ```
 
-See the [Rules DSL specification](docs/rules-dsl-spec.md) for the complete
-matcher, action, condition, value-source, and template contracts.
+Use `rsproxy rules help` for the complete built-in topic index (including
+machine-readable `--json` output), and see the
+[Rules DSL specification](docs/rules-dsl-spec.md) for the complete
+matcher, action, condition, value-source, and template contracts. Existing
+integrations should also review the [v2 to v3 migration notes](docs/rules-migration-v2-v3.md)
+and the historical [v1 to v2 notes](docs/rules-migration-v1-v2.md).
 
 ## Common commands
 

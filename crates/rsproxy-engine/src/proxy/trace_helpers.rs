@@ -95,22 +95,28 @@ pub(super) fn is_upstream_ttfb_timeout(error: &io::Error) -> bool {
 }
 
 pub(super) fn merge_matched_rules(existing: &mut Vec<MatchedRule>, additional: Vec<MatchedRule>) {
-    let mut merged = Vec::with_capacity(existing.len() + additional.len());
+    let additional_keys = additional
+        .iter()
+        .map(rule_identity)
+        .collect::<std::collections::HashSet<_>>();
+    let mut merged = Vec::with_capacity(existing.len().saturating_add(additional.len()));
+    let mut seen = std::collections::HashSet::new();
     for rule in existing.drain(..) {
-        if !additional.iter().any(|seen| same_rule(seen, &rule)) {
+        let identity = rule_identity(&rule);
+        if !additional_keys.contains(&identity) && seen.insert(identity) {
             merged.push(rule);
         }
     }
     for rule in additional {
-        if !merged.iter().any(|seen| same_rule(seen, &rule)) {
+        if seen.insert(rule_identity(&rule)) {
             merged.push(rule);
         }
     }
     *existing = merged;
 }
 
-pub(super) fn same_rule(left: &MatchedRule, right: &MatchedRule) -> bool {
-    left.group == right.group && left.line == right.line && left.raw == right.raw
+fn rule_identity(rule: &MatchedRule) -> (Arc<str>, usize, Arc<str>) {
+    (Arc::clone(&rule.group), rule.line, Arc::clone(&rule.raw))
 }
 
 pub(super) fn trace_hidden(actions: &[ResolvedAction]) -> bool {
@@ -125,11 +131,25 @@ pub(super) fn apply_trace_tags(
     meta: &RequestMeta,
     state: &SharedState,
 ) {
+    let mut tag_count = session
+        .flags
+        .iter()
+        .filter(|flag| flag.starts_with("tag:"))
+        .count();
     for item in actions {
+        if tag_count >= rsproxy_rules::MAX_RULE_TAGS_PER_REQUEST {
+            break;
+        }
         let Action::Tag(value) = &item.action else {
             continue;
         };
-        let Ok(tag) = resolve_value_text(value, item, meta, state) else {
+        let Ok(tag) = resolve_value_text_bounded(
+            value,
+            item,
+            meta,
+            state,
+            rsproxy_rules::MAX_RULE_RENDERED_TAG_BYTES,
+        ) else {
             continue;
         };
         let tag = tag.trim();
@@ -139,6 +159,7 @@ pub(super) fn apply_trace_tags(
         let flag = format!("tag:{tag}");
         if !session.flags.iter().any(|seen| seen == &flag) {
             session.flags.push(flag);
+            tag_count += 1;
         }
     }
 }

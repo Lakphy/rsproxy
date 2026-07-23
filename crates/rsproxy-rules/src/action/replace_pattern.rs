@@ -28,6 +28,22 @@ impl RegexReplacePattern {
         self.compiled.replace_all(input, replacement).into_owned()
     }
 
+    /// Replaces all matches only when capture expansion fits `limit` UTF-8 bytes.
+    pub fn replace_all_bounded(
+        &self,
+        input: &str,
+        replacement: &str,
+        limit: usize,
+    ) -> Result<String, crate::RuleModelError> {
+        crate::bounded_replace::regex_replace_all(
+            &self.compiled,
+            input,
+            replacement,
+            limit,
+            "regex replacement",
+        )
+    }
+
     /// Returns pattern text without DSL slash delimiters or flags.
     pub fn pattern(&self) -> &str {
         &self.pattern

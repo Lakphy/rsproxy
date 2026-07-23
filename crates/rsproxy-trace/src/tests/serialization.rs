@@ -26,9 +26,9 @@ fn spill_json_covers_all_session_frame_tls_and_optional_shapes() {
         session.error = (index == 1).then(|| "closed\nby\tpeer\u{0001}".to_string());
         session.flags = vec!["one".to_string(), "two".to_string()];
         session.matched_rules.push(MatchedRule {
-            group: "default".to_string(),
+            group: "default".into(),
             line: 1,
-            raw: "example.test upstream(socks5://user:secret@proxy.test:1080)".to_string(),
+            raw: "example.test upstream(socks5://user:secret@proxy.test:1080)".into(),
         });
         session.req_headers = vec![("X-Test".to_string(), "yes".to_string())];
         session.req_trailers = vec![("X-Request-End".to_string(), "yes".to_string())];

@@ -74,7 +74,11 @@ pub(in crate::proxy) fn first_redirect(
 ) -> io::Result<Option<(String, u16)>> {
     for item in actions {
         if let Action::Redirect { url, code } = &item.action {
-            return Ok(Some((resolve_value_text(url, item, meta, state)?, *code)));
+            let rendered =
+                resolve_value_text_bounded(url, item, meta, state, state.config.max_header_size)?;
+            rsproxy_rules::validate_redirect_location(&rendered)
+                .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error))?;
+            return Ok(Some((rendered, *code)));
         }
     }
     Ok(None)

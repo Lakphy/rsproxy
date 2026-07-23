@@ -124,7 +124,7 @@ fn offline_group_helpers_cover_file_list_cat_toggle_remove_and_load_paths() {
     let storage = root.join("storage");
     let rules_file = root.join("input.rules");
     std::fs::create_dir_all(&root).unwrap();
-    std::fs::write(&rules_file, "example.test status(218)\n").unwrap();
+    std::fs::write(&rules_file, "@language 3\nexample.test status(218)\n").unwrap();
     let api = "127.0.0.1:1";
 
     run_rules_set("file-group", Some(&rules_file), api, &storage, false).unwrap();
@@ -135,13 +135,13 @@ fn offline_group_helpers_cover_file_list_cat_toggle_remove_and_load_paths() {
 
     run_rules_toggle("file-group", api, &storage, false, false).unwrap();
     let disabled = load_rule_set(None, api, &storage).unwrap();
-    assert!(disabled.rules.is_empty());
+    assert!(disabled.is_empty());
     run_rules_toggle("file-group", api, &storage, true, false).unwrap();
     let enabled = load_rule_set(None, api, &storage).unwrap();
-    assert_eq!(enabled.rules.len(), 1);
+    assert_eq!(enabled.rules().len(), 1);
 
     let from_file = load_rule_set(Some(&rules_file), api, &storage).unwrap();
-    assert_eq!(from_file.rules[0].actions.len(), 1);
+    assert_eq!(from_file.rules()[0].actions.len(), 1);
     let missing_file = root.join("missing.rules");
     assert!(run_rules_set("missing", Some(&missing_file), api, &storage, false).is_err());
     assert!(load_rule_set(Some(&missing_file), api, &storage).is_err());

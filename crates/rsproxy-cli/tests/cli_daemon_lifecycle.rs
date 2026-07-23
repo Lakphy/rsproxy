@@ -19,7 +19,7 @@ fn daemon_lifecycle_recovers_stale_state_and_preserves_rules() {
     fs::create_dir_all(&rules_dir).unwrap();
     fs::write(
         rules_dir.join("default.rules"),
-        "lifecycle.test status(204)\n",
+        "@language 3\nlifecycle.test status(204)\n",
     )
     .unwrap();
 

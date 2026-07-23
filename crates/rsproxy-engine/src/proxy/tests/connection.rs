@@ -64,7 +64,7 @@ fn client_connection_processes_pipelined_requests_in_order() {
     client.read_to_string(&mut response).unwrap();
     server.join().unwrap().unwrap();
 
-    assert_eq!(response.matches("HTTP/1.1 209 OK\r\n").count(), 2);
+    assert_eq!(response.matches("HTTP/1.1 209 \r\n").count(), 2);
     let keep_alive = response.find("Connection: keep-alive\r\n").unwrap();
     let close = response.rfind("Connection: close\r\n").unwrap();
     assert!(keep_alive < close);

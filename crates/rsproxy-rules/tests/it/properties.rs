@@ -10,7 +10,7 @@ fn action() -> impl Strategy<Value = String> {
         Just("direct".to_string()),
         Just("bypass".to_string()),
         Just("hide".to_string()),
-        (100u16..600).prop_map(|code| format!("status({code})")),
+        (200u16..600).prop_map(|code| format!("status({code})")),
         safe_word().prop_map(|value| format!("tag({value}-${{path}})")),
         safe_word().prop_map(|value| format!("req.header(x-property: {value})")),
         safe_word().prop_map(|value| format!("req.cookie({value}=${{id}})")),
@@ -73,13 +73,13 @@ proptest! {
         let source = lines.join("\n");
         let parsed = RuleSet::parse("property", &source).unwrap();
         let printed = parsed
-            .rules
+            .rules()
             .iter()
-            .map(|rule| rule.raw.as_str())
+            .map(|rule| rule.raw.as_ref())
             .collect::<Vec<_>>()
             .join("\n");
         let reparsed = RuleSet::parse("property", &printed).unwrap();
-        prop_assert_eq!(&parsed.rules, &reparsed.rules);
+        prop_assert_eq!(parsed.rules(), reparsed.rules());
         prop_assert_eq!(parsed.stats(), reparsed.stats());
 
         let req = request("http://alpha.example.test/api/alpha?mode=property".to_string());

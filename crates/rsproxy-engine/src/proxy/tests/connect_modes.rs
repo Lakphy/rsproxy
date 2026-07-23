@@ -223,7 +223,7 @@ fn plaintext_http_inside_connect_reuses_the_http_rule_pipeline() {
     client.read_to_string(&mut response).unwrap();
     proxy_server.join().unwrap();
 
-    assert!(response.starts_with("HTTP/1.1 209 OK\r\n"));
+    assert!(response.starts_with("HTTP/1.1 209 \r\n"));
     let sessions = state.trace.list(10);
     assert_eq!(sessions.len(), 1);
     assert_eq!(sessions[0].url, "http://plain.test:80/inside");
@@ -261,7 +261,7 @@ fn tls_clienthello_still_enters_the_mitm_http_pipeline() {
     }
     proxy_server.join().unwrap();
 
-    assert!(response.starts_with("HTTP/1.1 210 OK\r\n"));
+    assert!(response.starts_with("HTTP/1.1 210 \r\n"));
     let sessions = state.trace.list(10);
     assert_eq!(sessions.len(), 1);
     assert!(sessions[0].flags.contains(&"mitm".to_string()));

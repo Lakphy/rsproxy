@@ -22,6 +22,55 @@ fn ruleset_stats_reports_domain_index_and_prefilter() {
     assert_eq!(stats.global_rules, 1);
     assert_eq!(stats.prefilter_literals, 1);
     assert_eq!(stats.prefilter_rules, 1);
+    assert_eq!(stats.compiled_globs, 0);
+    assert_eq!(stats.compiled_body_literals, 0);
+}
+
+#[test]
+fn snapshot_compiles_deduplicated_case_insensitive_body_literals() {
+    let rules = RuleSet::parse(
+        "compiled",
+        concat!(
+            "example.test req.header(x-a: yes) when body(~ Alpha)\n",
+            "example.test req.header(x-b: yes) when any(body(~ alpha), body(~ beta))\n",
+            "example.test req.header(x-c: yes) when not(body(~ missing))"
+        ),
+    )
+    .unwrap();
+    assert_eq!(rules.stats().compiled_body_literals, 3);
+
+    let mut request = req("http://example.test/");
+    request.body = b"ALPHA and BETA".to_vec();
+    let result = rules.resolve(&request);
+    assert_eq!(result.actions.len(), 3);
+}
+
+#[test]
+fn snapshot_compiles_and_deduplicates_every_runtime_glob_program() {
+    let rules = RuleSet::parse(
+        "compiled",
+        "api*.example.test/path/**?mode=* status(204) when host(API*.EXAMPLE.TEST)",
+    )
+    .unwrap();
+    assert_eq!(rules.stats().compiled_globs, 3);
+
+    let result = rules.resolve(&req("http://api1.example.test/path/child?mode=debug"));
+    assert_eq!(result.actions.len(), 1);
+    assert_eq!(result.actions[0].action, Action::Status(204));
+}
+
+#[test]
+fn snapshot_uses_validated_escape_semantics_without_a_wildcard() {
+    let rules = RuleSet::parse(
+        "compiled",
+        r"api\.example.test/literal\. status(204) when url(http://api\.example.test/literal\.) when clientIp(192\.0\.2\.1)",
+    )
+    .unwrap();
+    assert_eq!(rules.stats().compiled_globs, 4);
+
+    let mut request = req("http://api.example.test/literal.");
+    request.client_ip = Some("192.0.2.1".to_string());
+    assert_eq!(rules.resolve(&request).actions.len(), 1);
 }
 
 #[test]

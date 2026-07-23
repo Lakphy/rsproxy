@@ -89,6 +89,102 @@ fn trace_help_marks_json_before_piping_to_jq() {
 }
 
 #[test]
+fn rules_language_help_is_indexed_searchable_machine_readable_and_runtime_free() {
+    let topic = command_output(&["rules", "help", "req.header"]);
+    assert!(topic.status.success());
+    let topic = String::from_utf8(topic.stdout).unwrap();
+    for expected in [
+        "action.req.header",
+        "req.header(NAME: VALUE)",
+        "This family stacks",
+        "action.res.header",
+    ] {
+        assert!(topic.contains(expected), "topic omitted {expected:?}");
+    }
+
+    let search = command_output(&["rules", "help", "--search", "response header"]);
+    assert!(search.status.success());
+    let search = String::from_utf8(search.stdout).unwrap();
+    assert!(search.contains("condition.res.header"));
+    assert!(search.contains("action.res.header"));
+
+    let json = command_output(&["rules", "help", "action.tls", "--json"]);
+    assert!(json.status.success());
+    let json: serde_json::Value = serde_json::from_slice(&json.stdout).unwrap();
+    assert_eq!(json["schema"], "rsproxy.rules.help/v1");
+    assert_eq!(json["language_version"], 3);
+    assert_eq!(json["limits"]["source_line_bytes"], 65_536);
+    assert_eq!(json["limits"]["snapshot_source_bytes"], 16_777_216);
+    assert_eq!(json["limits"]["groups_per_snapshot"], 1_024);
+    assert_eq!(json["limits"]["rules_per_snapshot"], 10_000);
+    assert_eq!(json["limits"]["diagnostics"], 256);
+    assert_eq!(json["limits"]["actions_per_rule"], 256);
+    assert_eq!(json["limits"]["actions_per_snapshot"], 100_000);
+    assert_eq!(json["limits"]["condition_nodes_per_rule"], 256);
+    assert_eq!(json["limits"]["condition_nodes_per_snapshot"], 100_000);
+    assert_eq!(json["limits"]["body_conditions_per_snapshot"], 256);
+    assert_eq!(json["limits"]["properties_per_rule"], 64);
+    assert_eq!(json["limits"]["call_arguments"], 256);
+    assert_eq!(json["limits"]["external_value_bytes"], 8_388_608);
+    assert_eq!(json["limits"]["rendered_value_bytes"], 8_388_608);
+    assert_eq!(json["limits"]["external_path_bytes"], 4_096);
+    assert_eq!(json["limits"]["rendered_tag_bytes"], 4_096);
+    assert_eq!(json["limits"]["tags_per_request"], 256);
+    assert_eq!(json["limits"]["explain_value_bytes"], 4_096);
+    assert_eq!(json["limits"]["explain_bytes"], 8_388_608);
+    assert_eq!(json["limits"]["upstream_hops"], 32);
+    assert_eq!(json["limits"]["mock_file_candidates"], 32);
+    assert_eq!(json["limits"]["lint_comparisons"], 1_000_000);
+    assert_eq!(json["limits"]["lint_comparison_bytes"], 268_435_456);
+    assert_eq!(json["limits"]["lint_findings_per_report"], 10_000);
+    assert_eq!(json["limits"]["lint_report_bytes"], 4_194_304);
+    assert_eq!(json["limits"]["tls_pem_bytes"], 1_048_576);
+    assert_eq!(
+        json["limits"]["condition_http_status"],
+        serde_json::json!([100, 599])
+    );
+    assert_eq!(
+        json["limits"]["final_http_status"],
+        serde_json::json!([200, 599])
+    );
+    assert_eq!(
+        json["limits"]["redirect_status"],
+        serde_json::json!([301, 302, 303, 307, 308])
+    );
+    assert_eq!(json["kind"], "topic");
+    assert_eq!(json["topics"][0]["id"], "action.tls");
+    assert!(json["topics"][0]["syntax"].as_array().unwrap().len() >= 3);
+    assert_eq!(json["topics"][0]["dsl_spellings"][0]["canonical"], "tls");
+    assert_eq!(
+        json["topics"][0]["resolution"],
+        "single: first applicable action wins"
+    );
+
+    let ambiguous = command_output(&["rules", "help", "status"]);
+    assert_eq!(ambiguous.status.code(), Some(2));
+    let error = String::from_utf8(ambiguous.stderr).unwrap();
+    assert!(error.contains("action.status"));
+    assert!(error.contains("condition.status"));
+
+    let runtime_free = Command::new(env!("CARGO_BIN_EXE_rsproxy"))
+        .args([
+            "rules",
+            "help",
+            "concept.rule",
+            "--config",
+            "/definitely/missing/rsproxy.toml",
+        ])
+        .env("RSPROXY_LOG_FORMAT", "invalid-for-runtime")
+        .output()
+        .unwrap();
+    assert!(
+        runtime_free.status.success(),
+        "{}",
+        String::from_utf8_lossy(&runtime_free.stderr)
+    );
+}
+
+#[test]
 fn long_help_explains_defaults_inputs_and_safe_workflows() {
     let cases = [
         (
@@ -193,6 +289,7 @@ fn every_command_help_exits_without_runtime_side_effects() {
         ),
         (&["status", "--help"], "rsproxy status"),
         (&["rules", "--help"], "rsproxy rules"),
+        (&["rules", "help", "--help"], "built-in rule-language index"),
         (&["rules", "check", "--help"], "rules check"),
         (&["rules", "ls", "--help"], "rules ls"),
         (&["rules", "cat", "--help"], "rules cat"),

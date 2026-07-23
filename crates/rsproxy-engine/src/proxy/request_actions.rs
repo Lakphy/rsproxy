@@ -26,29 +26,31 @@ fn apply_request_actions_inner(
     body_available: bool,
 ) -> io::Result<()> {
     let mut body_changed = false;
+    let header_limit = rule_header_limit(state);
     for item in actions {
         match &item.action {
             Action::ReqHeader(op) => apply_header_op(&mut req.headers, op, item, meta, state)?,
             Action::ReqMethod(method) => {
-                req.method = resolve_value_text(method, item, meta, state)?.to_ascii_uppercase()
+                req.method = resolve_value_text_bounded(method, item, meta, state, header_limit)?
+                    .to_ascii_uppercase()
             }
             Action::ReqCookie(op) => apply_req_cookie(&mut req.headers, op, item, meta, state)?,
             Action::ReqUa(value) => {
                 http::set_header(
                     &mut req.headers,
                     "User-Agent",
-                    resolve_value_text(value, item, meta, state)?,
+                    resolve_value_text_bounded(value, item, meta, state, header_limit)?,
                 );
             }
             Action::ReqReferer(value) => {
                 http::set_header(
                     &mut req.headers,
                     "Referer",
-                    resolve_value_text(value, item, meta, state)?,
+                    resolve_value_text_bounded(value, item, meta, state, header_limit)?,
                 );
             }
             Action::ReqAuth(value) => {
-                let value = resolve_value_text(value, item, meta, state)?;
+                let value = resolve_value_text_bounded(value, item, meta, state, header_limit)?;
                 http::set_header(
                     &mut req.headers,
                     "Authorization",
@@ -56,20 +58,26 @@ fn apply_request_actions_inner(
                 );
             }
             Action::ReqForwarded(value) => {
-                let value = forwarded_for_value(&resolve_value_text(value, item, meta, state)?);
+                let value = forwarded_for_value(&resolve_value_text_bounded(
+                    value,
+                    item,
+                    meta,
+                    state,
+                    header_limit,
+                )?);
                 http::set_header(&mut req.headers, "X-Forwarded-For", value);
             }
             Action::ReqType(value) => {
                 http::set_header(
                     &mut req.headers,
                     "Content-Type",
-                    resolve_value_text(value, item, meta, state)?,
+                    resolve_value_text_bounded(value, item, meta, state, header_limit)?,
                 );
             }
             Action::ReqCharset(value) => {
                 set_charset(
                     &mut req.headers,
-                    &resolve_value_text(value, item, meta, state)?,
+                    &resolve_value_text_bounded(value, item, meta, state, header_limit)?,
                 );
             }
             Action::ReqBody(op) if body_available => {
@@ -89,6 +97,8 @@ fn apply_request_actions_inner(
     {
         update_body_headers(&mut req.headers, req.body.len());
     }
+    validate_http_method(&req.method)?;
+    validate_header_block(&req.headers, state)?;
     Ok(())
 }
 

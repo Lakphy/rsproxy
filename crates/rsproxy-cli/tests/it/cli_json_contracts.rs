@@ -13,7 +13,7 @@ fn offline_query_commands_emit_stable_json_shapes() {
     fs::create_dir_all(storage.join("values")).unwrap();
     fs::write(
         storage.join("rules/default.rules"),
-        "contract.test status(204)\n",
+        "@language 3\ncontract.test status(204)\n",
     )
     .unwrap();
     fs::write(storage.join("values/alpha"), "one").unwrap();
@@ -21,9 +21,24 @@ fn offline_query_commands_emit_stable_json_shapes() {
     let check = run_json(
         &storage,
         &["rules", "check", "--json"],
-        Some("contract.test status(204)\n"),
+        Some("@language 3\ncontract.test status(204)\n"),
     );
     assert_shape(&check, &json!({"ok": true, "rules": 1}));
+
+    let migrated = run_json(
+        &storage,
+        &["rules", "migrate", "--json"],
+        Some("contract.test direct when clientIp(203.0.113.*)\n"),
+    );
+    assert_shape(
+        &migrated,
+        &json!({
+            "ok": true,
+            "language": 3,
+            "rules": 1,
+            "source": "@language 3\ncontract.test direct when client.ip(203.0.113.*)\n",
+        }),
+    );
 
     let groups = run_json(&storage, &["rules", "ls", "--json"], None);
     assert_shape(
@@ -34,13 +49,15 @@ fn offline_query_commands_emit_stable_json_shapes() {
     let group = run_json(&storage, &["rules", "cat", "default", "--json"], None);
     assert_shape(
         &group,
-        &json!({"name": "default", "text": "contract.test status(204)\n"}),
+        &json!({"name": "default", "text": "@language 3\ncontract.test status(204)\n"}),
     );
 
     let stats = run_json(&storage, &["rules", "stats", "--json"], None);
     assert_exact_keys(
         &stats,
         &[
+            "compiled_body_literals",
+            "compiled_globs",
             "disabled",
             "domain_exact_entries",
             "domain_suffix_entries",
@@ -80,6 +97,8 @@ fn offline_query_commands_emit_stable_json_shapes() {
     assert_exact_keys(
         &bench,
         &[
+            "compiled_body_literals",
+            "compiled_globs",
             "global_rules",
             "indexed_rules",
             "iterations",

@@ -166,3 +166,44 @@ fn cache_directives_render_with_templates() {
         "public, max-age=/120, immutable"
     );
 }
+
+#[test]
+fn attachment_filename_uses_quoted_fallback_and_utf8_extended_value() {
+    let meta = RequestMeta {
+        method: "GET".to_string(),
+        url: "http://example.com/".to_string(),
+        headers: Vec::new(),
+        body: Vec::new(),
+        client_ip: None,
+        server_ip: None,
+        template: Default::default(),
+    };
+    let actions = vec![resolved(Action::Attachment(Some(Value::inline(
+        "report \\\"最终\\\\.txt",
+    ))))];
+    let mut head = http::RawResponseHead {
+        version: "HTTP/1.1".to_string(),
+        status: 200,
+        reason: "OK".to_string(),
+        headers: Vec::new(),
+    };
+    let mut headers = Vec::new();
+    let mut body = Vec::new();
+
+    apply_response_actions(
+        &mut head,
+        &mut headers,
+        &mut body,
+        &meta,
+        &actions,
+        &test_state(),
+    )
+    .unwrap();
+
+    assert_eq!(
+        http::header(&headers, "content-disposition"),
+        Some(
+            "attachment; filename=\"report \\\\\\\"__\\\\\\\\.txt\"; filename*=UTF-8''report%20%5C%22%E6%9C%80%E7%BB%88%5C%5C.txt"
+        )
+    );
+}

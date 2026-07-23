@@ -59,6 +59,67 @@ fn completed_session(state: &SharedState) -> Session {
     sessions.into_iter().next().unwrap()
 }
 
+fn run_local_response(method: &str, rules: &str) -> (CapturedHttpResponse, SharedState) {
+    let state = support::isolated_state("local-response", rules);
+    let origin = "127.0.0.1:9".parse().unwrap();
+    let mut capture = CapturedHttpResponse::default();
+    handle_http_stream(
+        &mut capture,
+        request(origin, method),
+        state.clone(),
+        test_connection_input(),
+    )
+    .unwrap();
+    (capture, state)
+}
+
+fn split_wire_response(bytes: &[u8]) -> (&[u8], &[u8]) {
+    let boundary = bytes
+        .windows(4)
+        .position(|window| window == b"\r\n\r\n")
+        .expect("response must contain a complete head");
+    (&bytes[..boundary + 4], &bytes[boundary + 4..])
+}
+
+#[test]
+fn local_status_responses_obey_head_and_bodyless_status_semantics() {
+    let (capture, state) = run_local_response("GET", "127.0.0.1 status(204)");
+    let (head, body) = split_wire_response(&capture.bytes);
+    let head = String::from_utf8_lossy(head);
+    assert!(head.starts_with("HTTP/1.1 204 No Content\r\n"));
+    assert!(!head.to_ascii_lowercase().contains("content-length:"));
+    assert!(!head.to_ascii_lowercase().contains("transfer-encoding:"));
+    assert!(body.is_empty());
+    assert_eq!(completed_session(&state).response_bytes, 0);
+    let _ = fs::remove_dir_all(&state.config.storage);
+
+    let (capture, state) = run_local_response("HEAD", "127.0.0.1 status(200)");
+    let (head, body) = split_wire_response(&capture.bytes);
+    let head = String::from_utf8_lossy(head);
+    assert!(head.starts_with("HTTP/1.1 200 OK\r\n"));
+    assert!(head.to_ascii_lowercase().contains("content-length:"));
+    assert!(body.is_empty());
+    assert_eq!(completed_session(&state).response_bytes, 0);
+    let _ = fs::remove_dir_all(&state.config.storage);
+}
+
+#[test]
+fn local_mock_response_writer_owns_framing_headers() {
+    let rules = concat!(
+        "127.0.0.1 mock(status=200, header=Content-Length: 0, ",
+        "header=Transfer-Encoding: chunked, body=unexpected)"
+    );
+    let (capture, state) = run_local_response("GET", rules);
+    let (head, body) = split_wire_response(&capture.bytes);
+    let head = String::from_utf8_lossy(head).to_ascii_lowercase();
+    assert_eq!(head.matches("content-length:").count(), 1);
+    assert!(head.contains("content-length: 10\r\n"));
+    assert!(!head.contains("transfer-encoding:"));
+    assert_eq!(body, b"unexpected");
+    assert_eq!(completed_session(&state).response_bytes, 10);
+    let _ = fs::remove_dir_all(&state.config.storage);
+}
+
 #[test]
 fn empty_rule_plain_gets_use_the_fast_pool_and_keep_trace_contracts() {
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
@@ -185,6 +246,72 @@ fn head_and_no_content_responses_never_consume_an_origin_body() {
         assert!(capture.bytes.ends_with(b"\r\n\r\n"));
         assert_eq!(completed_session(&state).response_bytes, 0);
     }
+}
+
+#[test]
+fn reset_content_consumes_malformed_upstream_bytes_but_never_forwards_them() {
+    let large = vec![b'x'; 70 * 1024];
+    let mut fixed = format!(
+        "HTTP/1.1 205 Reset Content\r\nContent-Length: {}\r\nConnection: keep-alive\r\n\r\n",
+        large.len()
+    )
+    .into_bytes();
+    fixed.extend_from_slice(&large);
+    let chunked = b"HTTP/1.1 205 Reset Content\r\nTransfer-Encoding: chunked\r\nConnection: keep-alive\r\n\r\n9\r\ndiscarded\r\n0\r\n\r\n".to_vec();
+
+    for response in [fixed, chunked] {
+        let (result, capture, state) = run_response("GET", response, |_| {});
+        result.unwrap();
+        let (head, body) = split_wire_response(&capture.bytes);
+        let head = String::from_utf8_lossy(head).to_ascii_lowercase();
+        assert!(head.starts_with("http/1.1 205 reset content\r\n"));
+        assert!(head.contains("content-length: 0\r\n"));
+        assert!(!head.contains("transfer-encoding:"));
+        assert!(body.is_empty());
+
+        let session = completed_session(&state);
+        assert_eq!(session.response_bytes, 0);
+        assert!(
+            session
+                .flags
+                .iter()
+                .any(|flag| flag == "upstream-205-content-discarded")
+        );
+    }
+}
+
+#[test]
+fn forbidden_and_connection_nominated_upstream_trailers_are_dropped() {
+    let response = concat!(
+        "HTTP/1.1 200 OK\r\n",
+        "Transfer-Encoding: chunked\r\n",
+        "Trailer: grpc-status, content-length, x-hop\r\n",
+        "Connection: x-hop\r\n\r\n",
+        "2\r\nok\r\n0\r\n",
+        "grpc-status: 0\r\ncontent-length: 99\r\nx-hop: secret\r\n\r\n"
+    )
+    .as_bytes()
+    .to_vec();
+    let (result, capture, state) = run_response("GET", response, |_| {});
+
+    result.unwrap();
+    let text = String::from_utf8(capture.bytes)
+        .unwrap()
+        .to_ascii_lowercase();
+    assert!(text.ends_with("0\r\ngrpc-status: 0\r\n\r\n"), "{text:?}");
+    assert!(!text.contains("content-length: 99"));
+    assert!(!text.contains("x-hop: secret"));
+    let session = completed_session(&state);
+    assert_eq!(
+        session.res_trailers,
+        vec![("grpc-status".to_string(), "0".to_string())]
+    );
+    assert!(
+        session
+            .flags
+            .iter()
+            .any(|flag| flag == "forbidden-upstream-trailer-dropped")
+    );
 }
 
 #[test]

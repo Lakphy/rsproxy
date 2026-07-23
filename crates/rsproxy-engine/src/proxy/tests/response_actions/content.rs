@@ -6,6 +6,7 @@ fn res_merge_deep_merges_json_objects() {
     let changed = apply_res_merge(
         &mut body,
         r#"{"added":2,"nested":{"replace":"after","new":3}}"#,
+        usize::MAX,
     )
     .unwrap();
     assert!(changed);
@@ -20,7 +21,7 @@ fn res_merge_deep_merges_json_objects() {
 #[test]
 fn res_merge_leaves_non_json_response_unchanged() {
     let mut body = b"not json".to_vec();
-    let changed = apply_res_merge(&mut body, r#"{"added":true}"#).unwrap();
+    let changed = apply_res_merge(&mut body, r#"{"added":true}"#, usize::MAX).unwrap();
     assert!(!changed);
     assert_eq!(body, b"not json");
 }
@@ -28,8 +29,42 @@ fn res_merge_leaves_non_json_response_unchanged() {
 #[test]
 fn res_merge_rejects_non_object_patch() {
     let mut body = br#"{"ok":true}"#.to_vec();
-    let err = apply_res_merge(&mut body, r#"[1,2,3]"#).unwrap_err();
+    let err = apply_res_merge(&mut body, r#"[1,2,3]"#, usize::MAX).unwrap_err();
     assert_eq!(err.kind(), io::ErrorKind::InvalidInput);
+}
+
+#[test]
+fn body_mutations_reject_output_amplification_atomically() {
+    let mut state = test_state();
+    state.config.body_buffer_limit = 4;
+    let request = meta("http://example.test/");
+
+    let append = resolved(Action::ResBody(BodyOp::Append(Value::inline("xx"))));
+    let Action::ResBody(op) = &append.action else {
+        panic!("expected response body action");
+    };
+    let mut body = b"abc".to_vec();
+    let error = apply_body_op(&mut body, op, &append, &request, &state).unwrap_err();
+    assert_eq!(error.kind(), io::ErrorKind::InvalidData);
+    assert_eq!(body, b"abc");
+
+    let replace = RuleSet::parse("limit", "example.test res.body.replace(/a/, xx)")
+        .unwrap()
+        .resolve(&request)
+        .actions
+        .remove(0);
+    let Action::ResBody(op) = &replace.action else {
+        panic!("expected response body action");
+    };
+    let mut body = b"aaa".to_vec();
+    let error = apply_body_op(&mut body, op, &replace, &request, &state).unwrap_err();
+    assert_eq!(error.kind(), io::ErrorKind::InvalidData);
+    assert_eq!(body, b"aaa");
+
+    let mut body = br#"{"a":1}"#.to_vec();
+    let error = apply_res_merge(&mut body, r#"{"b":2}"#, 8).unwrap_err();
+    assert_eq!(error.kind(), io::ErrorKind::InvalidData);
+    assert_eq!(body, br#"{"a":1}"#);
 }
 
 #[test]

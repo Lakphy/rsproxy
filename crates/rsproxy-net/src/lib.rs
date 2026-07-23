@@ -45,9 +45,9 @@ pub use http::{
     BoundedRequestBody, RawRequest, RawResponseHead, RequestBodyFraming, RequestBodyRead,
     RequestBodyReader, RequestHead, header, read_request, read_request_body_bounded,
     read_request_head, read_request_head_tcp, read_response_head, read_response_head_buffered,
-    reason_phrase, remove_header, set_header, validate_request_trailers, write_response,
-    write_response_head, write_response_head_with_connection,
-    write_response_with_version_and_connection,
+    reason_phrase, remove_header, response_can_send_content, response_has_framed_body, set_header,
+    status_can_send_content, validate_request_trailers, write_response, write_response_head,
+    write_response_head_with_connection, write_response_with_version_and_connection,
 };
 pub use request_deadline::{RequestDeadline, TimeoutBudget, is_request_total_timeout};
 pub use runtime::h2_runtime;

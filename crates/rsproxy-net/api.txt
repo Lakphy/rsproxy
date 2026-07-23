@@ -378,8 +378,11 @@ pub fn rsproxy_net::read_response_head<R: std::io::Read + ?core::marker::Sized>(
 pub fn rsproxy_net::read_response_head_buffered<R: std::io::BufRead + ?core::marker::Sized>(&mut R, usize, usize) -> core::io::error::Result<rsproxy_net::RawResponseHead>
 pub fn rsproxy_net::reason_phrase(u16) -> &'static str
 pub fn rsproxy_net::remove_header(&mut alloc::vec::Vec<(alloc::string::String, alloc::string::String)>, &str)
+pub fn rsproxy_net::response_can_send_content(&str, u16) -> bool
+pub fn rsproxy_net::response_has_framed_body(&str, u16) -> bool
 pub fn rsproxy_net::serve_downstream_h2<S, H, F>(S, alloc::string::String, rsproxy_net::DownstreamH2Config, H) -> core::io::error::Result<()> where S: rsproxy_net::ReadyIo, H: core::ops::function::Fn(rsproxy_net::DownstreamH2Request) -> F + core::clone::Clone + core::marker::Send + core::marker::Sync + 'static, F: core::future::future::Future<Output = core::io::error::Result<rsproxy_net::DownstreamH2Response>> + core::marker::Send + 'static
 pub fn rsproxy_net::set_header(&mut alloc::vec::Vec<(alloc::string::String, alloc::string::String)>, &str, alloc::string::String)
+pub const fn rsproxy_net::status_can_send_content(u16) -> bool
 pub fn rsproxy_net::validate_request_trailers(&[(alloc::string::String, alloc::string::String)], usize, usize) -> core::io::error::Result<()>
 pub fn rsproxy_net::write_response<W: std::io::Write + ?core::marker::Sized>(&mut W, u16, &str, &[(alloc::string::String, alloc::string::String)], &[u8]) -> core::io::error::Result<()>
 pub fn rsproxy_net::write_response_head<W: std::io::Write + ?core::marker::Sized>(&mut W, &rsproxy_net::RawResponseHead, &[(alloc::string::String, alloc::string::String)]) -> core::io::error::Result<()>

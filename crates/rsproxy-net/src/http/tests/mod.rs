@@ -174,3 +174,145 @@ fn response_writers_emit_one_selected_connection_header() {
             .starts_with("HTTP/1.0 200 OK\r\n")
     );
 }
+
+#[test]
+fn complete_response_writer_owns_framing() {
+    let headers = vec![
+        ("Content-Length".to_string(), "0".to_string()),
+        ("Transfer-Encoding".to_string(), "chunked".to_string()),
+        ("Trailer".to_string(), "X-End".to_string()),
+        ("X-Test".to_string(), "yes".to_string()),
+    ];
+    let mut response = Vec::new();
+
+    write_response(&mut response, 200, "OK", &headers, b"actual").unwrap();
+
+    let response = String::from_utf8(response).unwrap();
+    assert!(response.contains("Content-Length: 6\r\n"));
+    assert_eq!(response.matches("Content-Length:").count(), 1);
+    assert!(!response.contains("Transfer-Encoding:"));
+    assert!(!response.contains("Trailer:"));
+    assert!(response.ends_with("\r\n\r\nactual"));
+}
+
+#[test]
+fn response_writers_reject_injection_before_writing() {
+    for headers in [
+        vec![("X-Test\r\nInjected".to_string(), "yes".to_string())],
+        vec![("X-Test".to_string(), "yes\r\nInjected: true".to_string())],
+    ] {
+        let mut response = Vec::new();
+        let error = write_response(&mut response, 200, "OK", &headers, b"").unwrap_err();
+        assert_eq!(error.kind(), io::ErrorKind::InvalidInput);
+        assert!(response.is_empty());
+    }
+
+    let mut response = Vec::new();
+    let error = write_response_with_version_and_connection(
+        &mut response,
+        "HTTP/1.1\r\nInjected: true",
+        200,
+        "OK",
+        &[],
+        b"",
+        false,
+    )
+    .unwrap_err();
+    assert_eq!(error.kind(), io::ErrorKind::InvalidInput);
+    assert!(response.is_empty());
+
+    let mut response = Vec::new();
+    let error = write_response(&mut response, 200, "OK\r\nInjected: true", &[], b"").unwrap_err();
+    assert_eq!(error.kind(), io::ErrorKind::InvalidInput);
+    assert!(response.is_empty());
+}
+
+#[test]
+fn bodyless_statuses_reject_content_and_omit_framing() {
+    for status in [100, 204, 304] {
+        let mut response = Vec::new();
+        let error =
+            write_response(&mut response, status, reason_phrase(status), &[], b"body").unwrap_err();
+        assert_eq!(error.kind(), io::ErrorKind::InvalidInput);
+        assert!(response.is_empty());
+
+        write_response(&mut response, status, reason_phrase(status), &[], b"").unwrap();
+        let response = String::from_utf8(response).unwrap();
+        assert!(!response.contains("Content-Length:"));
+        assert!(!response.contains("Transfer-Encoding:"));
+    }
+    assert!(!status_can_send_content(204));
+    assert!(!response_can_send_content("HEAD", 200));
+    assert!(response_can_send_content("GET", 200));
+    assert!(response_has_framed_body("GET", 205));
+    assert!(!response_can_send_content("GET", 205));
+
+    let mut reset = Vec::new();
+    write_response(&mut reset, 205, reason_phrase(205), &[], b"").unwrap();
+    let reset = String::from_utf8(reset).unwrap();
+    assert!(reset.contains("Content-Length: 0\r\n"));
+}
+
+#[test]
+fn streaming_response_head_rejects_ambiguous_framing() {
+    let head = RawResponseHead {
+        version: "HTTP/1.1".to_string(),
+        status: 200,
+        reason: "OK".to_string(),
+        headers: Vec::new(),
+    };
+    let headers = vec![
+        ("Content-Length".to_string(), "4".to_string()),
+        ("Transfer-Encoding".to_string(), "chunked".to_string()),
+    ];
+    let mut response = Vec::new();
+
+    let error = write_response_head(&mut response, &head, &headers).unwrap_err();
+
+    assert_eq!(error.kind(), io::ErrorKind::InvalidInput);
+    assert!(response.is_empty());
+}
+
+#[test]
+fn streaming_response_head_normalizes_content_length_and_bodyless_framing() {
+    let mut response = Vec::new();
+    let head = RawResponseHead {
+        version: "HTTP/1.1".to_string(),
+        status: 200,
+        reason: "OK".to_string(),
+        headers: Vec::new(),
+    };
+    write_response_head(
+        &mut response,
+        &head,
+        &[
+            ("Content-Length".to_string(), "04".to_string()),
+            ("content-length".to_string(), "4, 4".to_string()),
+        ],
+    )
+    .unwrap();
+    let response = String::from_utf8(response).unwrap();
+    assert_eq!(response.matches("Content-Length:").count(), 1);
+    assert!(response.contains("Content-Length: 4\r\n"));
+
+    for status in [100, 204, 304] {
+        let mut response = Vec::new();
+        let head = RawResponseHead {
+            version: "HTTP/1.1".to_string(),
+            status,
+            reason: reason_phrase(status).to_string(),
+            headers: Vec::new(),
+        };
+        write_response_head(
+            &mut response,
+            &head,
+            &[("Content-Length".to_string(), "9".to_string())],
+        )
+        .unwrap();
+        assert!(
+            !String::from_utf8(response)
+                .unwrap()
+                .contains("Content-Length:")
+        );
+    }
+}

@@ -336,7 +336,7 @@ fn rules_bytes(rules: &[MatchedRule], capacity: usize) -> usize {
     vector_storage_bytes::<MatchedRule>(capacity).saturating_add(
         rules
             .iter()
-            .map(|rule| rule.group.capacity().saturating_add(rule.raw.capacity()))
+            .map(|rule| rule.group.len().saturating_add(rule.raw.len()))
             .sum(),
     )
 }

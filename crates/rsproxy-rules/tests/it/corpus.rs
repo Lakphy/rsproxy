@@ -108,7 +108,10 @@ fn validate_action_coverage(path: &Path, corpus: &CorpusFile) {
         "{} repeats a required action family",
         path.display()
     );
-    let implemented = Action::FAMILIES.iter().copied().collect::<BTreeSet<_>>();
+    let implemented = Action::FAMILIES
+        .iter()
+        .map(|family| family.as_str())
+        .collect::<BTreeSet<_>>();
     assert_eq!(
         implemented.len(),
         Action::FAMILIES.len(),

@@ -1,8 +1,21 @@
 use super::*;
 
 pub(super) fn parse_matcher(input: &str) -> Result<Matcher, RuleModelError> {
+    parse_matcher_at_depth(input, 0)
+}
+
+fn parse_matcher_at_depth(input: &str, depth: usize) -> Result<Matcher, RuleModelError> {
+    if depth > MAX_PARSE_NESTING {
+        return Err(RuleModelError::limit(
+            "matcher nesting",
+            format!("matcher nesting exceeds {MAX_PARSE_NESTING} levels"),
+        ));
+    }
     if let Some(rest) = input.strip_prefix('!') {
-        return Ok(Matcher::Not(Box::new(parse_matcher(rest)?)));
+        return Ok(Matcher::Not(Box::new(parse_matcher_at_depth(
+            rest,
+            depth + 1,
+        )?)));
     }
     if let Some(rest) = input.strip_prefix('=') {
         if rest.is_empty() {
@@ -74,6 +87,17 @@ fn parse_glob_matcher(input: &str) -> Result<GlobMatcher, RuleModelError> {
             "glob matcher host",
             "glob matcher host is empty",
         ));
+    }
+
+    validate_glob_pattern(&host, '.', "matcher host glob")?;
+    if let Some(port) = &port {
+        validate_glob_pattern(port, '.', "matcher port glob")?;
+    }
+    if let Some(path) = &path {
+        validate_glob_pattern(path, '/', "matcher path glob")?;
+    }
+    if let Some(query) = &query {
+        validate_glob_pattern(query, '&', "matcher query glob")?;
     }
 
     Ok(GlobMatcher {

@@ -119,7 +119,7 @@ pub enum Action {
     /// Adds a rendered `tag:<value>` flag to the trace.
     Tag(Value),
     /// Suppresses later action families, or all later actions when the list is empty.
-    Skip(Vec<String>),
+    Skip(crate::ActionFamilySet),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

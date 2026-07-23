@@ -5,9 +5,9 @@ fn resolved_action_constructor_and_response_snapshot_are_observable() {
     let action = ResolvedAction::new(
         Action::Status(200),
         MatchedRule {
-            group: "template".to_string(),
+            group: "template".into(),
             line: 1,
-            raw: "fixture".to_string(),
+            raw: "fixture".into(),
         },
         Captures::default(),
     );
@@ -54,6 +54,48 @@ fn template_regex_cache_hit_and_lru_eviction_preserve_results() {
         assert_eq!(captures.render(&expression, &request), request.url);
     }
     assert_eq!(captures.render(expression, &request), expected);
+}
+
+#[test]
+fn bounded_template_render_rejects_capture_and_regex_expansion_before_allocation() {
+    let captures = Captures::default();
+    let request = req("aaaa");
+    let expression = "${url.replace(/a/, xx)}";
+    assert_eq!(
+        captures.render_bounded(expression, &request, 8).unwrap(),
+        "xxxxxxxx"
+    );
+    let error = captures
+        .render_bounded(expression, &request, 7)
+        .unwrap_err();
+    assert!(matches!(error, RuleModelError::LimitExceeded { .. }));
+
+    let action = ResolvedAction::new(
+        Action::Tag(Value::inline("$0$0")),
+        MatchedRule {
+            group: "template".into(),
+            line: 1,
+            raw: "fixture".into(),
+        },
+        Captures {
+            whole: Some("abcd".into()),
+            ..Captures::default()
+        },
+    );
+    assert_eq!(
+        action.render_bounded("$0$0", &request, 8).unwrap(),
+        "abcdabcd"
+    );
+    assert!(action.render_bounded("$0$0", &request, 7).is_err());
+}
+
+#[test]
+fn human_explanations_use_bounded_template_rendering() {
+    let rules = RuleSet::parse("explain", "* tag(${url}${url})").unwrap();
+    let request = req(&format!("http://example.test/{}", "x".repeat(3000)));
+    let explanation = rules.explain(&request);
+    assert!(explanation.contains("<render-limit:4096>"));
+    assert!(explanation.len() <= MAX_RULE_EXPLAIN_BYTES);
 }
 
 #[test]

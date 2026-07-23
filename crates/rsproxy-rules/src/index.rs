@@ -1,4 +1,8 @@
 use super::*;
+use crate::model::{
+    BodyLiteralId, CompiledBodyContainsSet, CompiledConditionResources, CompiledMatcherResources,
+    CompiledRuleResources,
+};
 
 impl RuleIndex {
     pub(super) fn build(rules: &[Rule]) -> Self {
@@ -41,6 +45,25 @@ impl RuleIndex {
             index.prefilter_literals.clear();
             index.prefilter_rule_ids.clear();
         }
+        index.compiled_globs = CompiledGlobSet::build(rules);
+        index.compiled_body_literals = CompiledBodyContainsSet::build(rules);
+        index.compiled_resources = rules
+            .iter()
+            .map(|rule| CompiledRuleResources {
+                matcher: bind_matcher_resources(&rule.matcher, &index.compiled_globs),
+                conditions: rule
+                    .conditions
+                    .iter()
+                    .map(|condition| {
+                        bind_condition_resources(
+                            condition,
+                            &index.compiled_globs,
+                            &index.compiled_body_literals,
+                        )
+                    })
+                    .collect(),
+            })
+            .collect();
         index
     }
 
@@ -73,8 +96,186 @@ impl RuleIndex {
             global_rules: self.global.len(),
             prefilter_literals: self.prefilter_literals.len(),
             prefilter_rules: self.prefilter_rule_ids.len(),
+            compiled_globs: self.compiled_globs.len(),
+            compiled_body_literals: self.compiled_body_literals.len(),
         }
     }
+}
+
+impl CompiledBodyContainsSet {
+    fn build(rules: &[Rule]) -> Self {
+        let mut source_literals = BTreeSet::<String>::new();
+        for rule in rules {
+            for condition in &rule.conditions {
+                collect_body_literals(condition, &mut source_literals);
+            }
+        }
+        Self::from_literals(source_literals)
+    }
+
+    /// Builds a set covering one condition's body literals for focused tests.
+    #[cfg(test)]
+    pub(crate) fn for_condition(condition: &Condition) -> Self {
+        let mut source_literals = BTreeSet::new();
+        collect_body_literals(condition, &mut source_literals);
+        Self::from_literals(source_literals)
+    }
+
+    fn from_literals(source_literals: BTreeSet<String>) -> Self {
+        let literals = source_literals
+            .iter()
+            .map(|literal| literal.to_ascii_lowercase())
+            .collect::<BTreeSet<_>>()
+            .into_iter()
+            .collect::<Vec<_>>();
+        let normalized_ids = literals
+            .iter()
+            .enumerate()
+            .map(|(id, literal)| (literal.clone(), id))
+            .collect::<BTreeMap<_, _>>();
+        let literal_ids = source_literals
+            .into_iter()
+            .map(|literal| {
+                let id = normalized_ids[&literal.to_ascii_lowercase()];
+                (literal, id)
+            })
+            .collect();
+        let matcher = if literals.is_empty() {
+            None
+        } else {
+            Some(
+                AhoCorasickBuilder::new()
+                    .ascii_case_insensitive(true)
+                    .match_kind(MatchKind::Standard)
+                    .build(&literals)
+                    .expect("parser-bounded body literals must compile into a snapshot"),
+            )
+        };
+        Self {
+            literals,
+            literal_ids,
+            matcher,
+        }
+    }
+
+    pub(crate) fn len(&self) -> usize {
+        self.literals.len()
+    }
+
+    pub(crate) fn id(&self, literal: &str) -> Option<BodyLiteralId> {
+        self.literal_ids.get(literal).copied().map(BodyLiteralId)
+    }
+
+    pub(crate) fn matches_id(&self, id: BodyLiteralId, matched: &[bool]) -> bool {
+        matched.get(id.0).copied().unwrap_or(false)
+    }
+
+    pub(crate) fn scan(&self, text: &str) -> Vec<bool> {
+        let mut matched = vec![false; self.literals.len()];
+        let Some(matcher) = &self.matcher else {
+            return matched;
+        };
+        let mut remaining = matched.len();
+        for found in matcher.find_overlapping_iter(text) {
+            let seen = &mut matched[found.pattern().as_usize()];
+            if !*seen {
+                *seen = true;
+                remaining -= 1;
+                if remaining == 0 {
+                    break;
+                }
+            }
+        }
+        matched
+    }
+}
+
+pub(crate) fn bind_matcher_resources(
+    matcher: &Matcher,
+    globs: &CompiledGlobSet,
+) -> CompiledMatcherResources {
+    match matcher {
+        Matcher::Glob(glob) => CompiledMatcherResources::Glob {
+            host: host_pattern_uses_regex(&glob.host)
+                .then(|| globs.id(&glob.host, '.'))
+                .flatten(),
+            port: glob
+                .port
+                .as_ref()
+                .and_then(|pattern| globs.id(pattern, '.')),
+            path: glob.path.as_ref().and_then(|pattern| {
+                glob_syntax_is_active(pattern)
+                    .then(|| globs.id(pattern, '/'))
+                    .flatten()
+            }),
+            query: glob
+                .query
+                .as_ref()
+                .and_then(|pattern| globs.id(pattern, '&')),
+        },
+        Matcher::Not(inner) => {
+            CompiledMatcherResources::Not(Box::new(bind_matcher_resources(inner, globs)))
+        }
+        Matcher::ExactUrl(_) | Matcher::Port(_) | Matcher::Regex(_) => {
+            CompiledMatcherResources::None
+        }
+    }
+}
+
+pub(crate) fn bind_condition_resources(
+    condition: &Condition,
+    globs: &CompiledGlobSet,
+    body_literals: &CompiledBodyContainsSet,
+) -> CompiledConditionResources {
+    match condition {
+        Condition::Host(pattern) => CompiledConditionResources::Host(
+            host_pattern_uses_regex(pattern)
+                .then(|| globs.id(&pattern.to_ascii_lowercase(), '.'))
+                .flatten(),
+        ),
+        Condition::Url(UrlCondition::Glob(pattern)) => CompiledConditionResources::UrlGlob(
+            glob_syntax_is_active(pattern)
+                .then(|| globs.id(pattern, '\0'))
+                .flatten(),
+        ),
+        Condition::ClientIp(patterns) => CompiledConditionResources::ClientIp(
+            patterns
+                .iter()
+                .map(|pattern| globs.id(&normalize_ip_value(pattern), '\0'))
+                .collect(),
+        ),
+        Condition::ServerIp(patterns) => CompiledConditionResources::ServerIp(
+            patterns
+                .iter()
+                .map(|pattern| globs.id(&normalize_ip_value(pattern), '\0'))
+                .collect(),
+        ),
+        Condition::BodyContains(literal) => CompiledConditionResources::BodyContains(
+            body_literals
+                .id(literal)
+                .expect("snapshot body literal must have a compiled ID"),
+        ),
+        Condition::Any(children) | Condition::All(children) => {
+            CompiledConditionResources::Children(
+                children
+                    .iter()
+                    .map(|child| bind_condition_resources(child, globs, body_literals))
+                    .collect(),
+            )
+        }
+        Condition::Not(inner) => CompiledConditionResources::Not(Box::new(
+            bind_condition_resources(inner, globs, body_literals),
+        )),
+        _ => CompiledConditionResources::None,
+    }
+}
+
+fn collect_body_literals(condition: &Condition, literals: &mut BTreeSet<String>) {
+    condition.for_each_node(&mut |node| {
+        if let Condition::BodyContains(literal) = node {
+            literals.insert(literal.clone());
+        }
+    });
 }
 
 enum MatcherIndexKey {

@@ -160,9 +160,7 @@ fn finish_streamed_upstream_response<W: WsIo + Send>(
         .filter(|length| *length <= context.state.config.body_buffer_limit);
     let fixed_body_can_coalesce = fixed_body_length.is_some()
         && http::header(&head.headers, "trailer").is_none()
-        && !context.request.method.eq_ignore_ascii_case("HEAD")
-        && !(100..200).contains(&head.status)
-        && !matches!(head.status, 204 | 304);
+        && http::response_has_framed_body(&context.request.method, head.status);
     if body_actions
         || context.request.version.eq_ignore_ascii_case("HTTP/1.0")
         || fixed_body_can_coalesce

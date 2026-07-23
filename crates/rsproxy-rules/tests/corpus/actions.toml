@@ -84,7 +84,7 @@ spec = true
 rules = "example.test mock(status=503, type=application/json, header=X-Mock: yes, body=down)"
 expect_actions = ["mock"]
 expect_rules = ["default:1"]
-expect_explain = ["default:1 mock(status=503, header=Content-Type: application/json, header=X-Mock: yes, body=down)"]
+expect_explain = ["default:1 mock(status=503, header=Content-Type: application/json, header=x-mock: yes, body=down)"]
 [case.request]
 url = "http://example.test/"
 

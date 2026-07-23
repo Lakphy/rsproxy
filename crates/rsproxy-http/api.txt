@@ -1,0 +1,5 @@
+pub mod rsproxy_http
+pub fn rsproxy_http::is_forbidden_trailer_name(&str) -> bool
+pub fn rsproxy_http::response_can_send_content(&str, u16) -> bool
+pub fn rsproxy_http::response_has_framed_body(&str, u16) -> bool
+pub const fn rsproxy_http::status_can_send_content(u16) -> bool

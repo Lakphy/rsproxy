@@ -22,8 +22,18 @@ pub(super) fn upstream_route(
     }
     for item in actions {
         if let Action::Upstream(value) = &item.action {
-            let rendered = resolve_value_text(value, item, meta, state)?;
+            let rendered =
+                resolve_value_text_bounded(value, item, meta, state, rule_header_limit(state))?;
             let entries = upstream_entries(&rendered);
+            if entries.len() > rsproxy_rules::MAX_RULE_UPSTREAM_HOPS {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    format!(
+                        "upstream route exceeds the {}-hop limit",
+                        rsproxy_rules::MAX_RULE_UPSTREAM_HOPS
+                    ),
+                ));
+            }
             if entries.len() > 1 {
                 let hops = entries
                     .iter()
@@ -87,26 +97,29 @@ pub(super) fn upstream_pool_key(
     actions: &[ResolvedAction],
     meta: &RequestMeta,
     state: &SharedState,
-) -> String {
-    let tls_policy = tls_action(actions)
-        .map(|item| {
-            let op = tls_action_op(item);
-            format!(
-                "min={:?};ciphers={:?};cert={};key={}",
-                op.min_version,
-                op.ciphers,
-                op.client_cert
-                    .as_deref()
-                    .map(|value| item.render(value, meta))
-                    .unwrap_or_default(),
-                op.client_key
-                    .as_deref()
-                    .map(|value| item.render(value, meta))
-                    .unwrap_or_default()
-            )
-        })
-        .unwrap_or_default();
-    format!(
+) -> io::Result<String> {
+    let tls_policy = if let Some(item) = tls_action(actions) {
+        let op = tls_action_op(item);
+        let cert = op
+            .client_cert
+            .as_deref()
+            .map(|value| render_rule_path(value, item, meta))
+            .transpose()?
+            .unwrap_or_default();
+        let key = op
+            .client_key
+            .as_deref()
+            .map(|value| render_rule_path(value, item, meta))
+            .transpose()?
+            .unwrap_or_default();
+        format!(
+            "min={:?};ciphers={:?};cert={cert};key={key}",
+            op.min_version, op.ciphers
+        )
+    } else {
+        String::new()
+    };
+    Ok(format!(
         "state={};storage={};origin={}:{};route={route:?};tls={tls_policy};headers={}:{}",
         state.rules.identity(),
         state.config.storage.display(),
@@ -114,7 +127,7 @@ pub(super) fn upstream_pool_key(
         url.effective_port().unwrap_or(443),
         state.config.max_header_size,
         state.config.max_header_count,
-    )
+    ))
 }
 
 pub(super) fn upstream_entries(value: &str) -> Vec<&str> {
@@ -122,6 +135,7 @@ pub(super) fn upstream_entries(value: &str) -> Vec<&str> {
         .split(',')
         .map(str::trim)
         .filter(|item| !item.is_empty())
+        .take(rsproxy_rules::MAX_RULE_UPSTREAM_HOPS + 1)
         .collect()
 }
 
@@ -156,7 +170,13 @@ pub(super) fn upstream_target(
 ) -> io::Result<(String, u16)> {
     for item in actions {
         if let Action::Host(pool) = &item.action {
-            let rendered = resolve_value_text(pool.selected_address(), item, meta, state)?;
+            let rendered = resolve_value_text_bounded(
+                pool.selected_address(),
+                item,
+                meta,
+                state,
+                rule_header_limit(state),
+            )?;
             let (host, port) = split_addr(&rendered, url.effective_port().unwrap_or(80));
             return Ok((host, port));
         }

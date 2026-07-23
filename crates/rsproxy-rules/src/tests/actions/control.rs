@@ -91,7 +91,7 @@ fn parses_multi_hop_upstream_action() {
     .unwrap();
 
     assert_eq!(
-        rules.rules[0].actions[0],
+        rules.rules()[0].actions[0],
         Action::Upstream(Value::inline(
             "proxy://127.0.0.1:18001, proxy://127.0.0.1:18002"
         ))

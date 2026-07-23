@@ -211,13 +211,13 @@ impl RuleStore {
 
 impl RuleSnapshot {
     fn compile(groups: Vec<RuleGroup>) -> Result<Self, RuleStoreError> {
-        RuleSet::parse_groups(
+        RuleSet::parse_versioned_groups(
             groups
                 .iter()
                 .map(|group| (group.name.as_str(), group.text.as_str())),
         )
         .map_err(RuleStoreError::Parse)?;
-        let compiled = RuleSet::parse_groups(
+        let compiled = RuleSet::parse_versioned_groups(
             groups
                 .iter()
                 .filter(|group| group.enabled)

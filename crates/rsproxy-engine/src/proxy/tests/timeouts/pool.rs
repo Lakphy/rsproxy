@@ -133,7 +133,7 @@ fn upstream_pool_keys_isolate_routes() {
     };
 
     assert_ne!(
-        upstream_pool_key(&url, &direct, &[], &request, &state),
-        upstream_pool_key(&url, &proxy, &[], &request, &state)
+        upstream_pool_key(&url, &direct, &[], &request, &state).unwrap(),
+        upstream_pool_key(&url, &proxy, &[], &request, &state).unwrap()
     );
 }

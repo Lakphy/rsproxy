@@ -211,9 +211,7 @@ pub(in crate::proxy) fn forward_unpooled<W: WsIo + Send>(
 
     let request_observation = take_request_observation(req, &mut request_summary);
     let response_context = ResponseContext::from_forward(ctx);
-    let body_allowed = !req.method.eq_ignore_ascii_case("HEAD")
-        && !(100..200).contains(&head.status)
-        && !matches!(head.status, 204 | 304);
+    let body_allowed = http::response_has_framed_body(&req.method, head.status);
     let fixed_body_can_coalesce = body_allowed
         && http::header(&head.headers, "trailer").is_none()
         && http::header(&head.headers, "content-length")

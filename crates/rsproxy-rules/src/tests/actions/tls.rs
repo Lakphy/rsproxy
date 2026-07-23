@@ -8,7 +8,7 @@ fn parses_tls_client_cert_action_and_explains_templates() {
     )
     .unwrap();
     assert!(matches!(
-        &rules.rules[0].actions[0],
+        &rules.rules()[0].actions[0],
         Action::Tls(TlsOp { client_cert: Some(client_cert), client_key: Some(client_key), .. })
             if client_cert == "certs/${host}.pem" && client_key == "keys/${host}.key"
     ));
@@ -27,7 +27,7 @@ fn parses_tls_version_and_cipher_policy_with_aliases() {
         )
         .unwrap();
     assert!(matches!(
-        &rules.rules[0].actions[0],
+        &rules.rules()[0].actions[0],
         Action::Tls(TlsOp {
             client_cert: None,
             client_key: None,
@@ -87,4 +87,12 @@ fn tls_action_rejects_invalid_options_or_missing_key_pair() {
         incompatible[0].message,
         "tls min=1.3 requires at least one TLS 1.3 cipher suite"
     );
+
+    for source in [
+        "example.com tls(client-cert=bad\0cert, client-key=key.pem)",
+        "example.com tls(client-cert=cert.pem, client-key=bad\0key)",
+    ] {
+        let invalid_path = RuleSet::parse("default", source).unwrap_err();
+        assert!(invalid_path[0].message.contains("must not contain NUL"));
+    }
 }

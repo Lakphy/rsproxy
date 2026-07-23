@@ -25,6 +25,12 @@ pub(super) fn parse_tls_op(args: &[&str]) -> Result<TlsOp, RuleModelError> {
                         "tls client-cert must not be empty",
                     ));
                 }
+                if value.contains('\0') {
+                    return Err(RuleModelError::invalid(
+                        "TLS client certificate",
+                        "tls client-cert must not contain NUL",
+                    ));
+                }
                 client_cert = Some(value);
             }
             "client-key" => {
@@ -33,6 +39,12 @@ pub(super) fn parse_tls_op(args: &[&str]) -> Result<TlsOp, RuleModelError> {
                     return Err(RuleModelError::empty(
                         "TLS client key",
                         "tls client-key must not be empty",
+                    ));
+                }
+                if value.contains('\0') {
+                    return Err(RuleModelError::invalid(
+                        "TLS client key",
+                        "tls client-key must not contain NUL",
                     ));
                 }
                 client_key = Some(value);

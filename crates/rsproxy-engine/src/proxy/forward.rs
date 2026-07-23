@@ -87,7 +87,7 @@ pub(super) fn forward<W: WsIo + Send>(
     };
     let h2_pool_key = match plan {
         UpstreamPlan::H2 { pooled: true, .. } => {
-            Some(upstream_pool_key(&url, &route, actions, meta, state))
+            Some(upstream_pool_key(&url, &route, actions, meta, state)?)
         }
         _ => None,
     };

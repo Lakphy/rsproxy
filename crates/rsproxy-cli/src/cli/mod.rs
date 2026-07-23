@@ -13,7 +13,9 @@ mod util;
 use crate::tui;
 use crate::{CliError, CliResult, DaemonConflict};
 use clap::{CommandFactory, Parser};
-use command::{Cli, CompletionShell, ConfigCommand, RuntimeArgs, StartupCommand, TopLevelCommand};
+use command::{
+    Cli, CompletionShell, ConfigCommand, RulesCommand, RuntimeArgs, StartupCommand, TopLevelCommand,
+};
 use rsproxy_control::api_request;
 use std::io;
 
@@ -46,6 +48,9 @@ pub fn run_parsed(cli: ParsedCli) -> CliResult<()> {
 
     let command = match command {
         TopLevelCommand::Completions(args) => return generate_completions(args.shell),
+        TopLevelCommand::Rules(args) if matches!(&args.command, Some(RulesCommand::Help(_))) => {
+            return rules::rules_cmd(args, cli.json);
+        }
         command => command,
     };
 

@@ -193,9 +193,11 @@ pub(super) fn prepare_h2_client_response_headers(
     body_len: Option<usize>,
 ) {
     strip_hop_by_hop_headers(headers);
+    if !http::status_can_send_content(status) {
+        http::remove_header(headers, "content-length");
+        return;
+    }
     if let Some(body_len) = body_len
-        && !(100..200).contains(&status)
-        && !matches!(status, 204 | 304)
         && http::header(headers, "content-length").is_none()
     {
         http::set_header(headers, "Content-Length", body_len.to_string());

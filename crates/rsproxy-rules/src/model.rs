@@ -1,4 +1,4 @@
-use crate::{Action, TemplateMetadata};
+use crate::{Action, CompiledGlobSet, TemplateMetadata};
 use aho_corasick::AhoCorasick;
 use fancy_regex::Regex as FancyRegex;
 use regex::Regex as LinearRegex;
@@ -11,11 +11,38 @@ use std::sync::Arc;
 /// Construct snapshots through [`RuleSet::parse`] or [`RuleSet::parse_groups`]
 /// so matcher compilation and ordering invariants are established together.
 pub struct RuleSet {
-    /// Unix-millisecond publication identifier assigned when the snapshot is built.
-    pub version: u64,
+    /// DSL compatibility version used to compile this snapshot.
+    pub(crate) language_version: u16,
+    /// Process-local monotonic publication identifier seeded from Unix milliseconds.
+    pub(crate) version: u64,
     /// Parsed rules in group order and then source-line order.
-    pub rules: Vec<Rule>,
+    pub(crate) rules: Vec<Rule>,
     pub(crate) index: RuleIndex,
+}
+
+impl RuleSet {
+    /// Returns the process-local monotonic publication identifier.
+    ///
+    /// Fresh snapshots receive a greater value even when built concurrently or
+    /// after a wall-clock rollback; clones retain their snapshot's value.
+    pub fn version(&self) -> u64 {
+        self.version
+    }
+
+    /// Returns the DSL compatibility version used by this snapshot.
+    pub fn language_version(&self) -> u16 {
+        self.language_version
+    }
+
+    /// Returns the validated rules in group and source order.
+    pub fn rules(&self) -> &[Rule] {
+        &self.rules
+    }
+
+    /// Reports whether the immutable snapshot contains no rules.
+    pub fn is_empty(&self) -> bool {
+        self.rules.is_empty()
+    }
 }
 
 #[derive(Clone, Debug, Default)]
@@ -27,6 +54,54 @@ pub(crate) struct RuleIndex {
     pub(crate) prefilter_literal_rules: Vec<Vec<usize>>,
     pub(crate) prefilter_rule_ids: HashSet<usize>,
     pub(crate) prefilter: Option<AhoCorasick>,
+    pub(crate) compiled_globs: CompiledGlobSet,
+    pub(crate) compiled_body_literals: CompiledBodyContainsSet,
+    pub(crate) compiled_resources: Vec<CompiledRuleResources>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct GlobId(pub(crate) usize);
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct BodyLiteralId(pub(crate) usize);
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct CompiledRuleResources {
+    pub(crate) matcher: CompiledMatcherResources,
+    pub(crate) conditions: Vec<CompiledConditionResources>,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub(crate) enum CompiledMatcherResources {
+    #[default]
+    None,
+    Glob {
+        host: Option<GlobId>,
+        port: Option<GlobId>,
+        path: Option<GlobId>,
+        query: Option<GlobId>,
+    },
+    Not(Box<CompiledMatcherResources>),
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub(crate) enum CompiledConditionResources {
+    #[default]
+    None,
+    Host(Option<GlobId>),
+    UrlGlob(Option<GlobId>),
+    ClientIp(Vec<Option<GlobId>>),
+    ServerIp(Vec<Option<GlobId>>),
+    BodyContains(BodyLiteralId),
+    Children(Vec<CompiledConditionResources>),
+    Not(Box<CompiledConditionResources>),
+}
+
+#[derive(Clone, Debug, Default)]
+pub(crate) struct CompiledBodyContainsSet {
+    pub(crate) literals: Vec<String>,
+    pub(crate) literal_ids: BTreeMap<String, usize>,
+    pub(crate) matcher: Option<AhoCorasick>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -51,6 +126,10 @@ pub struct RuleSetStats {
     pub prefilter_literals: usize,
     /// Regex rules guarded by at least one required-literal prefilter entry.
     pub prefilter_rules: usize,
+    /// Distinct glob programs compiled into the immutable snapshot.
+    pub compiled_globs: usize,
+    /// Distinct body literals compiled into the immutable snapshot.
+    pub compiled_body_literals: usize,
 }
 
 impl PartialEq for RuleIndex {
@@ -61,6 +140,8 @@ impl PartialEq for RuleIndex {
             && self.prefilter_literals == other.prefilter_literals
             && self.prefilter_literal_rules == other.prefilter_literal_rules
             && self.prefilter_rule_ids == other.prefilter_rule_ids
+            && self.compiled_body_literals.literals == other.compiled_body_literals.literals
+            && self.compiled_resources == other.compiled_resources
     }
 }
 
@@ -70,11 +151,11 @@ impl Eq for RuleIndex {}
 /// One source rule after DSL parsing and model validation.
 pub struct Rule {
     /// Caller-supplied group name used in diagnostics and cross-group ordering.
-    pub group: String,
+    pub group: Arc<str>,
     /// One-based source line within the group.
     pub line: usize,
     /// Comment-free rule text retained for explain and trace output.
-    pub raw: String,
+    pub raw: Arc<str>,
     /// URL matcher that admits the rule and produces captures.
     pub matcher: Matcher,
     /// Validated actions in their source order.
@@ -281,20 +362,33 @@ pub struct ResolvedAction {
 /// Compact source provenance for a matched action.
 pub struct MatchedRule {
     /// Caller-supplied rules group.
-    pub group: String,
+    pub group: Arc<str>,
     /// One-based line number within the group.
     pub line: usize,
     /// Comment-free DSL source retained for diagnostics and trace explanations.
-    pub raw: String,
+    pub raw: Arc<str>,
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 /// Matcher captures available to `$0`-`$9`, `${name}`, and action templates.
 ///
 /// Glob wildcards populate numbered captures. Regex matchers additionally retain
 /// the complete match and named captures; unmatched numbered groups render empty.
 pub struct Captures {
-    pub(crate) whole: Option<String>,
-    pub(crate) indexed: Vec<String>,
-    pub(crate) named: BTreeMap<String, String>,
+    pub(crate) whole: Option<Arc<str>>,
+    pub(crate) indexed: Vec<Arc<str>>,
+    pub(crate) named: Arc<BTreeMap<String, Arc<str>>>,
+}
+
+impl Default for Captures {
+    fn default() -> Self {
+        // A shared empty map keeps the per-evaluation default allocation-free.
+        static EMPTY_NAMED: std::sync::LazyLock<Arc<BTreeMap<String, Arc<str>>>> =
+            std::sync::LazyLock::new(|| Arc::new(BTreeMap::new()));
+        Self {
+            whole: None,
+            indexed: Vec::new(),
+            named: EMPTY_NAMED.clone(),
+        }
+    }
 }

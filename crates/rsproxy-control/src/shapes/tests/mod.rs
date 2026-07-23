@@ -51,9 +51,9 @@ fn har_is_rfc3339_and_preserves_rsproxy_diagnostics() {
     session.flags = vec!["h2-client".to_string(), "request-total-timeout".to_string()];
     session.error = Some("stage=request_total: \"quoted\"".to_string());
     session.matched_rules.push(MatchedRule {
-        group: "default".to_string(),
+        group: "default".into(),
         line: 3,
-        raw: "example.test tag(exported)".to_string(),
+        raw: "example.test tag(exported)".into(),
     });
     session
         .res_headers
@@ -199,9 +199,9 @@ fn session_json_covers_kinds_frames_tls_headers_and_secret_redaction() {
         session.error = (index == 1).then(|| "closed\nby peer".to_string());
         session.flags = vec!["one".to_string(), "two".to_string()];
         session.matched_rules.push(MatchedRule {
-            group: "secret".to_string(),
+            group: "secret".into(),
             line: 9,
-            raw: "example.test upstream(socks5://user:password@proxy.test:1080)".to_string(),
+            raw: "example.test upstream(socks5://user:password@proxy.test:1080)".into(),
         });
         session.req_headers = vec![("X-Quote".to_string(), "\"value\"".to_string())];
         session.req_trailers = vec![("X-Request-End".to_string(), "yes".to_string())];

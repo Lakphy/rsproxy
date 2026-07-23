@@ -37,7 +37,7 @@ pub rsproxy_rules::Action::ResMerge(rsproxy_rules::Value)
 pub rsproxy_rules::Action::ResStatus(u16)
 pub rsproxy_rules::Action::ResTrailer(rsproxy_rules::HeaderOp)
 pub rsproxy_rules::Action::ResType(rsproxy_rules::Value)
-pub rsproxy_rules::Action::Skip(alloc::vec::Vec<alloc::string::String>)
+pub rsproxy_rules::Action::Skip(rsproxy_rules::ActionFamilySet)
 pub rsproxy_rules::Action::Status(u16)
 pub rsproxy_rules::Action::Tag(rsproxy_rules::Value)
 pub rsproxy_rules::Action::Throttle
@@ -50,8 +50,15 @@ pub rsproxy_rules::Action::UrlRewrite
 pub rsproxy_rules::Action::UrlRewrite::from: rsproxy_rules::UrlRewritePattern
 pub rsproxy_rules::Action::UrlRewrite::to: rsproxy_rules::Value
 impl rsproxy_rules::Action
-pub const rsproxy_rules::Action::FAMILIES: &'static [&'static str]
-pub fn rsproxy_rules::Action::family(&self) -> &'static str
+pub const rsproxy_rules::Action::FAMILIES: &'static [rsproxy_rules::ActionFamily]
+pub const rsproxy_rules::Action::STACKABLE_FAMILIES: &'static [rsproxy_rules::ActionFamily]
+impl rsproxy_rules::Action
+pub fn rsproxy_rules::Action::applies_in(&self, rsproxy_rules::Phase) -> bool
+pub fn rsproxy_rules::Action::family(&self) -> rsproxy_rules::ActionFamily
+pub fn rsproxy_rules::Action::family_applies_in(rsproxy_rules::ActionFamily, rsproxy_rules::Phase) -> bool
+pub fn rsproxy_rules::Action::family_is_stackable(rsproxy_rules::ActionFamily) -> bool
+pub const fn rsproxy_rules::Action::family_phases(rsproxy_rules::ActionFamily) -> &'static [rsproxy_rules::Phase]
+pub fn rsproxy_rules::Action::is_stackable(&self) -> bool
 impl core::clone::Clone for rsproxy_rules::Action
 pub fn rsproxy_rules::Action::clone(&self) -> rsproxy_rules::Action
 impl core::cmp::Eq for rsproxy_rules::Action
@@ -60,6 +67,79 @@ pub fn rsproxy_rules::Action::eq(&self, &rsproxy_rules::Action) -> bool
 impl core::fmt::Debug for rsproxy_rules::Action
 pub fn rsproxy_rules::Action::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::StructuralPartialEq for rsproxy_rules::Action
+#[repr(u8)] pub enum rsproxy_rules::ActionFamily
+pub rsproxy_rules::ActionFamily::Attachment
+pub rsproxy_rules::ActionFamily::Bypass
+pub rsproxy_rules::ActionFamily::Cache
+pub rsproxy_rules::ActionFamily::DelayReq
+pub rsproxy_rules::ActionFamily::DelayRes
+pub rsproxy_rules::ActionFamily::Delete
+pub rsproxy_rules::ActionFamily::Direct
+pub rsproxy_rules::ActionFamily::Hide
+pub rsproxy_rules::ActionFamily::Host
+pub rsproxy_rules::ActionFamily::Inject
+pub rsproxy_rules::ActionFamily::MapRemote
+pub rsproxy_rules::ActionFamily::Mock
+pub rsproxy_rules::ActionFamily::Redirect
+pub rsproxy_rules::ActionFamily::ReqAuth
+pub rsproxy_rules::ActionFamily::ReqBodyAppend
+pub rsproxy_rules::ActionFamily::ReqBodyPrepend
+pub rsproxy_rules::ActionFamily::ReqBodyReplace
+pub rsproxy_rules::ActionFamily::ReqBodySet
+pub rsproxy_rules::ActionFamily::ReqCharset
+pub rsproxy_rules::ActionFamily::ReqCookie
+pub rsproxy_rules::ActionFamily::ReqForwarded
+pub rsproxy_rules::ActionFamily::ReqHeader
+pub rsproxy_rules::ActionFamily::ReqMethod
+pub rsproxy_rules::ActionFamily::ReqReferer
+pub rsproxy_rules::ActionFamily::ReqType
+pub rsproxy_rules::ActionFamily::ReqUa
+pub rsproxy_rules::ActionFamily::ResBodyAppend
+pub rsproxy_rules::ActionFamily::ResBodyPrepend
+pub rsproxy_rules::ActionFamily::ResBodyReplace
+pub rsproxy_rules::ActionFamily::ResBodySet
+pub rsproxy_rules::ActionFamily::ResCharset
+pub rsproxy_rules::ActionFamily::ResCookie
+pub rsproxy_rules::ActionFamily::ResCors
+pub rsproxy_rules::ActionFamily::ResHeader
+pub rsproxy_rules::ActionFamily::ResMerge
+pub rsproxy_rules::ActionFamily::ResStatus
+pub rsproxy_rules::ActionFamily::ResTrailer
+pub rsproxy_rules::ActionFamily::ResType
+pub rsproxy_rules::ActionFamily::Skip
+pub rsproxy_rules::ActionFamily::Status
+pub rsproxy_rules::ActionFamily::Tag
+pub rsproxy_rules::ActionFamily::ThrottleReq
+pub rsproxy_rules::ActionFamily::ThrottleRes
+pub rsproxy_rules::ActionFamily::Tls
+pub rsproxy_rules::ActionFamily::Upstream
+pub rsproxy_rules::ActionFamily::UrlQuery
+pub rsproxy_rules::ActionFamily::UrlRewrite
+impl rsproxy_rules::ActionFamily
+pub const rsproxy_rules::ActionFamily::ALL: &'static [Self]
+pub const fn rsproxy_rules::ActionFamily::as_str(self) -> &'static str
+pub fn rsproxy_rules::ActionFamily::from_name(&str) -> core::option::Option<Self>
+pub const fn rsproxy_rules::ActionFamily::phases(self) -> &'static [rsproxy_rules::Phase]
+pub const fn rsproxy_rules::ActionFamily::resolution(self) -> rsproxy_rules::ResolutionPolicy
+impl core::clone::Clone for rsproxy_rules::ActionFamily
+pub fn rsproxy_rules::ActionFamily::clone(&self) -> rsproxy_rules::ActionFamily
+impl core::cmp::Eq for rsproxy_rules::ActionFamily
+impl core::cmp::Ord for rsproxy_rules::ActionFamily
+pub fn rsproxy_rules::ActionFamily::cmp(&self, &rsproxy_rules::ActionFamily) -> core::cmp::Ordering
+impl core::cmp::PartialEq for rsproxy_rules::ActionFamily
+pub fn rsproxy_rules::ActionFamily::eq(&self, &rsproxy_rules::ActionFamily) -> bool
+impl core::cmp::PartialOrd for rsproxy_rules::ActionFamily
+pub fn rsproxy_rules::ActionFamily::partial_cmp(&self, &rsproxy_rules::ActionFamily) -> core::option::Option<core::cmp::Ordering>
+impl core::fmt::Debug for rsproxy_rules::ActionFamily
+pub fn rsproxy_rules::ActionFamily::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for rsproxy_rules::ActionFamily
+pub fn rsproxy_rules::ActionFamily::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::hash::Hash for rsproxy_rules::ActionFamily
+pub fn rsproxy_rules::ActionFamily::hash<__H: core::hash::Hasher>(&self, &mut __H)
+impl core::iter::traits::collect::FromIterator<rsproxy_rules::ActionFamily> for rsproxy_rules::ActionFamilySet
+pub fn rsproxy_rules::ActionFamilySet::from_iter<T: core::iter::traits::collect::IntoIterator<Item = rsproxy_rules::ActionFamily>>(T) -> Self
+impl core::marker::Copy for rsproxy_rules::ActionFamily
+impl core::marker::StructuralPartialEq for rsproxy_rules::ActionFamily
 pub enum rsproxy_rules::BodyOp
 pub rsproxy_rules::BodyOp::Append(rsproxy_rules::Value)
 pub rsproxy_rules::BodyOp::Prepend(rsproxy_rules::Value)
@@ -247,6 +327,8 @@ impl core::marker::StructuralPartialEq for rsproxy_rules::Matcher
 pub enum rsproxy_rules::Phase
 pub rsproxy_rules::Phase::Req
 pub rsproxy_rules::Phase::Res
+impl rsproxy_rules::Phase
+pub fn rsproxy_rules::Phase::as_str(self) -> &'static str
 impl core::clone::Clone for rsproxy_rules::Phase
 pub fn rsproxy_rules::Phase::clone(&self) -> rsproxy_rules::Phase
 impl core::cmp::Eq for rsproxy_rules::Phase
@@ -282,6 +364,18 @@ impl core::fmt::Debug for rsproxy_rules::RegexEngine
 pub fn rsproxy_rules::RegexEngine::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Copy for rsproxy_rules::RegexEngine
 impl core::marker::StructuralPartialEq for rsproxy_rules::RegexEngine
+pub enum rsproxy_rules::ResolutionPolicy
+pub rsproxy_rules::ResolutionPolicy::FirstWins
+pub rsproxy_rules::ResolutionPolicy::Stackable
+impl core::clone::Clone for rsproxy_rules::ResolutionPolicy
+pub fn rsproxy_rules::ResolutionPolicy::clone(&self) -> rsproxy_rules::ResolutionPolicy
+impl core::cmp::Eq for rsproxy_rules::ResolutionPolicy
+impl core::cmp::PartialEq for rsproxy_rules::ResolutionPolicy
+pub fn rsproxy_rules::ResolutionPolicy::eq(&self, &rsproxy_rules::ResolutionPolicy) -> bool
+impl core::fmt::Debug for rsproxy_rules::ResolutionPolicy
+pub fn rsproxy_rules::ResolutionPolicy::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for rsproxy_rules::ResolutionPolicy
+impl core::marker::StructuralPartialEq for rsproxy_rules::ResolutionPolicy
 pub enum rsproxy_rules::RuleErrorCode
 pub rsproxy_rules::RuleErrorCode::Action
 pub rsproxy_rules::RuleErrorCode::Condition
@@ -348,6 +442,26 @@ impl core::fmt::Debug for rsproxy_rules::RuleModelError
 pub fn rsproxy_rules::RuleModelError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::fmt::Display for rsproxy_rules::RuleModelError
 pub fn rsproxy_rules::RuleModelError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub enum rsproxy_rules::SemanticLintKind
+pub rsproxy_rules::SemanticLintKind::ActionAfterSkip
+pub rsproxy_rules::SemanticLintKind::BodyActionWithBodylessStatus
+pub rsproxy_rules::SemanticLintKind::ConflictingTerminalActions
+pub rsproxy_rules::SemanticLintKind::DuplicateSingleFamily
+pub rsproxy_rules::SemanticLintKind::RequestActionRequiresResponse
+pub rsproxy_rules::SemanticLintKind::ResponseActionWithLocalResponse
+pub rsproxy_rules::SemanticLintKind::UnsatisfiableConditions
+pub rsproxy_rules::SemanticLintKind::UpstreamOverriddenByDirect
+impl rsproxy_rules::SemanticLintKind
+pub fn rsproxy_rules::SemanticLintKind::as_str(self) -> &'static str
+impl core::clone::Clone for rsproxy_rules::SemanticLintKind
+pub fn rsproxy_rules::SemanticLintKind::clone(&self) -> rsproxy_rules::SemanticLintKind
+impl core::cmp::Eq for rsproxy_rules::SemanticLintKind
+impl core::cmp::PartialEq for rsproxy_rules::SemanticLintKind
+pub fn rsproxy_rules::SemanticLintKind::eq(&self, &rsproxy_rules::SemanticLintKind) -> bool
+impl core::fmt::Debug for rsproxy_rules::SemanticLintKind
+pub fn rsproxy_rules::SemanticLintKind::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for rsproxy_rules::SemanticLintKind
+impl core::marker::StructuralPartialEq for rsproxy_rules::SemanticLintKind
 pub enum rsproxy_rules::TlsCipherSuite
 pub rsproxy_rules::TlsCipherSuite::Tls12EcdheEcdsaAes128GcmSha256
 pub rsproxy_rules::TlsCipherSuite::Tls12EcdheEcdsaAes256GcmSha384
@@ -422,6 +536,27 @@ pub fn rsproxy_rules::Value::eq(&self, &rsproxy_rules::Value) -> bool
 impl core::fmt::Debug for rsproxy_rules::Value
 pub fn rsproxy_rules::Value::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::StructuralPartialEq for rsproxy_rules::Value
+pub struct rsproxy_rules::ActionFamilySet(_)
+impl rsproxy_rules::ActionFamilySet
+pub const rsproxy_rules::ActionFamilySet::ALL: Self
+pub const rsproxy_rules::ActionFamilySet::EMPTY: Self
+pub const fn rsproxy_rules::ActionFamilySet::contains(self, rsproxy_rules::ActionFamily) -> bool
+pub fn rsproxy_rules::ActionFamilySet::insert(&mut self, rsproxy_rules::ActionFamily)
+pub const fn rsproxy_rules::ActionFamilySet::is_empty(self) -> bool
+pub fn rsproxy_rules::ActionFamilySet::iter(self) -> impl core::iter::traits::iterator::Iterator<Item = rsproxy_rules::ActionFamily>
+impl core::clone::Clone for rsproxy_rules::ActionFamilySet
+pub fn rsproxy_rules::ActionFamilySet::clone(&self) -> rsproxy_rules::ActionFamilySet
+impl core::cmp::Eq for rsproxy_rules::ActionFamilySet
+impl core::cmp::PartialEq for rsproxy_rules::ActionFamilySet
+pub fn rsproxy_rules::ActionFamilySet::eq(&self, &rsproxy_rules::ActionFamilySet) -> bool
+impl core::default::Default for rsproxy_rules::ActionFamilySet
+pub fn rsproxy_rules::ActionFamilySet::default() -> rsproxy_rules::ActionFamilySet
+impl core::fmt::Debug for rsproxy_rules::ActionFamilySet
+pub fn rsproxy_rules::ActionFamilySet::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::iter::traits::collect::FromIterator<rsproxy_rules::ActionFamily> for rsproxy_rules::ActionFamilySet
+pub fn rsproxy_rules::ActionFamilySet::from_iter<T: core::iter::traits::collect::IntoIterator<Item = rsproxy_rules::ActionFamily>>(T) -> Self
+impl core::marker::Copy for rsproxy_rules::ActionFamilySet
+impl core::marker::StructuralPartialEq for rsproxy_rules::ActionFamilySet
 pub struct rsproxy_rules::CacheDirective
 pub rsproxy_rules::CacheDirective::name: alloc::string::String
 pub rsproxy_rules::CacheDirective::value: core::option::Option<rsproxy_rules::Value>
@@ -438,14 +573,16 @@ impl rsproxy_rules::Captures
 pub fn rsproxy_rules::Captures::get_index(&self, usize) -> core::option::Option<&str>
 pub fn rsproxy_rules::Captures::insert_index(&mut self, alloc::string::String)
 pub fn rsproxy_rules::Captures::render(&self, &str, &rsproxy_rules::RequestMeta) -> alloc::string::String
+pub fn rsproxy_rules::Captures::render_bounded(&self, &str, &rsproxy_rules::RequestMeta, usize) -> core::result::Result<alloc::string::String, rsproxy_rules::RuleModelError>
 pub fn rsproxy_rules::Captures::render_with_response(&self, &str, &rsproxy_rules::RequestMeta, core::option::Option<&rsproxy_rules::ResponseMeta>) -> alloc::string::String
+pub fn rsproxy_rules::Captures::render_with_response_bounded(&self, &str, &rsproxy_rules::RequestMeta, core::option::Option<&rsproxy_rules::ResponseMeta>, usize) -> core::result::Result<alloc::string::String, rsproxy_rules::RuleModelError>
 impl core::clone::Clone for rsproxy_rules::Captures
 pub fn rsproxy_rules::Captures::clone(&self) -> rsproxy_rules::Captures
 impl core::cmp::Eq for rsproxy_rules::Captures
 impl core::cmp::PartialEq for rsproxy_rules::Captures
 pub fn rsproxy_rules::Captures::eq(&self, &rsproxy_rules::Captures) -> bool
 impl core::default::Default for rsproxy_rules::Captures
-pub fn rsproxy_rules::Captures::default() -> rsproxy_rules::Captures
+pub fn rsproxy_rules::Captures::default() -> Self
 impl core::fmt::Debug for rsproxy_rules::Captures
 pub fn rsproxy_rules::Captures::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::StructuralPartialEq for rsproxy_rules::Captures
@@ -527,12 +664,12 @@ pub fn rsproxy_rules::InjectOp::fmt(&self, &mut core::fmt::Formatter<'_>) -> cor
 impl core::marker::StructuralPartialEq for rsproxy_rules::InjectOp
 pub struct rsproxy_rules::LintFinding
 pub rsproxy_rules::LintFinding::families: alloc::vec::Vec<alloc::string::String>
-pub rsproxy_rules::LintFinding::group: alloc::string::String
+pub rsproxy_rules::LintFinding::group: alloc::sync::Arc<str>
 pub rsproxy_rules::LintFinding::line: usize
-pub rsproxy_rules::LintFinding::raw: alloc::string::String
-pub rsproxy_rules::LintFinding::shadowed_by_group: alloc::string::String
+pub rsproxy_rules::LintFinding::raw: alloc::sync::Arc<str>
+pub rsproxy_rules::LintFinding::shadowed_by_group: alloc::sync::Arc<str>
 pub rsproxy_rules::LintFinding::shadowed_by_line: usize
-pub rsproxy_rules::LintFinding::shadowed_by_raw: alloc::string::String
+pub rsproxy_rules::LintFinding::shadowed_by_raw: alloc::sync::Arc<str>
 impl core::clone::Clone for rsproxy_rules::LintFinding
 pub fn rsproxy_rules::LintFinding::clone(&self) -> rsproxy_rules::LintFinding
 impl core::cmp::Eq for rsproxy_rules::LintFinding
@@ -541,10 +678,23 @@ pub fn rsproxy_rules::LintFinding::eq(&self, &rsproxy_rules::LintFinding) -> boo
 impl core::fmt::Debug for rsproxy_rules::LintFinding
 pub fn rsproxy_rules::LintFinding::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::StructuralPartialEq for rsproxy_rules::LintFinding
+pub struct rsproxy_rules::LintReport
+pub rsproxy_rules::LintReport::comparison_bytes: usize
+pub rsproxy_rules::LintReport::comparisons: usize
+pub rsproxy_rules::LintReport::complete: bool
+pub rsproxy_rules::LintReport::findings: alloc::vec::Vec<rsproxy_rules::LintFinding>
+impl core::clone::Clone for rsproxy_rules::LintReport
+pub fn rsproxy_rules::LintReport::clone(&self) -> rsproxy_rules::LintReport
+impl core::cmp::Eq for rsproxy_rules::LintReport
+impl core::cmp::PartialEq for rsproxy_rules::LintReport
+pub fn rsproxy_rules::LintReport::eq(&self, &rsproxy_rules::LintReport) -> bool
+impl core::fmt::Debug for rsproxy_rules::LintReport
+pub fn rsproxy_rules::LintReport::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for rsproxy_rules::LintReport
 pub struct rsproxy_rules::MatchedRule
-pub rsproxy_rules::MatchedRule::group: alloc::string::String
+pub rsproxy_rules::MatchedRule::group: alloc::sync::Arc<str>
 pub rsproxy_rules::MatchedRule::line: usize
-pub rsproxy_rules::MatchedRule::raw: alloc::string::String
+pub rsproxy_rules::MatchedRule::raw: alloc::sync::Arc<str>
 impl core::clone::Clone for rsproxy_rules::MatchedRule
 pub fn rsproxy_rules::MatchedRule::clone(&self) -> rsproxy_rules::MatchedRule
 impl core::cmp::Eq for rsproxy_rules::MatchedRule
@@ -582,6 +732,7 @@ pub fn rsproxy_rules::RegexReplacePattern::is_case_insensitive(&self) -> bool
 pub fn rsproxy_rules::RegexReplacePattern::new(alloc::string::String, bool) -> core::result::Result<Self, regex::error::Error>
 pub fn rsproxy_rules::RegexReplacePattern::pattern(&self) -> &str
 pub fn rsproxy_rules::RegexReplacePattern::replace_all(&self, &str, &str) -> alloc::string::String
+pub fn rsproxy_rules::RegexReplacePattern::replace_all_bounded(&self, &str, &str, usize) -> core::result::Result<alloc::string::String, rsproxy_rules::RuleModelError>
 impl core::clone::Clone for rsproxy_rules::RegexReplacePattern
 pub fn rsproxy_rules::RegexReplacePattern::clone(&self) -> rsproxy_rules::RegexReplacePattern
 impl core::cmp::Eq for rsproxy_rules::RegexReplacePattern
@@ -623,6 +774,7 @@ pub rsproxy_rules::ResolvedAction::rule: rsproxy_rules::MatchedRule
 impl rsproxy_rules::ResolvedAction
 pub fn rsproxy_rules::ResolvedAction::new(rsproxy_rules::Action, rsproxy_rules::MatchedRule, rsproxy_rules::Captures) -> Self
 pub fn rsproxy_rules::ResolvedAction::render(&self, &str, &rsproxy_rules::RequestMeta) -> alloc::string::String
+pub fn rsproxy_rules::ResolvedAction::render_bounded(&self, &str, &rsproxy_rules::RequestMeta, usize) -> core::result::Result<alloc::string::String, rsproxy_rules::RuleModelError>
 pub fn rsproxy_rules::ResolvedAction::response_meta(&self) -> core::option::Option<&rsproxy_rules::ResponseMeta>
 impl core::clone::Clone for rsproxy_rules::ResolvedAction
 pub fn rsproxy_rules::ResolvedAction::clone(&self) -> rsproxy_rules::ResolvedAction
@@ -647,11 +799,11 @@ pub struct rsproxy_rules::Rule
 pub rsproxy_rules::Rule::actions: alloc::vec::Vec<rsproxy_rules::Action>
 pub rsproxy_rules::Rule::conditions: alloc::vec::Vec<rsproxy_rules::Condition>
 pub rsproxy_rules::Rule::disabled: bool
-pub rsproxy_rules::Rule::group: alloc::string::String
+pub rsproxy_rules::Rule::group: alloc::sync::Arc<str>
 pub rsproxy_rules::Rule::important: bool
 pub rsproxy_rules::Rule::line: usize
 pub rsproxy_rules::Rule::matcher: rsproxy_rules::Matcher
-pub rsproxy_rules::Rule::raw: alloc::string::String
+pub rsproxy_rules::Rule::raw: alloc::sync::Arc<str>
 pub rsproxy_rules::Rule::tags: alloc::vec::Vec<alloc::string::String>
 impl core::clone::Clone for rsproxy_rules::Rule
 pub fn rsproxy_rules::Rule::clone(&self) -> rsproxy_rules::Rule
@@ -666,6 +818,7 @@ pub rsproxy_rules::RuleError::code: rsproxy_rules::RuleErrorCode
 pub rsproxy_rules::RuleError::group: alloc::string::String
 pub rsproxy_rules::RuleError::line: usize
 pub rsproxy_rules::RuleError::message: alloc::string::String
+pub rsproxy_rules::RuleError::span: core::option::Option<rsproxy_rules::RuleSourceSpan>
 impl core::clone::Clone for rsproxy_rules::RuleError
 pub fn rsproxy_rules::RuleError::clone(&self) -> rsproxy_rules::RuleError
 impl core::cmp::Eq for rsproxy_rules::RuleError
@@ -678,22 +831,32 @@ impl core::fmt::Display for rsproxy_rules::RuleError
 pub fn rsproxy_rules::RuleError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::StructuralPartialEq for rsproxy_rules::RuleError
 pub struct rsproxy_rules::RuleSet
-pub rsproxy_rules::RuleSet::rules: alloc::vec::Vec<rsproxy_rules::Rule>
-pub rsproxy_rules::RuleSet::version: u64
 impl rsproxy_rules::RuleSet
 pub fn rsproxy_rules::RuleSet::empty() -> Self
 pub fn rsproxy_rules::RuleSet::explain(&self, &rsproxy_rules::RequestMeta) -> alloc::string::String
 pub fn rsproxy_rules::RuleSet::explain_response(&self, &rsproxy_rules::RequestMeta, &rsproxy_rules::ResponseMeta) -> alloc::string::String
 pub fn rsproxy_rules::RuleSet::parse(&str, &str) -> core::result::Result<Self, alloc::vec::Vec<rsproxy_rules::RuleError>>
 pub fn rsproxy_rules::RuleSet::parse_groups<I, G, T>(I) -> core::result::Result<Self, alloc::vec::Vec<rsproxy_rules::RuleError>> where I: core::iter::traits::collect::IntoIterator<Item = (G, T)>, G: core::convert::AsRef<str>, T: core::convert::AsRef<str>
+pub fn rsproxy_rules::RuleSet::parse_versioned(&str, &str) -> core::result::Result<Self, alloc::vec::Vec<rsproxy_rules::RuleError>>
+pub fn rsproxy_rules::RuleSet::parse_versioned_groups<I, G, T>(I) -> core::result::Result<Self, alloc::vec::Vec<rsproxy_rules::RuleError>> where I: core::iter::traits::collect::IntoIterator<Item = (G, T)>, G: core::convert::AsRef<str>, T: core::convert::AsRef<str>
+pub fn rsproxy_rules::RuleSet::stats(&self) -> rsproxy_rules::RuleSetStats
+impl rsproxy_rules::RuleSet
+pub fn rsproxy_rules::RuleSet::is_empty(&self) -> bool
+pub fn rsproxy_rules::RuleSet::language_version(&self) -> u16
+pub fn rsproxy_rules::RuleSet::rules(&self) -> &[rsproxy_rules::Rule]
+pub fn rsproxy_rules::RuleSet::version(&self) -> u64
+impl rsproxy_rules::RuleSet
+pub fn rsproxy_rules::RuleSet::lint(&self) -> alloc::vec::Vec<rsproxy_rules::LintFinding>
+pub fn rsproxy_rules::RuleSet::lint_report(&self) -> rsproxy_rules::LintReport
+impl rsproxy_rules::RuleSet
 pub fn rsproxy_rules::RuleSet::request_body_required(&self, &rsproxy_rules::RequestMeta) -> bool
 pub fn rsproxy_rules::RuleSet::resolve(&self, &rsproxy_rules::RequestMeta) -> rsproxy_rules::ResolveResult
 pub fn rsproxy_rules::RuleSet::resolve_response(&self, &rsproxy_rules::RequestMeta, &rsproxy_rules::ResponseMeta) -> rsproxy_rules::ResolveResult
 pub fn rsproxy_rules::RuleSet::resolve_response_without_request_body(&self, &rsproxy_rules::RequestMeta, &rsproxy_rules::ResponseMeta) -> rsproxy_rules::ResolveResult
 pub fn rsproxy_rules::RuleSet::resolve_without_request_body(&self, &rsproxy_rules::RequestMeta) -> rsproxy_rules::ResolveResult
-pub fn rsproxy_rules::RuleSet::stats(&self) -> rsproxy_rules::RuleSetStats
 impl rsproxy_rules::RuleSet
-pub fn rsproxy_rules::RuleSet::lint(&self) -> alloc::vec::Vec<rsproxy_rules::LintFinding>
+pub fn rsproxy_rules::RuleSet::semantic_lint(&self) -> alloc::vec::Vec<rsproxy_rules::SemanticLintFinding>
+pub fn rsproxy_rules::RuleSet::semantic_lint_report(&self) -> rsproxy_rules::SemanticLintReport
 impl core::clone::Clone for rsproxy_rules::RuleSet
 pub fn rsproxy_rules::RuleSet::clone(&self) -> rsproxy_rules::RuleSet
 impl core::cmp::Eq for rsproxy_rules::RuleSet
@@ -703,6 +866,8 @@ impl core::fmt::Debug for rsproxy_rules::RuleSet
 pub fn rsproxy_rules::RuleSet::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::StructuralPartialEq for rsproxy_rules::RuleSet
 pub struct rsproxy_rules::RuleSetStats
+pub rsproxy_rules::RuleSetStats::compiled_body_literals: usize
+pub rsproxy_rules::RuleSetStats::compiled_globs: usize
 pub rsproxy_rules::RuleSetStats::disabled: usize
 pub rsproxy_rules::RuleSetStats::domain_exact_entries: usize
 pub rsproxy_rules::RuleSetStats::domain_suffix_entries: usize
@@ -719,6 +884,60 @@ pub fn rsproxy_rules::RuleSetStats::eq(&self, &rsproxy_rules::RuleSetStats) -> b
 impl core::fmt::Debug for rsproxy_rules::RuleSetStats
 pub fn rsproxy_rules::RuleSetStats::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::StructuralPartialEq for rsproxy_rules::RuleSetStats
+pub struct rsproxy_rules::RuleSourceSpan
+pub rsproxy_rules::RuleSourceSpan::end: usize
+pub rsproxy_rules::RuleSourceSpan::start: usize
+impl core::clone::Clone for rsproxy_rules::RuleSourceSpan
+pub fn rsproxy_rules::RuleSourceSpan::clone(&self) -> rsproxy_rules::RuleSourceSpan
+impl core::cmp::Eq for rsproxy_rules::RuleSourceSpan
+impl core::cmp::PartialEq for rsproxy_rules::RuleSourceSpan
+pub fn rsproxy_rules::RuleSourceSpan::eq(&self, &rsproxy_rules::RuleSourceSpan) -> bool
+impl core::fmt::Debug for rsproxy_rules::RuleSourceSpan
+pub fn rsproxy_rules::RuleSourceSpan::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for rsproxy_rules::RuleSourceSpan
+impl core::marker::StructuralPartialEq for rsproxy_rules::RuleSourceSpan
+pub struct rsproxy_rules::RuleSyntaxSpelling
+pub rsproxy_rules::RuleSyntaxSpelling::aliases: &'static [&'static str]
+pub rsproxy_rules::RuleSyntaxSpelling::canonical: &'static str
+pub rsproxy_rules::RuleSyntaxSpelling::prefix: bool
+pub rsproxy_rules::RuleSyntaxSpelling::topics: &'static [&'static str]
+impl rsproxy_rules::RuleSyntaxSpelling
+pub fn rsproxy_rules::RuleSyntaxSpelling::accepts(&self, &str) -> bool
+impl core::clone::Clone for rsproxy_rules::RuleSyntaxSpelling
+pub fn rsproxy_rules::RuleSyntaxSpelling::clone(&self) -> rsproxy_rules::RuleSyntaxSpelling
+impl core::cmp::Eq for rsproxy_rules::RuleSyntaxSpelling
+impl core::cmp::PartialEq for rsproxy_rules::RuleSyntaxSpelling
+pub fn rsproxy_rules::RuleSyntaxSpelling::eq(&self, &rsproxy_rules::RuleSyntaxSpelling) -> bool
+impl core::fmt::Debug for rsproxy_rules::RuleSyntaxSpelling
+pub fn rsproxy_rules::RuleSyntaxSpelling::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for rsproxy_rules::RuleSyntaxSpelling
+impl core::marker::StructuralPartialEq for rsproxy_rules::RuleSyntaxSpelling
+pub struct rsproxy_rules::SemanticLintFinding
+pub rsproxy_rules::SemanticLintFinding::families: alloc::vec::Vec<alloc::string::String>
+pub rsproxy_rules::SemanticLintFinding::group: alloc::sync::Arc<str>
+pub rsproxy_rules::SemanticLintFinding::kind: rsproxy_rules::SemanticLintKind
+pub rsproxy_rules::SemanticLintFinding::line: usize
+pub rsproxy_rules::SemanticLintFinding::message: alloc::string::String
+pub rsproxy_rules::SemanticLintFinding::raw: alloc::sync::Arc<str>
+impl core::clone::Clone for rsproxy_rules::SemanticLintFinding
+pub fn rsproxy_rules::SemanticLintFinding::clone(&self) -> rsproxy_rules::SemanticLintFinding
+impl core::cmp::Eq for rsproxy_rules::SemanticLintFinding
+impl core::cmp::PartialEq for rsproxy_rules::SemanticLintFinding
+pub fn rsproxy_rules::SemanticLintFinding::eq(&self, &rsproxy_rules::SemanticLintFinding) -> bool
+impl core::fmt::Debug for rsproxy_rules::SemanticLintFinding
+pub fn rsproxy_rules::SemanticLintFinding::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for rsproxy_rules::SemanticLintFinding
+pub struct rsproxy_rules::SemanticLintReport
+pub rsproxy_rules::SemanticLintReport::complete: bool
+pub rsproxy_rules::SemanticLintReport::findings: alloc::vec::Vec<rsproxy_rules::SemanticLintFinding>
+impl core::clone::Clone for rsproxy_rules::SemanticLintReport
+pub fn rsproxy_rules::SemanticLintReport::clone(&self) -> rsproxy_rules::SemanticLintReport
+impl core::cmp::Eq for rsproxy_rules::SemanticLintReport
+impl core::cmp::PartialEq for rsproxy_rules::SemanticLintReport
+pub fn rsproxy_rules::SemanticLintReport::eq(&self, &rsproxy_rules::SemanticLintReport) -> bool
+impl core::fmt::Debug for rsproxy_rules::SemanticLintReport
+pub fn rsproxy_rules::SemanticLintReport::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for rsproxy_rules::SemanticLintReport
 pub struct rsproxy_rules::TemplateMetadata
 impl rsproxy_rules::TemplateMetadata
 pub fn rsproxy_rules::TemplateMetadata::fixed(impl core::convert::Into<alloc::string::String>, u64, u64, impl core::convert::Into<alloc::string::String>) -> Self
@@ -767,5 +986,50 @@ pub fn rsproxy_rules::UrlParts::eq(&self, &rsproxy_rules::UrlParts) -> bool
 impl core::fmt::Debug for rsproxy_rules::UrlParts
 pub fn rsproxy_rules::UrlParts::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::StructuralPartialEq for rsproxy_rules::UrlParts
+pub const rsproxy_rules::ACTION_SYNTAX: &[rsproxy_rules::RuleSyntaxSpelling]
+pub const rsproxy_rules::CONDITION_SYNTAX: &[rsproxy_rules::RuleSyntaxSpelling]
+pub const rsproxy_rules::MATCHER_SYNTAX: &[rsproxy_rules::RuleSyntaxSpelling]
+pub const rsproxy_rules::MAX_HTTP_STATUS: u16
+pub const rsproxy_rules::MAX_RULES_PER_SNAPSHOT: usize
+pub const rsproxy_rules::MAX_RULE_ACTIONS_PER_RULE: usize
+pub const rsproxy_rules::MAX_RULE_ACTIONS_PER_SNAPSHOT: usize
+pub const rsproxy_rules::MAX_RULE_BODY_CONDITIONS_PER_SNAPSHOT: usize
+pub const rsproxy_rules::MAX_RULE_CALL_ARGUMENTS: usize
+pub const rsproxy_rules::MAX_RULE_CONDITION_NODES_PER_RULE: usize
+pub const rsproxy_rules::MAX_RULE_CONDITION_NODES_PER_SNAPSHOT: usize
+pub const rsproxy_rules::MAX_RULE_DIAGNOSTICS: usize
+pub const rsproxy_rules::MAX_RULE_EXPLAIN_BYTES: usize
+pub const rsproxy_rules::MAX_RULE_EXPLAIN_VALUE_BYTES: usize
+pub const rsproxy_rules::MAX_RULE_EXTERNAL_PATH_BYTES: usize
+pub const rsproxy_rules::MAX_RULE_EXTERNAL_VALUE_BYTES: usize
+pub const rsproxy_rules::MAX_RULE_GLOB_CAPTURES: usize
+pub const rsproxy_rules::MAX_RULE_GROUPS_PER_SNAPSHOT: usize
+pub const rsproxy_rules::MAX_RULE_GROUP_NAME_BYTES: usize
+pub const rsproxy_rules::MAX_RULE_LINT_COMPARISONS: usize
+pub const rsproxy_rules::MAX_RULE_LINT_COMPARISON_BYTES: usize
+pub const rsproxy_rules::MAX_RULE_LINT_FINDINGS: usize
+pub const rsproxy_rules::MAX_RULE_LINT_REPORT_BYTES: usize
+pub const rsproxy_rules::MAX_RULE_MOCK_FILE_CANDIDATES: usize
+pub const rsproxy_rules::MAX_RULE_PARSE_NESTING: usize
+pub const rsproxy_rules::MAX_RULE_PROPERTIES_PER_RULE: usize
+pub const rsproxy_rules::MAX_RULE_RENDERED_TAG_BYTES: usize
+pub const rsproxy_rules::MAX_RULE_RENDERED_VALUE_BYTES: usize
+pub const rsproxy_rules::MAX_RULE_SNAPSHOT_SOURCE_BYTES: usize
+pub const rsproxy_rules::MAX_RULE_SOURCE_LINE_BYTES: usize
+pub const rsproxy_rules::MAX_RULE_TAGS_PER_REQUEST: usize
+pub const rsproxy_rules::MAX_RULE_TLS_PEM_BYTES: usize
+pub const rsproxy_rules::MAX_RULE_UPSTREAM_HOPS: usize
+pub const rsproxy_rules::MIN_FINAL_HTTP_STATUS: u16
+pub const rsproxy_rules::MIN_HTTP_STATUS: u16
+pub const rsproxy_rules::PROPERTY_SYNTAX: &[rsproxy_rules::RuleSyntaxSpelling]
+pub const rsproxy_rules::REDIRECT_STATUSES: &[u16]
+pub const rsproxy_rules::RULE_LANGUAGE_HEADER: &str
+pub const rsproxy_rules::RULE_LANGUAGE_VERSION: u16
+pub fn rsproxy_rules::canonical_action_name(&str) -> core::option::Option<&'static str>
+pub fn rsproxy_rules::canonical_condition_name(&str) -> core::option::Option<&'static str>
+pub fn rsproxy_rules::canonical_property_name(&str) -> core::option::Option<&'static str>
+pub fn rsproxy_rules::is_http_token_byte(u8) -> bool
+pub fn rsproxy_rules::migrate_rule_source_v3(&str) -> alloc::string::String
 pub fn rsproxy_rules::redact_secrets(&str) -> alloc::string::String
 pub fn rsproxy_rules::valid_value_key(&str) -> bool
+pub fn rsproxy_rules::validate_redirect_location(&str) -> core::result::Result<(), rsproxy_rules::RuleModelError>

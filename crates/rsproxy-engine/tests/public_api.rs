@@ -46,7 +46,7 @@ fn public_facade_builds_runtime_state_and_exposes_the_listener_entrypoint() {
     let state = SharedState::new(config).unwrap();
     let handle = state.handle();
     assert_eq!(handle.status_snapshot().config.storage, storage);
-    assert_eq!(handle.rules().snapshot().compiled.rules.len(), 0);
+    assert_eq!(handle.rules().snapshot().compiled.rules().len(), 0);
     assert_eq!(handle.trace_store().stats().sessions, 0);
 
     let _serve: fn(TcpListener, SharedState) -> EngineResult<()> = serve;

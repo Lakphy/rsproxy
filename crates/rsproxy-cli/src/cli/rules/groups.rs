@@ -1,8 +1,8 @@
-use crate::cli::util::read_stdin;
+use crate::cli::util::{read_stdin_bounded, read_utf8_file_bounded};
 use crate::{CliError, CliResult, RuleDiagnostics};
 use rsproxy_control::api_request;
 use rsproxy_engine::RuleStore;
-use rsproxy_rules::RuleSet;
+use rsproxy_rules::{MAX_RULE_SNAPSHOT_SOURCE_BYTES, RuleSet};
 use serde::Deserialize;
 use std::env;
 use std::fs;
@@ -33,10 +33,9 @@ pub(crate) fn run_rules_set(
 ) -> CliResult<()> {
     validate_group(group)?;
     let text = if let Some(file) = file {
-        fs::read_to_string(file)
-            .map_err(|source| CliError::io(format!("read rules file {}", file.display()), source))?
+        read_utf8_file_bounded(file, MAX_RULE_SNAPSHOT_SOURCE_BYTES, "rules file")?
     } else {
-        read_stdin()?
+        read_stdin_bounded(MAX_RULE_SNAPSHOT_SOURCE_BYTES, "rules stdin")?
     };
     save_group(group, text, api, storage, json)
 }
@@ -145,12 +144,11 @@ pub(super) fn run_rules_edit(group: &str, api: &str, storage: &Path, json: bool)
         )
     })?;
     let edit_result = run_editor(&edit_path);
-    let text_result = fs::read_to_string(&edit_path).map_err(|source| {
-        CliError::io(
-            format!("read rules editor file {}", edit_path.display()),
-            source,
-        )
-    });
+    let text_result = read_utf8_file_bounded(
+        &edit_path,
+        MAX_RULE_SNAPSHOT_SOURCE_BYTES,
+        "rules editor file",
+    );
     let _ = fs::remove_file(&edit_path);
     edit_result?;
     save_group(group, text_result?, api, storage, json)
@@ -158,10 +156,8 @@ pub(super) fn run_rules_edit(group: &str, api: &str, storage: &Path, json: bool)
 
 pub(crate) fn load_rule_set(file: Option<&Path>, api: &str, storage: &Path) -> CliResult<RuleSet> {
     if let Some(file) = file {
-        let text = fs::read_to_string(file).map_err(|source| {
-            CliError::io(format!("read rules file {}", file.display()), source)
-        })?;
-        return RuleSet::parse("default", &text)
+        let text = read_utf8_file_bounded(file, MAX_RULE_SNAPSHOT_SOURCE_BYTES, "rules file")?;
+        return RuleSet::parse_versioned("default", &text)
             .map_err(RuleDiagnostics)
             .map_err(Into::into);
     }
@@ -171,7 +167,7 @@ pub(crate) fn load_rule_set(file: Option<&Path>, api: &str, storage: &Path) -> C
                 context: "parse rules export",
                 source,
             })?;
-        return RuleSet::parse_groups(
+        return RuleSet::parse_versioned_groups(
             groups
                 .iter()
                 .filter(|group| group.enabled)
@@ -184,7 +180,7 @@ pub(crate) fn load_rule_set(file: Option<&Path>, api: &str, storage: &Path) -> C
 }
 
 fn save_group(group: &str, text: String, api: &str, storage: &Path, json: bool) -> CliResult<()> {
-    RuleSet::parse(group, &text).map_err(RuleDiagnostics)?;
+    RuleSet::parse_versioned(group, &text).map_err(RuleDiagnostics)?;
     let path = group_api_path(group);
     match api_request("POST", api, &path, &text) {
         Ok(body) if json => println!("{body}"),
@@ -248,8 +244,8 @@ fn local_group_list_json(storage: &Path) -> CliResult<String> {
         .iter()
         .enumerate()
         .map(|(order, group)| {
-            let rules = RuleSet::parse(&group.name, &group.text)
-                .map(|rules| rules.rules.len())
+            let rules = RuleSet::parse_versioned(&group.name, &group.text)
+                .map(|rules| rules.rules().len())
                 .unwrap_or_default();
             serde_json::json!({
                 "name": group.name,

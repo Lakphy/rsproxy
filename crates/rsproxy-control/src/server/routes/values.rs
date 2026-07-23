@@ -5,7 +5,8 @@ use super::ControlState;
 use super::respond_json;
 use crate::shapes;
 use std::fs;
-use std::io::Write;
+use std::io::{Read, Write};
+use std::path::Path;
 
 const PREFIX: &str = "/api/values/";
 
@@ -46,7 +47,7 @@ pub(super) fn get<W: Write + ?Sized>(
     let Some(key) = key_from_path(path) else {
         return respond_json(stream, 400, "{\"error\":\"invalid key\"}");
     };
-    match fs::read(state.options.storage.join("values").join(&key)) {
+    match read_value(&state.options.storage.join("values").join(&key)) {
         Ok(body) => http::write_response(
             stream,
             200,
@@ -57,6 +58,9 @@ pub(super) fn get<W: Write + ?Sized>(
             )],
             &body,
         ),
+        Err(error) if error.kind() == std::io::ErrorKind::InvalidData => {
+            respond_json(stream, 413, "{\"error\":\"value exceeds size limit\"}")
+        }
         Err(_) => respond_json(stream, 404, "{\"error\":\"not found\"}"),
     }
 }
@@ -70,6 +74,9 @@ pub(super) fn set<W: Write + ?Sized>(
     let Some(key) = key_from_path(path) else {
         return respond_json(stream, 400, "{\"error\":\"invalid key\"}");
     };
+    if body.len() > rsproxy_rules::MAX_RULE_EXTERNAL_VALUE_BYTES {
+        return respond_json(stream, 413, "{\"error\":\"value exceeds size limit\"}");
+    }
     let values_dir = state.options.storage.join("values");
     fs::create_dir_all(&values_dir)?;
     fs::write(values_dir.join(key), body)?;
@@ -91,4 +98,19 @@ pub(super) fn delete<W: Write + ?Sized>(
 fn key_from_path(path: &str) -> Option<String> {
     let key = percent_decode(path.strip_prefix(PREFIX)?);
     valid_value_key(&key).then_some(key)
+}
+
+fn read_value(path: &Path) -> std::io::Result<Vec<u8>> {
+    let file = fs::File::open(path)?;
+    let limit = rsproxy_rules::MAX_RULE_EXTERNAL_VALUE_BYTES;
+    let mut body = Vec::with_capacity(limit.min(64 * 1024));
+    file.take(limit.saturating_add(1) as u64)
+        .read_to_end(&mut body)?;
+    if body.len() > limit {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            format!("rule value exceeds the {limit}-byte limit"),
+        ));
+    }
+    Ok(body)
 }

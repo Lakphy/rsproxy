@@ -41,7 +41,11 @@ pub(crate) fn generate_leaf_certificate(
 }
 
 pub(crate) fn load_certs(path: &Path) -> io::Result<Vec<CertificateDer<'static>>> {
-    let pem = fs::read(path)?;
+    let pem = crate::bounded_io::read_file(
+        path,
+        rsproxy_rules::MAX_RULE_TLS_PEM_BYTES,
+        "PEM certificate",
+    )?;
     parse_certs(&pem)
 }
 
@@ -50,7 +54,11 @@ pub(crate) fn load_certs_from_pem(pem: &str) -> io::Result<Vec<CertificateDer<'s
 }
 
 pub(crate) fn load_private_key(path: &Path) -> io::Result<PrivateKeyDer<'static>> {
-    let pem = fs::read(path)?;
+    let pem = crate::bounded_io::read_file(
+        path,
+        rsproxy_rules::MAX_RULE_TLS_PEM_BYTES,
+        "PEM private key",
+    )?;
     parse_private_key(&pem)
 }
 

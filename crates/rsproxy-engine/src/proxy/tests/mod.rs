@@ -64,9 +64,9 @@ fn resolved(action: Action) -> ResolvedAction {
     ResolvedAction::new(
         action,
         MatchedRule {
-            group: "default".to_string(),
+            group: "default".into(),
             line: 1,
-            raw: String::new(),
+            raw: String::new().into(),
         },
         Default::default(),
     )

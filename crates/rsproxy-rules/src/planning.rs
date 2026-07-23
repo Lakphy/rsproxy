@@ -1,6 +1,21 @@
 use super::*;
+use crate::model::CompiledConditionResources;
 
 impl Condition {
+    /// Calls `visit` for every node in this condition tree, combinators included.
+    pub(crate) fn for_each_node(&self, visit: &mut impl FnMut(&Condition)) {
+        visit(self);
+        match self {
+            Condition::Any(conditions) | Condition::All(conditions) => {
+                for condition in conditions {
+                    condition.for_each_node(visit);
+                }
+            }
+            Condition::Not(inner) => inner.for_each_node(visit),
+            _ => {}
+        }
+    }
+
     pub(super) fn depends_on_request_body(&self) -> bool {
         match self {
             Condition::BodyContains(_) | Condition::BodyRegex(_) => true,
@@ -14,9 +29,8 @@ impl Condition {
 
     pub(super) fn may_match_before_request_body(
         &self,
-        req: &RequestMeta,
-        url: Option<&UrlParts>,
-        line: usize,
+        resources: &CompiledConditionResources,
+        context: &matcher::ConditionMatchContext<'_, '_>,
     ) -> bool {
         match self {
             Condition::BodyContains(_)
@@ -24,18 +38,34 @@ impl Condition {
             | Condition::ResHeaderPresent(_)
             | Condition::ResHeaderContains { .. }
             | Condition::Status(_) => true,
-            Condition::Any(conditions) => conditions
-                .iter()
-                .any(|condition| condition.may_match_before_request_body(req, url, line)),
-            Condition::All(conditions) => conditions
-                .iter()
-                .all(|condition| condition.may_match_before_request_body(req, url, line)),
+            Condition::Any(conditions) => {
+                let CompiledConditionResources::Children(children) = resources else {
+                    return false;
+                };
+                conditions
+                    .iter()
+                    .zip(children)
+                    .any(|(condition, resources)| {
+                        condition.may_match_before_request_body(resources, context)
+                    })
+            }
+            Condition::All(conditions) => {
+                let CompiledConditionResources::Children(children) = resources else {
+                    return false;
+                };
+                conditions
+                    .iter()
+                    .zip(children)
+                    .all(|(condition, resources)| {
+                        condition.may_match_before_request_body(resources, context)
+                    })
+            }
             Condition::Not(inner)
                 if inner.depends_on_request_body() || inner.depends_on_response() =>
             {
                 true
             }
-            _ => self.matches(req, url, None, line),
+            _ => self.matches_with_compiled(resources, context),
         }
     }
 

@@ -76,6 +76,39 @@ fn resolve_benchmarks(criterion: &mut Criterion) {
     group.finish();
 }
 
+fn body_literal_benchmark(criterion: &mut Criterion) {
+    let mut source = String::new();
+    for index in 0..256 {
+        writeln!(
+            source,
+            "body.example.test req.header(x-{index}: yes) when body(~ token-{index:03}-tail)"
+        )
+        .expect("writing generated rules to a String cannot fail");
+    }
+    let rules = RuleSet::parse("criterion", &source)
+        .expect("generated body-condition benchmark rules must parse");
+    let mut request = RequestMeta {
+        method: "POST".to_string(),
+        url: "http://body.example.test/upload".to_string(),
+        headers: Vec::new(),
+        body: vec![b'a'; 1024 * 1024],
+        client_ip: None,
+        server_ip: None,
+        template: Default::default(),
+    };
+    request.body.extend_from_slice(b" TOKEN-255-TAIL");
+    assert_eq!(rules.stats().compiled_body_literals, 256);
+    assert_eq!(rules.resolve(&request).actions.len(), 1);
+
+    let mut group = criterion.benchmark_group("rules_resolve_body_literals");
+    group.sample_size(20);
+    group.throughput(Throughput::Bytes(request.body.len() as u64));
+    group.bench_function("1mib_256_literals", |bencher| {
+        bencher.iter(|| rules.resolve(black_box(&request)));
+    });
+    group.finish();
+}
+
 fn benches() {
     let mut criterion = Criterion::default()
         .measurement_time(Duration::from_secs(3))
@@ -83,6 +116,7 @@ fn benches() {
         .configure_from_args();
     parse_benchmarks(&mut criterion);
     resolve_benchmarks(&mut criterion);
+    body_literal_benchmark(&mut criterion);
 }
 
 fn main() {

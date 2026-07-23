@@ -64,6 +64,36 @@ fn response_header_and_trailer_families_change_the_client_response() {
 }
 
 #[test]
+fn response_status_actions_remove_content_for_bodyless_statuses() {
+    for status in [204, 304] {
+        let origin = TestOrigin::spawn(OriginReply {
+            status: 200,
+            headers: vec![("Content-Type".to_string(), "text/plain".to_string())],
+            body: b"origin-body".to_vec(),
+            trailers: Vec::new(),
+        });
+        let rules = format!(
+            "127.0.0.1 res.status({status}) res.body.set(should-not-leak) res.trailer(x-end: no)"
+        );
+        let state = state_with_rules("bodyless-response", &rules);
+        let url = format!("http://{}/bodyless", origin.address);
+
+        let exchange = run_exchange(&state, "GET", &url, &[], &[]);
+        let _ = origin.finish();
+
+        assert_eq!(exchange.head.status, status);
+        assert!(exchange.body.body.is_empty());
+        assert!(exchange.body.trailers.is_empty());
+        assert_eq!(header(&exchange.head.headers, "content-length"), None);
+        assert_eq!(header(&exchange.head.headers, "transfer-encoding"), None);
+        assert_eq!(header(&exchange.head.headers, "trailer"), None);
+        let session = state.trace.list(1).pop().unwrap();
+        assert_eq!(session.response_bytes, 0);
+        cleanup_state(&state);
+    }
+}
+
+#[test]
 fn response_body_families_stack_in_rule_order() {
     let origin = TestOrigin::spawn(OriginReply::ok("origin"));
     let rules = concat!(

@@ -183,7 +183,7 @@ fn every_structured_value_slot_accepts_inline_template_reference_and_file_source
             let rule = format!("example.test {action}");
             let parsed = RuleSet::parse("matrix", &rule)
                 .unwrap_or_else(|errors| panic!("{} with {source}: {errors:?}", slot.name));
-            let actual = value_at(slot.name, &parsed.rules[0].actions[0]);
+            let actual = value_at(slot.name, &parsed.rules()[0].actions[0]);
             assert_eq!(actual, expected, "{} with {source}", slot.name);
         }
     }

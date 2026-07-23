@@ -6,6 +6,7 @@ use super::{CheckError, CheckKind, Violation, fail_if_any, io_error};
 
 const PUBLIC_API_TOOLCHAIN: &str = "nightly-2026-07-10";
 const API_CRATES: &[&str] = &[
+    "rsproxy-http",
     "rsproxy-rules",
     "rsproxy-trace",
     "rsproxy-net",

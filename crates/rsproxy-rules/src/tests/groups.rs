@@ -10,7 +10,7 @@ fn group_order_precedes_line_order_across_compiled_indices() {
 
     let result = rules.resolve(&req("http://example.test/"));
     assert!(matches!(result.actions[0].action, Action::Status(201)));
-    assert_eq!(result.actions[0].rule.group, "first");
+    assert_eq!(result.actions[0].rule.group.as_ref(), "first");
 }
 
 #[test]
@@ -23,7 +23,7 @@ fn important_rule_precedes_earlier_groups() {
 
     let result = rules.resolve(&req("http://example.test/"));
     assert!(matches!(result.actions[0].action, Action::Status(202)));
-    assert_eq!(result.actions[0].rule.group, "second");
+    assert_eq!(result.actions[0].rule.group.as_ref(), "second");
 }
 
 #[test]
@@ -37,5 +37,8 @@ fn parse_errors_identify_the_source_group_and_line() {
     assert_eq!(errors[0].group, "broken");
     assert_eq!(errors[0].line, 2);
     assert_eq!(errors[0].code, RuleErrorCode::Action);
-    assert_eq!(errors[0].to_string(), "broken:2: unknown action `unknown`");
+    assert_eq!(
+        errors[0].to_string(),
+        "broken:2:14: unknown action `unknown`"
+    );
 }

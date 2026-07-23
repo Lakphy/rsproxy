@@ -27,6 +27,7 @@ where
     let upstream_addr = context.upstream_addr.clone();
     let client_connection = context.client_connection;
     let deadline = context.deadline;
+    let upstream_status = head.status;
     let declared_trailers = declared_trailer_names(&head.headers, &response_actions);
     let mut response_headers = head.headers.clone();
     apply_streaming_response_actions(
@@ -40,9 +41,13 @@ where
     head.version = client_response_version(&req.version).to_string();
     strip_hop_by_hop_headers(&mut response_headers);
 
-    let body_allowed = !req.method.eq_ignore_ascii_case("HEAD")
-        && !(100..200).contains(&head.status)
-        && !matches!(head.status, 204 | 304);
+    let body_allowed =
+        http::response_can_send_content(&req.method, head.status) && upstream_status != 205;
+    if upstream_status == 205 && http::status_can_send_content(head.status) {
+        http::remove_header(&mut response_headers, "transfer-encoding");
+        http::remove_header(&mut response_headers, "trailer");
+        http::set_header(&mut response_headers, "Content-Length", "0".to_string());
+    }
     let content_length = http::header(&response_headers, "content-length");
     let chunked = body_allowed
         && !req.version.eq_ignore_ascii_case("HTTP/1.0")
@@ -106,7 +111,9 @@ where
         )
     });
     let mut summary = StreamSummary::new(trace_limit);
-    if body_allowed && !prefix.is_empty() {
+    if upstream_status == 205 && !prefix.is_empty() {
+        flags.push("upstream-205-content-discarded".to_string());
+    } else if body_allowed && !prefix.is_empty() {
         summary.observe(&prefix);
         if let Some(trace) = &mut trace {
             trace.observe_slice(&prefix);
@@ -123,6 +130,14 @@ where
         match frame {
             Ok(UpstreamBodyFrame::Data(data)) => {
                 if !body_allowed {
+                    if upstream_status == 205
+                        && !data.is_empty()
+                        && !flags
+                            .iter()
+                            .any(|flag| flag == "upstream-205-content-discarded")
+                    {
+                        flags.push("upstream-205-content-discarded".to_string());
+                    }
                     continue;
                 }
                 summary.observe(&data);
@@ -138,6 +153,9 @@ where
         }
     }
 
+    if sanitize_upstream_trailers(&mut summary.trailers, &head.headers) {
+        flags.push("forbidden-upstream-trailer-dropped".to_string());
+    }
     apply_response_trailer_actions(&mut summary.trailers, meta, &response_actions, state)?;
     if !body_allowed || req.version.eq_ignore_ascii_case("HTTP/1.0") {
         summary.trailers.clear();
@@ -258,11 +276,12 @@ fn declared_trailer_names(headers: &[(String, String)], actions: &[ResolvedActio
         .filter(|(name, _)| name.eq_ignore_ascii_case("trailer"))
         .flat_map(|(_, value)| value.split(','))
         .map(str::trim)
-        .filter(|name| !name.is_empty())
+        .filter(|name| !name.is_empty() && !rsproxy_http::is_forbidden_trailer_name(name))
         .map(str::to_string)
         .collect::<Vec<_>>();
     for item in actions {
         if let Action::ResTrailer(HeaderOp::Set { name, .. }) = &item.action
+            && !rsproxy_http::is_forbidden_trailer_name(name)
             && !names.iter().any(|seen| seen.eq_ignore_ascii_case(name))
         {
             names.push(name.clone());

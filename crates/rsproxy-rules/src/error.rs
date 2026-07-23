@@ -256,8 +256,16 @@ impl RuleErrorCode {
     }
 }
 
-#[derive(Clone, Debug, Error, PartialEq, Eq)]
-#[error("{group}:{line}: {message}")]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// Half-open UTF-8 byte range within one physical rule source line.
+pub struct RuleSourceSpan {
+    /// Zero-based byte offset of the first source byte covered by the diagnostic.
+    pub start: usize,
+    /// Zero-based exclusive byte offset after the last covered source byte.
+    pub end: usize,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
 /// A source-located DSL diagnostic returned by [`RuleSet::parse`](crate::RuleSet::parse).
 pub struct RuleError {
     /// Stable diagnostic category; consumers must not infer it from `message`.
@@ -266,6 +274,27 @@ pub struct RuleError {
     pub group: String,
     /// One-based line number within the group.
     pub line: usize,
+    /// Token or source range when the parser can identify one precisely.
+    pub span: Option<RuleSourceSpan>,
     /// Human-facing detail whose wording may evolve.
     pub message: String,
 }
+
+impl std::fmt::Display for RuleError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if let Some(span) = self.span {
+            write!(
+                formatter,
+                "{}:{}:{}: {}",
+                self.group,
+                self.line,
+                span.start + 1,
+                self.message
+            )
+        } else {
+            write!(formatter, "{}:{}: {}", self.group, self.line, self.message)
+        }
+    }
+}
+
+impl std::error::Error for RuleError {}

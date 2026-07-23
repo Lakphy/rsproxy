@@ -26,6 +26,17 @@ fn parse_errors_have_stable_stage_codes() {
 }
 
 #[test]
+fn parser_diagnostics_include_the_failing_token_span() {
+    let source = "example.test direct unknown()";
+    let error = &RuleSet::parse("spans", source).unwrap_err()[0];
+    let span = error
+        .span
+        .expect("action diagnostics should identify a token");
+    assert_eq!(&source[span.start..span.end], "unknown()");
+    assert_eq!(error.to_string(), "spans:1:21: unknown action `unknown`");
+}
+
+#[test]
 fn internal_parser_errors_retain_typed_numeric_and_regex_sources() {
     let duration = parse_duration_ms("badms").unwrap_err();
     assert!(matches!(

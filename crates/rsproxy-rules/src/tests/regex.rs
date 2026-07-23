@@ -27,7 +27,7 @@ fn regex_matcher_falls_back_to_fancy_for_lookahead() {
     )
     .unwrap();
     assert!(matches!(
-        &rules.rules[0].matcher,
+        &rules.rules()[0].matcher,
         Matcher::Regex(RegexMatcher {
             engine: RegexEngine::Fancy,
             ..
@@ -48,7 +48,7 @@ fn regex_matcher_falls_back_to_fancy_for_lookahead() {
 fn regex_matcher_falls_back_to_fancy_for_backreference() {
     let rules = RuleSet::parse("default", r#"/\/dup\/(\w+)\/\1/ req.header(x-dup: $1)"#).unwrap();
     assert!(matches!(
-        &rules.rules[0].matcher,
+        &rules.rules()[0].matcher,
         Matcher::Regex(RegexMatcher {
             engine: RegexEngine::Fancy,
             ..
@@ -73,7 +73,7 @@ fn fancy_regex_backtrack_limit_is_treated_as_no_match() {
     )
     .unwrap();
     assert!(matches!(
-        &rules.rules[0].matcher,
+        &rules.rules()[0].matcher,
         Matcher::Regex(RegexMatcher {
             engine: RegexEngine::Fancy,
             ..

@@ -13,6 +13,7 @@ fancy-regex.workspace = true
 getrandom.workspace = true
 regex.workspace = true
 regex-syntax.workspace = true
+rsproxy-http.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]

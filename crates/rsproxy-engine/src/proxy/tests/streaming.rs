@@ -84,8 +84,10 @@ fn small_fixed_length_response_keeps_framing_and_uses_buffered_completion() {
 
     assert!(!result.flags.contains(&"response-streamed".to_string()));
     let output = String::from_utf8(capture.bytes).unwrap();
-    assert!(output.contains("content-length: 4\r\n"));
-    assert!(!output.to_ascii_lowercase().contains("transfer-encoding"));
+    let normalized = output.to_ascii_lowercase();
+    assert_eq!(normalized.matches("content-length:").count(), 1);
+    assert!(normalized.contains("content-length: 4\r\n"));
+    assert!(!normalized.contains("transfer-encoding"));
     assert!(output.ends_with("\r\n\r\nbody"));
 }
 

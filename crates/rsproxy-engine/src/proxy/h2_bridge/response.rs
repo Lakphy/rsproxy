@@ -226,9 +226,7 @@ impl H2ResponseWriter {
                 "WebSocket over HTTP/2 is not supported",
             ));
         }
-        let body_allowed = !self.method.eq_ignore_ascii_case("HEAD")
-            && !(100..200).contains(&head.status)
-            && !matches!(head.status, 204 | 304);
+        let body_allowed = http::response_has_framed_body(&self.method, head.status);
         let chunked = header_contains_token(&head.headers, "transfer-encoding", "chunked");
         let content_length = http::header(&head.headers, "content-length")
             .map(|value| {

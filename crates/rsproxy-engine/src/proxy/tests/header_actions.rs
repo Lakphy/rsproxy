@@ -131,3 +131,68 @@ fn response_actions_render_response_headers_status_and_both_cookie_directions() 
         Some("201|upstream|request-cookie|response-cookie")
     );
 }
+
+#[test]
+fn rule_produced_header_blocks_and_regex_expansion_obey_configured_limits() {
+    let request_meta = meta("http://example.test/");
+    let rules = RuleSet::parse(
+        "limit",
+        "example.test req.header(x-a: 1234567890) req.header(x-b: 1234567890)",
+    )
+    .unwrap();
+    let actions = rules.resolve(&request_meta).actions;
+    let mut request = RawRequest {
+        method: "GET".to_string(),
+        target: request_meta.url.clone(),
+        version: "HTTP/1.1".to_string(),
+        headers: Vec::new(),
+        body: Vec::new(),
+        trailers: Vec::new(),
+    };
+    let mut state = test_state();
+    state.config.max_header_size = 33;
+    let error = apply_request_actions(&mut request, &request_meta, &actions, &state).unwrap_err();
+    assert_eq!(error.kind(), io::ErrorKind::InvalidData);
+    assert!(error.to_string().contains("header block"));
+
+    let rules = RuleSet::parse("limit", "example.test req.header(x-a ~ /a/xxxxxxxx)").unwrap();
+    let item = rules.resolve(&request_meta).actions.remove(0);
+    let Action::ReqHeader(op) = &item.action else {
+        panic!("expected request header action");
+    };
+    let mut headers = vec![("X-A".to_string(), "aaaa".to_string())];
+    state.config.max_header_size = 16;
+    let error = apply_header_op(&mut headers, op, &item, &request_meta, &state).unwrap_err();
+    assert_eq!(error.kind(), io::ErrorKind::InvalidData);
+    assert_eq!(headers[0].1, "aaaa");
+}
+
+#[test]
+fn rule_produced_http_fields_reject_control_character_injection() {
+    let request_meta = meta("http://example.test/path");
+    for source in [
+        r#"example.test req.header(x-safe: "ok\r\nInjected: yes")"#,
+        r#"example.test req.method("GET\r\nInjected: yes")"#,
+    ] {
+        let actions = RuleSet::parse("security", source)
+            .unwrap()
+            .resolve(&request_meta)
+            .actions;
+        let mut request = RawRequest {
+            method: "GET".to_string(),
+            target: request_meta.url.clone(),
+            version: "HTTP/1.1".to_string(),
+            headers: Vec::new(),
+            body: Vec::new(),
+            trailers: Vec::new(),
+        };
+        let error = apply_request_actions(&mut request, &request_meta, &actions, &test_state())
+            .expect_err("HTTP control characters must never reach serialization");
+        assert_eq!(error.kind(), io::ErrorKind::InvalidData, "{source}");
+        let message = error.to_string();
+        assert!(
+            message.contains("invalid") && message.contains("HTTP"),
+            "{source}: {error}"
+        );
+    }
+}

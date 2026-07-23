@@ -46,7 +46,10 @@ fn whistle_migration_matrix_is_snapshot_backed_parseable_and_action_complete() {
     whistle_fixture::assert_pinned();
     let text = fs::read_to_string(matrix_path()).unwrap();
     let matrix: MigrationMatrix = toml::from_str(&text).unwrap();
-    let implemented = Action::FAMILIES.iter().copied().collect::<BTreeSet<_>>();
+    let implemented = Action::FAMILIES
+        .iter()
+        .map(|family| family.as_str())
+        .collect::<BTreeSet<_>>();
     let mut observed = BTreeSet::new();
     let mut ids = HashSet::new();
     let mut classified_whistle = BTreeSet::new();

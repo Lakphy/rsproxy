@@ -239,6 +239,25 @@ fn body_condition_matches_contains_and_regex() {
 }
 
 #[test]
+fn body_contains_handles_overlapping_literals_from_one_scan() {
+    let rules = RuleSet::parse(
+        "default",
+        concat!(
+            "example.com req.header(x-a: yes) when body(~ a)\n",
+            "example.com req.header(x-aa: yes) when body(~ aa)\n",
+            "example.com req.header(x-aaa: yes) when all(body(~ AAA), not(body(~ z)))"
+        ),
+    )
+    .unwrap();
+    let mut request = req("http://example.com/");
+    request.body = b"aaa".to_vec();
+
+    let result = rules.resolve(&request);
+
+    assert_eq!(result.actions.len(), 3);
+}
+
+#[test]
 fn all_condition_requires_every_nested_condition() {
     let rules = RuleSet::parse(
         "default",

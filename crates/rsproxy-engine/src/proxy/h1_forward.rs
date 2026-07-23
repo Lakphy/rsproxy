@@ -66,7 +66,7 @@ pub(super) fn try_pooled<W: WsIo + Send>(
 }
 
 pub(super) fn pool_eligible(ctx: &ForwardCtx<'_>) -> bool {
-    ctx.rules.rules.is_empty()
+    ctx.rules.rules().is_empty()
         && ctx.actions.is_empty()
         && ctx.route.is_direct()
         && ctx.url.scheme == "http"

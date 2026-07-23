@@ -1,9 +1,10 @@
 use super::command::{ReplayArgs, RuntimeArgs, TraceArgs, TraceCommand, ValuesArgs, ValuesCommand};
 use super::config::runtime_config;
-use super::util::{percent_encode, read_stdin};
+use super::util::{percent_encode, read_stdin_bounded, read_utf8_file_bounded};
 use crate::app::AppConfig;
 use crate::{CliError, CliResult};
 use rsproxy_control::{api_request, api_request_with_timeout, api_stream_lines};
+use rsproxy_rules::MAX_RULE_EXTERNAL_VALUE_BYTES;
 use std::fs;
 use std::time::Duration;
 
@@ -115,9 +116,7 @@ pub(super) fn values_cmd(args: ValuesArgs, json: bool) -> CliResult<()> {
                 Ok(body) => body,
                 Err(_) => {
                     let path = storage.join("values").join(&args.key);
-                    fs::read_to_string(&path).map_err(|source| {
-                        CliError::io(format!("read value file {}", path.display()), source)
-                    })?
+                    read_utf8_file_bounded(&path, MAX_RULE_EXTERNAL_VALUE_BYTES, "rule value")?
                 }
             };
             if json {
@@ -129,11 +128,9 @@ pub(super) fn values_cmd(args: ValuesArgs, json: bool) -> CliResult<()> {
         }
         ValuesCommand::Set(args) => {
             let body = if let Some(file) = args.file {
-                fs::read_to_string(&file).map_err(|source| {
-                    CliError::io(format!("read value input {}", file.display()), source)
-                })?
+                read_utf8_file_bounded(&file, MAX_RULE_EXTERNAL_VALUE_BYTES, "rule value")?
             } else {
-                read_stdin()?
+                read_stdin_bounded(MAX_RULE_EXTERNAL_VALUE_BYTES, "rule value")?
             };
             let values_dir = storage.join("values");
             fs::create_dir_all(&values_dir).map_err(|source| {

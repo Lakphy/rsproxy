@@ -36,6 +36,42 @@ fn response_trailer_actions_set_override_and_remove() {
 }
 
 #[test]
+fn programmatic_rule_trailers_cannot_create_forbidden_fields() {
+    let mut trailers = Vec::new();
+    let meta = RequestMeta {
+        method: "GET".to_string(),
+        url: "http://example.com/".to_string(),
+        headers: Vec::new(),
+        body: Vec::new(),
+        client_ip: None,
+        server_ip: None,
+        template: Default::default(),
+    };
+    let actions = vec![resolved(Action::ResTrailer(HeaderOp::Set {
+        name: "content-length".to_string(),
+        value: Value::inline("10"),
+    }))];
+
+    let error = apply_response_trailer_actions(&mut trailers, &meta, &actions, &test_state())
+        .expect_err("forbidden trailers must be rejected at the execution boundary");
+    assert_eq!(error.kind(), io::ErrorKind::InvalidInput);
+    assert!(error.to_string().contains("forbidden in a trailer"));
+}
+
+#[test]
+fn upstream_trailer_sanitizer_preserves_grpc_metadata_only() {
+    let headers = vec![("Connection".to_string(), "x-hop".to_string())];
+    let mut trailers = vec![
+        ("grpc-status".to_string(), "0".to_string()),
+        ("Content-Length".to_string(), "10".to_string()),
+        ("X-Hop".to_string(), "secret".to_string()),
+    ];
+
+    assert!(sanitize_upstream_trailers(&mut trailers, &headers));
+    assert_eq!(trailers, vec![("grpc-status".to_string(), "0".to_string())]);
+}
+
+#[test]
 fn chunked_response_writer_emits_final_trailers() {
     let mut out = Vec::new();
     let head = http::RawResponseHead {

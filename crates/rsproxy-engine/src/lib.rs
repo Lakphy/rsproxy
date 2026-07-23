@@ -18,6 +18,7 @@
 #[cfg(feature = "bench-support")]
 #[doc(hidden)]
 pub mod benchmark_support;
+mod bounded_io;
 mod certificate;
 mod error;
 mod handle;

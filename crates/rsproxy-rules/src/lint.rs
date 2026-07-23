@@ -10,19 +10,32 @@ use super::*;
 /// when a broader earlier rule covers every URL it matches.
 pub struct LintFinding {
     /// Group of the rule that never takes effect.
-    pub group: String,
+    pub group: Arc<str>,
     /// One-based source line of the shadowed rule.
     pub line: usize,
     /// Comment-free source of the shadowed rule.
-    pub raw: String,
+    pub raw: Arc<str>,
     /// Group of the earlier rule that wins first.
-    pub shadowed_by_group: String,
+    pub shadowed_by_group: Arc<str>,
     /// One-based source line of the earlier rule.
     pub shadowed_by_line: usize,
     /// Comment-free source of the earlier rule.
-    pub shadowed_by_raw: String,
+    pub shadowed_by_raw: Arc<str>,
     /// Single-action families the later rule can never win.
     pub families: Vec<String>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+/// Bounded conservative shadow-lint result.
+pub struct LintReport {
+    /// Findings retained in deterministic rule/family order.
+    pub findings: Vec<LintFinding>,
+    /// False when the comparison, finding, or report-byte budget was reached.
+    pub complete: bool,
+    /// Pairwise rule comparisons performed.
+    pub comparisons: usize,
+    /// Matcher-source bytes charged for the comparisons performed.
+    pub comparison_bytes: usize,
 }
 
 impl RuleSet {
@@ -33,6 +46,11 @@ impl RuleSet {
     /// provable coverage relationship produce findings, so an empty result does
     /// not guarantee the absence of ordering mistakes.
     pub fn lint(&self) -> Vec<LintFinding> {
+        self.lint_report().findings
+    }
+
+    /// Runs shadow lint with explicit completeness and resource-budget metadata.
+    pub fn lint_report(&self) -> LintReport {
         let mut ordered: Vec<usize> = (0..self.rules.len())
             .filter(|idx| !self.rules[*idx].disabled)
             .collect();
@@ -41,31 +59,58 @@ impl RuleSet {
             (!rule.important, *idx)
         });
 
+        let ordered_families = ordered
+            .iter()
+            .map(|index| single_families(&self.rules[*index]))
+            .collect::<Vec<_>>();
+        let matcher_bytes = ordered
+            .iter()
+            .map(|index| matcher_source_bytes(&self.rules[*index].matcher))
+            .collect::<Vec<_>>();
         let mut findings = Vec::new();
-        for (pos, &later_idx) in ordered.iter().enumerate() {
+        let mut report_bytes = 0usize;
+        let mut comparisons = 0usize;
+        let mut comparison_bytes = 0usize;
+        let mut complete = true;
+        'later: for (pos, &later_idx) in ordered.iter().enumerate() {
             let later = &self.rules[later_idx];
-            let later_families = single_families(later);
+            let later_families = ordered_families[pos].clone();
             if later_families.is_empty() {
                 continue;
             }
             let mut remaining = later_families;
-            for &earlier_idx in &ordered[..pos] {
+            for (earlier_pos, &earlier_idx) in ordered[..pos].iter().enumerate() {
+                if comparisons == MAX_RULE_LINT_COMPARISONS {
+                    complete = false;
+                    break 'later;
+                }
+                let comparison_size = matcher_bytes[pos].saturating_add(matcher_bytes[earlier_pos]);
+                if comparison_bytes
+                    .checked_add(comparison_size)
+                    .is_none_or(|bytes| bytes > MAX_RULE_LINT_COMPARISON_BYTES)
+                {
+                    complete = false;
+                    break 'later;
+                }
+                comparisons += 1;
+                comparison_bytes += comparison_size;
                 let earlier = &self.rules[earlier_idx];
                 if !earlier.conditions.is_empty() {
                     continue;
                 }
-                let shared: Vec<String> = single_families(earlier)
-                    .into_iter()
+                let shared: Vec<String> = ordered_families[earlier_pos]
+                    .iter()
                     .filter(|family| remaining.contains(family))
+                    .cloned()
                     .collect();
                 if shared.is_empty() {
                     continue;
                 }
-                if !matcher_subsumes(&earlier.matcher, &later.matcher) {
+                if !matcher_subsumes(&earlier.matcher, &later.matcher, &self.index.compiled_globs) {
                     continue;
                 }
                 remaining.retain(|family| !shared.contains(family));
-                findings.push(LintFinding {
+                let finding = LintFinding {
                     group: later.group.clone(),
                     line: later.line,
                     raw: later.raw.clone(),
@@ -73,21 +118,64 @@ impl RuleSet {
                     shadowed_by_line: earlier.line,
                     shadowed_by_raw: earlier.raw.clone(),
                     families: shared,
-                });
+                };
+                let size = lint_finding_bytes(&finding);
+                if findings.len() == MAX_RULE_LINT_FINDINGS
+                    || report_bytes
+                        .checked_add(size)
+                        .is_none_or(|bytes| bytes > MAX_RULE_LINT_REPORT_BYTES)
+                {
+                    complete = false;
+                    break 'later;
+                }
+                report_bytes += size;
+                findings.push(finding);
                 if remaining.is_empty() {
                     break;
                 }
             }
         }
-        findings
+        LintReport {
+            findings,
+            complete,
+            comparisons,
+            comparison_bytes,
+        }
     }
+}
+
+fn matcher_source_bytes(matcher: &Matcher) -> usize {
+    match matcher {
+        Matcher::ExactUrl(url) => url.len(),
+        Matcher::Glob(glob) => glob
+            .scheme
+            .as_ref()
+            .map_or(0, String::len)
+            .saturating_add(glob.host.len())
+            .saturating_add(glob.port.as_ref().map_or(0, String::len))
+            .saturating_add(glob.path.as_ref().map_or(0, String::len))
+            .saturating_add(glob.query.as_ref().map_or(0, String::len)),
+        Matcher::Port(_) => size_of::<u16>(),
+        Matcher::Regex(regex) => regex.pattern.len(),
+        Matcher::Not(inner) => matcher_source_bytes(inner),
+    }
+}
+
+fn lint_finding_bytes(finding: &LintFinding) -> usize {
+    finding
+        .group
+        .len()
+        .saturating_add(finding.raw.len())
+        .saturating_add(finding.shadowed_by_group.len())
+        .saturating_add(finding.shadowed_by_raw.len())
+        .saturating_add(finding.families.iter().map(String::len).sum::<usize>())
 }
 
 fn single_families(rule: &Rule) -> Vec<String> {
     let mut families = Vec::new();
-    for action in &rule.actions {
+    for action in effective_actions(rule) {
         if action.is_single() {
-            let family = action.family().to_string();
+            let family = action.family().as_str().to_string();
             if !families.contains(&family) {
                 families.push(family);
             }
@@ -97,20 +185,23 @@ fn single_families(rule: &Rule) -> Vec<String> {
 }
 
 /// Reports whether `a` provably matches every URL that `b` matches.
-fn matcher_subsumes(a: &Matcher, b: &Matcher) -> bool {
+fn matcher_subsumes(a: &Matcher, b: &Matcher, globs: &CompiledGlobSet) -> bool {
     match (a, b) {
-        (Matcher::Glob(a), Matcher::Glob(b)) => glob_subsumes(a, b),
-        (Matcher::Glob(_), Matcher::ExactUrl(url)) => UrlParts::parse(url)
-            .ok()
-            .is_some_and(|parts| a.matches(&parts, url).is_some()),
+        (Matcher::Glob(a), Matcher::Glob(b)) => glob_subsumes(a, b, globs),
+        (Matcher::Glob(_), Matcher::ExactUrl(url)) => {
+            let resources = bind_matcher_resources(a, globs);
+            UrlParts::parse(url)
+                .ok()
+                .is_some_and(|parts| a.matches_compiled(&parts, url, globs, &resources).is_some())
+        }
         (Matcher::ExactUrl(a), Matcher::ExactUrl(b)) => a == b,
         _ => false,
     }
 }
 
-fn glob_subsumes(a: &GlobMatcher, b: &GlobMatcher) -> bool {
+fn glob_subsumes(a: &GlobMatcher, b: &GlobMatcher, globs: &CompiledGlobSet) -> bool {
     let scheme_ok = a.scheme.is_none() || a.scheme == b.scheme;
-    let host_ok = host_pattern_subsumes(&a.host, &b.host);
+    let host_ok = host_pattern_subsumes(&a.host, &b.host, globs);
     let port_ok = a.port.is_none() || a.port == b.port;
     let path_ok = a.path.is_none() || a.path == b.path;
     let query_ok = a.query.is_none() || a.query == b.query;
@@ -118,21 +209,19 @@ fn glob_subsumes(a: &GlobMatcher, b: &GlobMatcher) -> bool {
 }
 
 /// Reports whether host pattern `a` covers every host that pattern `b` covers.
-fn host_pattern_subsumes(a: &str, b: &str) -> bool {
-    let a = a.to_ascii_lowercase();
-    let b = b.to_ascii_lowercase();
+fn host_pattern_subsumes(a: &str, b: &str, globs: &CompiledGlobSet) -> bool {
     if a == b || a == "*" || a == "**" {
         return true;
     }
     // A literal host on the later rule reduces subsumption to plain matching.
-    if !b.contains('*') {
-        return host_matches(&a, &b);
+    if !glob_syntax_is_active(b) {
+        return globs.host_matches(a, b);
     }
     if let Some(base) = a.strip_prefix("**.")
         && let Some(later_base) = b.strip_prefix("**.").or_else(|| b.strip_prefix("*."))
     {
-        return !later_base.contains('*')
-            && (later_base == base || later_base.ends_with(&format!(".{base}")));
+        return !glob_syntax_is_active(later_base)
+            && (later_base == base || dotted_suffix_prefix(later_base, base).is_some());
     }
     false
 }

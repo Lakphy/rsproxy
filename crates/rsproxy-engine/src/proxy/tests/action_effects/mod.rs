@@ -86,6 +86,9 @@ fn every_action_family_has_one_executable_effect_owner() {
             "duplicate effect owner for {family}"
         );
     }
-    let expected = Action::FAMILIES.iter().copied().collect::<BTreeSet<_>>();
+    let expected = Action::FAMILIES
+        .iter()
+        .map(|family| family.as_str())
+        .collect::<BTreeSet<_>>();
     assert_eq!(actual, expected);
 }

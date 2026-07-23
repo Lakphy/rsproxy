@@ -1,7 +1,33 @@
 # rsproxy Rules DSL Spec
 
-Status: executable v1 contract for the grammar listed below, backed by a
+Status: executable language-version 3 contract for the grammar listed below, backed by a
 machine-readable corpus and the pinned Whistle option/migration contracts.
+
+The same language reference is built into the binary. `rsproxy rules help`
+prints the complete stable topic index; query a precise topic such as
+`action.req.header`, use an unambiguous shorthand such as `req.header`, list a
+category such as `conditions`, or search every ID, syntax form, example, note,
+alias, and relation with `rsproxy rules help --search 'response header'`.
+`--json` exposes the complete selected records under the versioned
+`rsproxy.rules.help/v1` schema, including `language_version` and each topic's
+canonical/compatibility `dsl_spellings`; action topics also declare `resolution`
+as single/first-wins or stackable. Parser dispatch and this help field
+consume the same `rsproxy-rules` registry. Ambiguous shorthand is rejected with
+the exact canonical IDs instead of silently choosing one.
+
+Standalone and persisted v3 sources declare their grammar on the first
+non-comment, non-blank line:
+
+```text
+@language 3
+```
+
+V3 source accepts canonical action and condition call names only. The
+programmatic compatibility parser remains available for embedded legacy text;
+CLI validation, group storage, and daemon reload use the versioned parser. Run
+`rsproxy rules migrate FILE` to preview an upgrade or add `--write` to replace
+the file after strict validation. See
+[`rules-migration-v2-v3.md`](rules-migration-v2-v3.md).
 
 ## Line Format
 
@@ -12,7 +38,10 @@ matcher action... [when condition]... [@important] [@disabled] [@tag:name]
 ```
 
 Whitespace separates top-level tokens. Whitespace inside `(...)`, quotes, or `<...>` is preserved.
-Comments start with `#` outside quotes.
+Comments start with `#` outside quotes. Quotes and `()`, `[]`, `{}`, and
+`<file>` delimiters must balance and share the published nesting limit. Empty, consecutive, and trailing call
+arguments are rejected rather than silently discarded; only explicitly empty
+calls such as `attachment()` and `skip()` are accepted.
 
 ## Matchers
 
@@ -43,9 +72,14 @@ Supported now:
 <!-- corpus:matcher-regex-named-capture -->
 | Regex | `/\/users\/(?P<uid>\d+)/` | Regex over the full URL; supports `i` flag and numbered/named captures |
 
-Regex matchers are compiled when rules are parsed. rsproxy uses the Rust `regex` crate by default for linear-time matching. Patterns rejected by `regex` but accepted by `fancy-regex`, such as backreferences and lookaround, automatically use the fancy engine with a hard backtrack limit. When that limit is exceeded, the matcher is treated as not matched.
+Regex matchers are compiled when rules are parsed. rsproxy uses the Rust `regex` crate by default for linear-time matching. Patterns rejected by `regex` but accepted by `fancy-regex`, such as backreferences and lookaround, automatically use the fancy engine with a hard backtrack limit. When that limit is exceeded, the matcher is treated as not matched. Glob components are translated to anchored linear regexes, deduplicated, and compiled into the immutable rules snapshot; wildcard captures remain non-greedy and only `$1` through `$9` are retained. Request resolution performs no glob compilation and glob matching never uses recursive or exponential backtracking. `rsproxy rules stats` and `rules bench` expose the snapshot's `compiled_globs` count.
 
-Glob and exact matchers validate scheme and authority before publication.
+Glob and exact matchers validate scheme, authority, and every component glob
+before publication. A dangling escape or a glob that cannot be compiled is a
+source-located error rather than a rule that silently never matches.
+Backslash escapes the next character consistently in matcher and condition
+globs; its presence selects whole-component glob matching even when the pattern
+contains no wildcard.
 Malformed/zero ports, broken bracketed IPv6 authorities, empty schemes, and
 exact values that are not URLs return a `matcher` error instead of degrading to
 a broader host-only match.
@@ -56,23 +90,29 @@ Rule sets are compiled with exact-domain and suffix-domain buckets, plus a globa
 
 Supported now:
 
+Every action help topic exposes a machine-readable `phases` array. Request-only
+families run before upstream forwarding, response-only families run after an
+upstream response exists, and `delete`, `hide`, `tag`, and `skip` can participate
+in both phases. A request-only action guarded by a condition that necessarily
+requires response metadata can never execute and is reported by `rules lint`.
+
 | Action | Example | Behavior |
 | --- | --- | --- |
 <!-- corpus:action-host-round-robin -->
 | `host(addr[, addr...])` | `host(127.0.0.1:18081, 127.0.0.1:18082)` | Connect to the next address in per-rule round-robin order while preserving the original Host header |
 | `upstream(proxy://h:p[, proxy://h:p \| https-proxy://h:p \| socks5://[user:pass@]h:p...] \| https-proxy://h:p \| socks5://[user:pass@]h:p)` | `upstream(proxy://127.0.0.1:18001, https-proxy://127.0.0.1:18443)` | Forward HTTP requests and CONNECT passthrough through another proxy; comma-separated `proxy://` / `http://` / `https-proxy://` / `socks://` / `socks5://` entries form a mixed upstream chain, including nested multiple-`https-proxy://` TLS hops |
-| `mock(value)` | `mock("hello ${host}\n")` / `mock(<mocks>)` / `mock(<a.json\|fallback.json>)` | Short-circuit with inline, `@key`, or file body; file mocks infer Content-Type, try `|`-separated candidates in order, and directory mocks append the request path (`/` -> `index.html`) |
+| `mock(value)` | `mock("hello ${host}\n")` / `mock(<mocks>)` / `mock(<a.json\|fallback.json>)` | Short-circuit with inline, `@key`, or file body; file mocks infer Content-Type, try `|`-separated candidates in order, and directory mocks append a traversal-safe request path (`/` -> `index.html`) |
 <!-- corpus:action-mock-inline-status-headers-body -->
-| `mock(status=..., type=..., header=..., body=...)` | `mock(status=503, type=application/json, header=X-Mock: yes, body={"ok":false})` | One-stop inline mock: combine a status (default 200), Content-Type, repeatable `header=Name: value` entries, and a body (inline, `@key`, or `<file>`) in one action |
+| `mock(status=..., type=..., header=..., body=...)` | `mock(status=503, type=application/json, header=X-Mock: yes, body={"ok":false})` | One-stop inline mock: combine a final status (default 200, range 200–599), Content-Type, repeatable `header=Name: value` entries, and a body (inline, `@key`, or `<file>`) in one action; 204/205/304 reject a body |
 | `mock.raw(value)` | `mock.raw("HTTP/1.1 207 Multi-Status\r\nX-Raw: yes\r\n\r\nbody")` | Short-circuit with raw status line, headers, and body |
 <!-- corpus:action-map-remote-transparent-forward -->
 | `map.remote(url)` | `map.remote(http://localhost:3000)` / `/^https:\/\/a.test\/(.*)$/ map.remote(http://localhost:3000/$1)` | Transparent reverse proxy (Whistle `pattern target`, Charles Map Remote): the request is served by the target backend while the client-visible URL is unchanged — no 30x is sent. A target without a path keeps the original path and query; an explicit target path (captures such as `$1` supported) replaces them. The upstream `Host` header and TLS follow the target. Aliases: `mapRemote`, `map_remote`, `map-remote` |
-| `status(code)` | `status(410)` | Short-circuit with status response |
-| `redirect(url[, code])` | `redirect(https://a.test, 302)` | Short-circuit redirect |
+| `status(code)` | `status(410)` | Short-circuit with a final 200–599 status response; 204/205/304 cannot carry response content |
+| `redirect(url[, code])` | `redirect(https://a.test, 302)` | Short-circuit with 301, 302, 303, 307, or 308 (default 302) |
 <!-- corpus:action-header-regex-replace -->
 | `req.header(op)` | `req.header(x-added: v)` / `req.header(-x)` / `req.header(x-release ~ /v(\d+)/release-$1)` | Set, remove, or regex-replace every matching request-header value before upstream forwarding |
 | `res.header(op)` | `res.header(x-seen: yes)` / `res.header(-server)` / `res.header(location ~ /old/new)` | Set, remove, or regex-replace every matching response-header value |
-| `res.status(code)` | `res.status(299)` | Rewrite upstream response status |
+| `res.status(code)` | `res.status(299)` | Rewrite upstream response status to 200–599; 204/205/304 remove body and trailers, with 205 normalized to `Content-Length: 0` |
 | `req.method(M)` | `req.method(POST)` | Rewrite request method |
 | `req.cookie(op)` | `req.cookie(sid=1)` / `req.cookie(-sid)` | Set/remove request Cookie entries |
 | `res.cookie(op)` | `res.cookie(token=1)` / `res.cookie(token=1; Path=/api; Max-Age=60; HttpOnly; Secure; SameSite=Lax)` / `res.cookie(-token)` | Add/remove Set-Cookie headers, including common Set-Cookie attributes |
@@ -98,11 +138,21 @@ Supported now:
 | `delay(req|res, d)` | `delay(res, 50ms)` | Sleep before request forwarding or response forwarding |
 | `throttle(req|res, speed)` | `throttle(res, 1KB/s)` | Rate-limit buffered and streaming request/response writes with pacing preserved across frames and bounded by the absolute request deadline |
 | `tls(min=version, ciphers=list, client-cert=<path>, client-key=<path>)` | `tls(min=1.2, ciphers=ECDHE-ECDSA-AES128-GCM-SHA256)` / `tls(client-cert=<certs/client.pem>, client-key=<certs/client-key.pem>)` | Configure origin TLS minimum version and allowed cipher suites and/or load a PEM client identity for upstream mTLS; policy applies to origin TLS after direct, SOCKS5, or upstream-proxy CONNECT routing, never to an HTTPS proxy hop itself |
-| `skip([family...])` | `skip(res.header)` / `skip()` | Skip subsequent actions by family, or all subsequent actions when empty, `all`, or `*` |
+| `skip([family...])` | `skip(res.header)` / `skip()` | Skip subsequent actions by validated family/parent, or all subsequent actions when empty, `all`, or `*` |
 | `hide` | `hide` | Suppress trace recording for the matched session; other actions still execute |
 | `tag(name)` | `tag(api:${path})` | Add `tag:<rendered>` to trace flags; templates are supported |
 | `bypass` | `bypass` | Keep CONNECT tunnels in passthrough mode instead of MITM |
 | `direct` | `direct` | Force direct origin routing for the request, overriding matched `upstream(...)` actions |
+
+Header and trailer names must be HTTP tokens. After templates, references, and
+files are rendered, the runtime also rejects header values containing CR, LF,
+NUL, DEL, or other forbidden controls; rewritten methods must remain HTTP
+tokens; and rewritten URLs must not contain ASCII whitespace or controls. The
+same validation applies to inline and raw mock responses before serialization,
+closing CRLF/header-injection paths even for dynamic values. Redirect locations
+reject whitespace, controls, and non-HTTP(S) absolute schemes. Response writers
+own `Content-Length`, `Transfer-Encoding`, connection, and trailer framing, so
+rule/mock headers cannot create conflicting message boundaries.
 
 ### Rule ordering: first match wins
 
@@ -118,8 +168,31 @@ api.foo.test upstream(socks5://127.0.0.1:2222)   # specific first
 
 With the reversed order the wildcard rule silently swallows every request,
 including `api.foo.test`. `rsproxy rules lint` detects provable cases of this
-shadowing; `@important` moves a rule ahead of all non-important rules when
-reordering lines is not practical.
+shadowing; it also reports repeated single-action families within one rule and
+flat or `all(...)` method/status/environment constraints whose positive and
+directly negated sets have no possible value. Constant chance/boolean trees such
+as `chance(0)` are covered too. It also reports request-only actions guarded by
+conditions that necessarily require response metadata, actions suppressed by an
+earlier same-rule `skip`, conflicting local responses, response-only actions
+bypassed by a local response, `upstream` overridden by same-rule `direct`, and
+body mutations made unobservable by `res.status(204/205/304)`.
+Local response precedence is fixed as `status`, then `redirect`, then `mock`;
+those responses do not enter the upstream response-action pipeline. The linter
+deliberately stays silent for cases requiring regex overlap, dynamic environment
+values, ambiguous `any(...)` phase inference, or cross-rule capability
+inference. A clean lint run is therefore not a completeness proof. `@important`
+moves a rule ahead of all non-important rules when reordering lines is not
+practical.
+
+Lint JSON uses schema `rsproxy.rules.lint/v1`. Every finding has a stable `kind`
+(`shadowed-rule`, `duplicate-single-family`, `unsatisfiable-conditions`,
+`request-action-requires-response`, `action-after-skip`,
+`conflicting-terminal-actions`, `response-action-with-local-response`, or
+`upstream-overridden-by-direct`, or `body-action-with-bodyless-status`), source `group`, one-based `line`, source
+`rule`, human `message`, and
+`families`. Shadow findings additionally identify the earlier rule with
+`shadowed_by_group`, `shadowed_by_line`, and `shadowed_by_rule`. Automation must
+branch on `kind`, not the human message.
 
 Whistle's `pattern $0` ("leave this request alone, ignore later rules") is
 expressed as an early `direct skip()` rule: `direct` forces origin routing and
@@ -129,8 +202,10 @@ Single-action families use first-match semantics. Header, cookie, body, query,
 `delete`, `inject`, `res.merge`, `res.trailer`, and tag families are stackable.
 `skip` is retained in explain/trace and applies to actions resolved after it in rule order.
 
-The public `Action::FAMILIES` list and machine-readable action corpus declare
-the same required set. The corpus runner fails if the implementation,
+The public action-family specifications generate `Action::FAMILIES`,
+`Action::STACKABLE_FAMILIES`, stackability, and phase lookup from one
+declaration. Help `resolution`/`phases` fields and the machine-readable action
+corpus must match that declaration. The corpus runner fails if the implementation,
 declaration, and resolved families differ. Value-source matrices cover every
 structured value slot, and the action-effect suite assigns each family an
 executable real-network owner. `scripts/verify.sh actions` runs these contracts
@@ -190,7 +265,9 @@ CORS, cache, merge JSON, and attachment names reject non-UTF-8 loaded bytes.
 Body, injection, and mock payload fields preserve binary bytes; loaded content
 is template/capture-rendered only when it is valid UTF-8. File paths may contain
 templates. They are a trusted-rule filesystem capability and are not restricted
-to the storage directory.
+to the storage directory. When a mock value selects a directory, the appended
+request path must contain only normal components; dot traversal, platform
+separator tricks, and a resolved symlink outside that directory are rejected.
 
 Regex replacement operands remain distinct from ordinary templates. Header and
 body regex replacements use their inline replacement grammar. A regex
@@ -253,9 +330,9 @@ Supported now:
 <!-- corpus:condition-response-header -->
 | `res.header(name ~ value)` | `when res.header(x-origin-state ~ hit)` | Case-insensitive response header substring, evaluated during response phase |
 <!-- corpus:condition-client-ip-glob -->
-| `clientIp(...)` / `ip(...)` | `when clientIp(127.0.0.1)` / `when ip(203.0.*)` | Client IP exact or simple glob match; socket-address values are normalized to IP |
+| `client.ip(...)` | `when client.ip(127.0.0.1)` / `when client.ip(203.0.*)` | Client IP exact or simple glob match; socket-address values are normalized to IP |
 <!-- corpus:condition-server-ip -->
-| `serverIp(...)` | `when serverIp(127.0.0.1)` | Request target literal IP exact or simple glob match; socket-address values are normalized to IP |
+| `server.ip(...)` | `when server.ip(127.0.0.1)` | Request target literal IP exact or simple glob match; socket-address values are normalized to IP |
 <!-- corpus:condition-response-status -->
 | `status(...)` | `when status(200, 404)` | Evaluated during response phase |
 <!-- corpus:condition-chance-one-always-matches -->
@@ -287,7 +364,9 @@ the first condition-satisfying action; stackable families preserve source order.
 
 <!-- corpus:composition-skip-family -->
 `skip(family...)` suppresses later actions in the named family without removing
-unrelated actions. `skip()`, `skip(all)`, and `skip(*)` suppress all later
+unrelated actions. Family names are canonicalized during parsing and must name
+an action family or a parent such as `res.body`; unknown names are rejected.
+`skip()`, `skip(all)`, and `skip(*)` suppress all later
 actions.
 
 ## Error Contract
@@ -345,13 +424,89 @@ parse errors. Regex matcher captures support `$0` for the complete match,
 
 ## Scope and Limits
 
-This document lists the complete supported v1 grammar; unknown forms fail
+This document lists the complete supported language-version 2 grammar; unknown forms fail
 validation instead of silently degrading to a broader behavior. The Whistle
 migration contract is a classified compatibility surface, not a promise that
 rsproxy accepts Whistle syntax or implements every Whistle option.
+
+Version 2 preserves every documented v1 rule form while rejecting malformed
+forms that v1 sometimes tolerated accidentally. See
+[`rules-migration-v1-v2.md`](rules-migration-v1-v2.md) for the exact detection
+and rewrite checklist.
+
+The public Rust model now enforces the same immutability claim: use
+`RuleSet::rules()`, `RuleSet::version()`, and `RuleSet::is_empty()` for
+inspection. The AST and its compiled candidate/glob indices can no longer be
+mutated independently after publication.
+
+One snapshot accepts at most 16,777,216 UTF-8 source bytes, 1,024 groups, and
+10,000 non-empty, non-comment source rule lines. Group identifiers are limited to 128 bytes, and one
+parse returns at most 256 diagnostics; the last diagnostic explicitly states
+when remaining source was not parsed. One physical source line is limited to
+65,536 UTF-8 bytes. A snapshot retains at most 100,000 actions, 100,000
+condition AST nodes, and 256 body substring/regex condition leaves. A rule
+accepts at most 256 actions, 256 total condition AST
+nodes, 64 property tokens, and 256 top-level arguments per call. Matcher
+negation, condition composition/negation, and delimiter nesting are each
+limited to 32 levels. The parser rejects over-limit input with a source-located
+`syntax`, `matcher`, `action`, `condition`, or `property` code.
+
+Every execution-time `@key`, `<path>`, or mock-file read accepts at most
+8,388,608 bytes. Every PEM certificate-chain or private-key file read accepts
+at most 1,048,576 bytes. Readers consume at most one byte beyond the limit to
+detect overflow, then return an explicit error instead of allocating the whole
+file. A mock candidate falls through only when it is not found; an oversized,
+unreadable, or otherwise invalid candidate fails the action immediately.
+
+Rendered filesystem paths are limited to 4,096 bytes. One rendered action value
+is limited to 8,388,608 bytes; one trace tag is limited to 4,096 bytes and at
+most 256 distinct rule tags are retained per request. Template transforms and
+plain/regex replacements compute their exact expanded length before allocating.
+URLs and header blocks additionally obey `max_header_size`/`max_header_count`;
+body set/append/prepend/replace/inject/merge outputs obey `body_buffer_limit`.
+Cross-phase matched-rule provenance and captures use shared immutable storage,
+so stacked actions do not duplicate source lines or large capture strings.
+Human explanations render at most 4,096 bytes per embedded value and 8,388,608
+bytes overall; a stable marker reports value or total-output truncation.
+Rendered upstream chains accept at most 32 proxy hops, and one mock file source
+tries at most 32 `|`-separated candidates.
+
+Each shadow-lint run performs at most 1,000,000 pairwise comparisons and charges
+at most 268,435,456 matcher-source bytes across those comparisons. Shadow and
+semantic reports each retain at most 10,000 findings and approximately
+4,194,304 source/message bytes. `lint_report()` / `semantic_lint_report()` and
+CLI lint JSON expose `complete`; reaching a budget produces `complete: false`
+and a failing CLI exit rather than a misleading clean result. The legacy Rust
+`lint()` methods return the bounded finding prefix for source compatibility.
+
+Delete body paths are separately limited to 16,384 bytes and 128 segments;
+value keys are limited to 128 bytes; regex/glob captures expose at most `$1`
+through `$9`. These are acceptance limits, not best-effort runtime timeouts: an
+invalid snapshot is never partially published. Query the current contract with
+`rsproxy rules help concept.limits` or inspect the `limits` object in help JSON.
+
+CLI rule files, editor results, and stdin are read through a one-extra-byte
+bounded reader, so the source limit is enforced before an unbounded `String`
+allocation. Persistent group files share one cumulative 16 MiB read budget;
+the group manifest is separately limited to 1 MiB and directory/manifest group
+counts are rejected before all files are loaded. Direct Rust callers already
+own their input strings, but parsing and compiled-snapshot amplification remain
+bounded by the same public constants.
+
+`RuleSet::version()` is a process-local monotonically increasing publication
+identifier seeded from Unix milliseconds. Concurrent publications are unique,
+wall-clock rollback cannot reduce the value, and clones retain the same ID; it
+is not a persistent timestamp or a content hash.
 
 Body conditions and mutations require bounded aggregation. When a body exceeds
 `body_buffer_limit`, the proxy preserves streaming, skips operations that need
 the complete body, and records the corresponding trace flag. Value files and
 `<path>` sources are trusted-rule filesystem capabilities and must not be
 accepted from untrusted rule authors.
+
+Within one resolution, lossy UTF-8 body decoding and normalized client/server
+IP values are computed at most once and reused across nested conditions. ASCII
+case-insensitive body literals are semantically deduplicated into one compiled
+Aho-Corasick matcher and scan the request body once; header substring checks do
+not allocate lowercase copies. The snapshot body-condition cap bounds remaining
+full-body regex scans.

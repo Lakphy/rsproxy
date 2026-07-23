@@ -17,6 +17,57 @@ fn mock_raw_parses_status_headers_and_body() {
 }
 
 #[test]
+fn mock_raw_framing_is_normalized_to_the_actual_body() {
+    let raw = b"HTTP/1.1 200 OK\r\nContent-Length: 0\r\nTransfer-Encoding: chunked\r\nConnection: keep-alive\r\n\r\nunexpected";
+    let parsed = parse_raw_mock_response(raw).unwrap();
+    let response = finalize_mock_response(parsed, &test_state()).unwrap();
+
+    assert_eq!(response.body, b"unexpected");
+    assert!(http::header(&response.headers, "content-length").is_none());
+    assert!(http::header(&response.headers, "transfer-encoding").is_none());
+    assert!(http::header(&response.headers, "connection").is_none());
+}
+
+#[test]
+fn mock_raw_rejects_bodyless_status_content_and_non_http1_versions() {
+    let body_error = parse_raw_mock_response(b"HTTP/1.1 204 No Content\r\n\r\nbody")
+        .and_then(|response| finalize_mock_response(response, &test_state()))
+        .unwrap_err();
+    assert_eq!(body_error.kind(), io::ErrorKind::InvalidData);
+
+    let version_error = parse_raw_mock_response(b"HTTP/2 200 OK\r\n\r\n").unwrap_err();
+    assert_eq!(version_error.kind(), io::ErrorKind::InvalidData);
+}
+
+#[test]
+fn mock_raw_rejects_invalid_header_names_before_serialization() {
+    let storage = std::env::temp_dir().join(format!(
+        "rsproxy-mock-invalid-header-{}-{}",
+        std::process::id(),
+        rsproxy_trace::now_millis()
+    ));
+    fs::create_dir_all(&storage).unwrap();
+    fs::write(
+        storage.join("invalid.http"),
+        b"HTTP/1.1 200 OK\r\nBad Name: value\r\n\r\nbody",
+    )
+    .unwrap();
+    let mut state = test_state();
+    state.config.storage = storage.clone();
+    let request = meta("http://example.test/");
+    let actions = RuleSet::parse("security", "example.test mock.raw(<invalid.http>)")
+        .unwrap()
+        .resolve(&request)
+        .actions;
+
+    let error = first_mock(&actions, &request, &state)
+        .expect_err("invalid raw mock headers must never reach serialization");
+    assert_eq!(error.kind(), io::ErrorKind::InvalidData);
+    assert!(error.to_string().contains("invalid HTTP header name"));
+    let _ = fs::remove_dir_all(storage);
+}
+
+#[test]
 fn mock_file_candidates_infer_content_type() {
     let storage = std::env::temp_dir().join(format!(
         "rsproxy-mock-test-{}-{}",
@@ -49,6 +100,20 @@ fn mock_file_candidates_infer_content_type() {
 }
 
 #[test]
+fn mock_file_candidate_lists_are_bounded_before_filesystem_walks() {
+    let candidates = (0..=rsproxy_rules::MAX_RULE_MOCK_FILE_CANDIDATES)
+        .map(|index| format!("missing-{index}.txt"))
+        .collect::<Vec<_>>()
+        .join("|");
+    let rules = RuleSet::parse("limit", &format!("example.test mock(<{candidates}>)")).unwrap();
+    let request = meta("http://example.test/");
+    let actions = rules.resolve(&request).actions;
+    let error = first_mock(&actions, &request, &test_state()).unwrap_err();
+    assert_eq!(error.kind(), io::ErrorKind::InvalidInput);
+    assert!(error.to_string().contains("32-candidate limit"));
+}
+
+#[test]
 fn mock_directory_candidate_joins_request_path() {
     let storage = std::env::temp_dir().join(format!(
         "rsproxy-mock-dir-test-{}-{}",
@@ -72,6 +137,47 @@ fn mock_directory_candidate_joins_request_path() {
         http::header(&response.headers, "content-type"),
         Some("application/json")
     );
+    let _ = fs::remove_dir_all(storage);
+}
+
+#[test]
+fn mock_directory_path_rejects_cross_platform_traversal_segments() {
+    for url in [
+        "http://example.test/../secret",
+        "http://example.test/..\\secret",
+        "http://example.test/C:/secret",
+        "http://example.test/server\\share",
+    ] {
+        let error = mock_directory_relative_path(&meta(url)).unwrap_err();
+        assert_eq!(error.kind(), io::ErrorKind::InvalidInput, "url={url}");
+    }
+    assert_eq!(
+        mock_directory_relative_path(&meta("http://example.test/api/")).unwrap(),
+        PathBuf::from("api/index.html")
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn mock_directory_rejects_symlink_targets_outside_the_root() {
+    use std::os::unix::fs::symlink;
+
+    let storage = std::env::temp_dir().join(format!(
+        "rsproxy-mock-symlink-test-{}-{}",
+        std::process::id(),
+        rsproxy_trace::now_millis()
+    ));
+    let root = storage.join("root");
+    let outside = storage.join("outside");
+    fs::create_dir_all(&root).unwrap();
+    fs::create_dir_all(&outside).unwrap();
+    fs::write(outside.join("secret.txt"), b"secret").unwrap();
+    symlink(&outside, root.join("escape")).unwrap();
+
+    let error = read_rule_file_path(&root, &meta("http://example.test/escape/secret.txt"), 1024)
+        .unwrap_err();
+
+    assert_eq!(error.kind(), io::ErrorKind::PermissionDenied);
     let _ = fs::remove_dir_all(storage);
 }
 

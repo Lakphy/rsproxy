@@ -19,7 +19,7 @@ pub(super) fn list<W: Write + ?Sized>(stream: &mut W, state: &ControlState) -> s
         .enumerate()
         .map(|(order, group)| {
             let rules = RuleSet::parse(&group.name, &group.text)
-                .map(|rules| rules.rules.len())
+                .map(|rules| rules.rules().len())
                 .unwrap_or_default();
             format!(
                 "{{\"name\":{},\"enabled\":{},\"order\":{},\"rules\":{}}}",
@@ -85,7 +85,7 @@ pub(super) fn check<W: Write + ?Sized>(stream: &mut W, body: &[u8]) -> std::io::
         Ok(rules) => respond_json(
             stream,
             200,
-            &format!("{{\"ok\":true,\"rules\":{}}}", rules.rules.len()),
+            &format!("{{\"ok\":true,\"rules\":{}}}", rules.rules().len()),
         ),
         Err(errors) => parse_errors(stream, &errors),
     }
@@ -217,7 +217,7 @@ fn change_group<W: Write + ?Sized>(
             &format!(
                 "{{\"ok\":true,\"groups\":{},\"rules\":{}}}",
                 snapshot.groups.len(),
-                snapshot.compiled.rules.len()
+                snapshot.compiled.rules().len()
             ),
         ),
         Err(RuleStoreError::Parse(errors)) => parse_errors(stream, &errors),

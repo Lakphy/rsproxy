@@ -45,6 +45,7 @@ fn apply_response_actions_inner(
     state: &SharedState,
     include_body: bool,
 ) -> io::Result<()> {
+    let header_limit = rule_header_limit(state);
     for item in actions {
         match &item.action {
             Action::ResHeader(op) => apply_header_op(headers, op, item, meta, state)?,
@@ -58,22 +59,24 @@ fn apply_response_actions_inner(
                 http::set_header(
                     headers,
                     "Content-Type",
-                    resolve_value_text(value, item, meta, state)?,
+                    resolve_value_text_bounded(value, item, meta, state, header_limit)?,
                 );
             }
-            Action::ResCharset(value) => {
-                set_charset(headers, &resolve_value_text(value, item, meta, state)?)
-            }
+            Action::ResCharset(value) => set_charset(
+                headers,
+                &resolve_value_text_bounded(value, item, meta, state, header_limit)?,
+            ),
             Action::ResMerge(value) if include_body => {
-                let patch = resolve_value_text(value, item, meta, state)?;
-                apply_res_merge(body, &patch)?;
+                let patch =
+                    resolve_value_text_bounded(value, item, meta, state, rule_body_limit(state))?;
+                apply_res_merge(body, &patch, rule_body_limit(state))?;
             }
             Action::Attachment(filename) => {
                 let value = filename
                     .as_ref()
                     .map(|name| {
-                        resolve_value_text(name, item, meta, state)
-                            .map(|name| format!("attachment; filename=\"{name}\""))
+                        resolve_value_text_bounded(name, item, meta, state, header_limit)
+                            .and_then(|name| content_disposition_attachment(&name))
                     })
                     .transpose()?
                     .unwrap_or_else(|| "attachment".to_string());
@@ -101,7 +104,56 @@ fn apply_response_actions_inner(
             _ => {}
         }
     }
+    validate_header_block(headers, state)?;
     Ok(())
+}
+
+fn content_disposition_attachment(filename: &str) -> io::Result<String> {
+    if filename.is_empty() || filename.chars().any(char::is_control) {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "attachment filename must be non-empty and contain no control characters",
+        ));
+    }
+    let mut fallback = String::with_capacity(filename.len());
+    for character in filename.chars() {
+        match character {
+            '"' | '\\' => {
+                fallback.push('\\');
+                fallback.push(character);
+            }
+            character if character.is_ascii() => fallback.push(character),
+            _ => fallback.push('_'),
+        }
+    }
+    let mut value = format!("attachment; filename=\"{fallback}\"");
+    if !filename.is_ascii() {
+        value.push_str("; filename*=UTF-8''");
+        for byte in filename.bytes() {
+            if byte.is_ascii_alphanumeric()
+                || matches!(
+                    byte,
+                    b'!' | b'#'
+                        | b'$'
+                        | b'&'
+                        | b'+'
+                        | b'-'
+                        | b'.'
+                        | b'^'
+                        | b'_'
+                        | b'`'
+                        | b'|'
+                        | b'~'
+                )
+            {
+                value.push(char::from(byte));
+            } else {
+                use std::fmt::Write as _;
+                write!(&mut value, "%{byte:02X}").expect("formatting into a String cannot fail");
+            }
+        }
+    }
+    Ok(value)
 }
 
 pub(super) fn apply_response_trailer_actions(
@@ -117,6 +169,43 @@ pub(super) fn apply_response_trailer_actions(
             _ => {}
         }
     }
+    validate_trailer_block(trailers, state)?;
+    Ok(())
+}
+
+pub(super) fn sanitize_upstream_trailers(
+    trailers: &mut Vec<(String, String)>,
+    response_headers: &[(String, String)],
+) -> bool {
+    let connection_names = response_headers
+        .iter()
+        .filter(|(name, _)| name.eq_ignore_ascii_case("connection"))
+        .flat_map(|(_, value)| value.split(','))
+        .map(str::trim)
+        .filter(|name| !name.is_empty())
+        .map(str::to_ascii_lowercase)
+        .collect::<Vec<_>>();
+    let before = trailers.len();
+    trailers.retain(|(name, _)| {
+        !rsproxy_http::is_forbidden_trailer_name(name)
+            && !connection_names
+                .iter()
+                .any(|connection| name.eq_ignore_ascii_case(connection))
+    });
+    trailers.len() != before
+}
+
+fn validate_trailer_block(trailers: &[(String, String)], state: &SharedState) -> io::Result<()> {
+    validate_header_block(trailers, state)?;
+    if let Some((name, _)) = trailers
+        .iter()
+        .find(|(name, _)| rsproxy_http::is_forbidden_trailer_name(name))
+    {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            format!("HTTP field `{name}` is forbidden in a trailer section"),
+        ));
+    }
     Ok(())
 }
 
@@ -127,14 +216,15 @@ pub(super) fn apply_res_cors(
     meta: &RequestMeta,
     state: &SharedState,
 ) -> io::Result<()> {
-    let origin = resolve_value_text(&op.origin, item, meta, state)?;
+    let limit = rule_header_limit(state);
+    let origin = resolve_value_text_bounded(&op.origin, item, meta, state, limit)?;
     http::set_header(headers, "Access-Control-Allow-Origin", origin.clone());
     http::set_header(
         headers,
         "Access-Control-Allow-Methods",
         op.methods
             .as_ref()
-            .map(|value| resolve_value_text(value, item, meta, state))
+            .map(|value| resolve_value_text_bounded(value, item, meta, state, limit))
             .transpose()?
             .unwrap_or_else(|| "GET,POST,PUT,PATCH,DELETE,OPTIONS".to_string()),
     );
@@ -143,7 +233,7 @@ pub(super) fn apply_res_cors(
         "Access-Control-Allow-Headers",
         op.headers
             .as_ref()
-            .map(|value| resolve_value_text(value, item, meta, state))
+            .map(|value| resolve_value_text_bounded(value, item, meta, state, limit))
             .transpose()?
             .unwrap_or_else(|| "Content-Type,Authorization,*".to_string()),
     );
@@ -160,14 +250,14 @@ pub(super) fn apply_res_cors(
         http::set_header(
             headers,
             "Access-Control-Expose-Headers",
-            resolve_value_text(value, item, meta, state)?,
+            resolve_value_text_bounded(value, item, meta, state, limit)?,
         );
     }
     if let Some(value) = &op.max_age {
         http::set_header(
             headers,
             "Access-Control-Max-Age",
-            resolve_value_text(value, item, meta, state)?,
+            resolve_value_text_bounded(value, item, meta, state, limit)?,
         );
     }
     if origin != "*" {
@@ -182,18 +272,21 @@ pub(super) fn render_cache_directives(
     meta: &RequestMeta,
     state: &SharedState,
 ) -> io::Result<String> {
-    directives
-        .iter()
-        .map(|directive| match &directive.value {
-            Some(value) => Ok(format!(
-                "{}={}",
-                directive.name,
-                resolve_value_text(value, item, meta, state)?
-            )),
-            None => Ok(directive.name.clone()),
-        })
-        .collect::<io::Result<Vec<_>>>()
-        .map(|values| values.join(", "))
+    let limit = rule_header_limit(state);
+    let mut out = String::new();
+    for (index, directive) in directives.iter().enumerate() {
+        if index > 0 {
+            push_text_bounded(&mut out, ", ", limit, "Cache-Control value")?;
+        }
+        push_text_bounded(&mut out, &directive.name, limit, "Cache-Control value")?;
+        if let Some(value) = &directive.value {
+            push_text_bounded(&mut out, "=", limit, "Cache-Control value")?;
+            let remaining = remaining_capacity(out.len(), limit, "Cache-Control value")?;
+            let value = resolve_value_text_bounded(value, item, meta, state, remaining)?;
+            push_text_bounded(&mut out, &value, limit, "Cache-Control value")?;
+        }
+    }
+    Ok(out)
 }
 
 pub(super) fn ensure_vary_origin(headers: &mut Vec<(String, String)>) {
@@ -215,7 +308,7 @@ pub(super) fn ensure_vary_origin(headers: &mut Vec<(String, String)>) {
     }
 }
 
-pub(super) fn apply_res_merge(body: &mut Vec<u8>, patch: &str) -> io::Result<bool> {
+pub(super) fn apply_res_merge(body: &mut Vec<u8>, patch: &str, limit: usize) -> io::Result<bool> {
     let Ok(text) = std::str::from_utf8(body) else {
         return Ok(false);
     };
@@ -236,12 +329,16 @@ pub(super) fn apply_res_merge(body: &mut Vec<u8>, patch: &str) -> io::Result<boo
         ));
     }
     merge_json(&mut base, patch);
-    *body = serde_json::to_vec(&base).map_err(|err| {
+    let merged = serde_json::to_vec(&base).map_err(|err| {
         io::Error::new(
             io::ErrorKind::InvalidData,
             format!("serialize res.merge json: {err}"),
         )
     })?;
+    if merged.len() > limit {
+        return Err(output_limit_error("merged response body", limit));
+    }
+    *body = merged;
     Ok(true)
 }
 

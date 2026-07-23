@@ -1,4 +1,6 @@
 use super::*;
+use cap_std::{ambient_authority, fs::Dir};
+use std::path::Component;
 
 #[derive(Clone, Debug)]
 pub(super) struct MockResponse {
@@ -16,29 +18,45 @@ pub(super) fn first_mock(
     for item in actions {
         match &item.action {
             Action::Mock(value) => {
-                let Ok((body, content_type)) = resolve_mock_value(value, item, meta, state) else {
-                    continue;
-                };
-                return Ok(Some(MockResponse {
+                let (body, content_type) = resolve_mock_value(value, item, meta, state)?;
+                let response = MockResponse {
                     status: 200,
                     reason: "OK".to_string(),
                     headers: vec![("Content-Type".to_string(), content_type)],
                     body,
-                }));
+                };
+                return finalize_mock_response(response, state).map(Some);
             }
             Action::MockRaw(value) => {
-                let bytes = resolve_value_bytes(value, item, meta, state)?;
-                return parse_raw_mock_response(&bytes).map(Some);
+                let bytes =
+                    resolve_value_bytes_bounded(value, item, meta, state, rule_body_limit(state))?;
+                let response = parse_raw_mock_response(&bytes)?;
+                return finalize_mock_response(response, state).map(Some);
             }
             Action::MockInline(op) => {
                 let status = op.status.unwrap_or(200);
                 let body = match &op.body {
-                    Some(value) => resolve_value_bytes(value, item, meta, state)?,
+                    Some(value) => resolve_value_bytes_bounded(
+                        value,
+                        item,
+                        meta,
+                        state,
+                        rule_body_limit(state),
+                    )?,
                     None => Vec::new(),
                 };
                 let mut headers = Vec::new();
                 for (name, value) in &op.headers {
-                    headers.push((name.clone(), resolve_value_text(value, item, meta, state)?));
+                    headers.push((
+                        name.clone(),
+                        resolve_value_text_bounded(
+                            value,
+                            item,
+                            meta,
+                            state,
+                            rule_header_limit(state),
+                        )?,
+                    ));
                 }
                 if !headers
                     .iter()
@@ -49,17 +67,52 @@ pub(super) fn first_mock(
                         "text/plain; charset=utf-8".to_string(),
                     ));
                 }
-                return Ok(Some(MockResponse {
-                    status,
-                    reason: http::reason_phrase(status).to_string(),
-                    headers,
-                    body,
-                }));
+                return finalize_mock_response(
+                    MockResponse {
+                        status,
+                        reason: http::reason_phrase(status).to_string(),
+                        headers,
+                        body,
+                    },
+                    state,
+                )
+                .map(Some);
             }
             _ => {}
         }
     }
     Ok(None)
+}
+
+pub(super) fn finalize_mock_response(
+    mut response: MockResponse,
+    state: &SharedState,
+) -> io::Result<MockResponse> {
+    if !(rsproxy_rules::MIN_FINAL_HTTP_STATUS..=rsproxy_rules::MAX_HTTP_STATUS)
+        .contains(&response.status)
+    {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            format!(
+                "mock response status must be in {}..={}",
+                rsproxy_rules::MIN_FINAL_HTTP_STATUS,
+                rsproxy_rules::MAX_HTTP_STATUS
+            ),
+        ));
+    }
+    if !http::status_can_send_content(response.status) && !response.body.is_empty() {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            format!(
+                "mock response status {} must not include content",
+                response.status
+            ),
+        ));
+    }
+    strip_hop_by_hop_headers(&mut response.headers);
+    http::remove_header(&mut response.headers, "content-length");
+    validate_header_block(&response.headers, state)?;
+    Ok(response)
 }
 
 pub(super) fn resolve_mock_value(
@@ -70,25 +123,37 @@ pub(super) fn resolve_mock_value(
 ) -> io::Result<(Vec<u8>, String)> {
     match value {
         Value::Inline(_) | Value::Reference(_) => Ok((
-            resolve_value_bytes(value, item, meta, state)?,
+            resolve_value_bytes_bounded(value, item, meta, state, rule_body_limit(state))?,
             "text/plain; charset=utf-8".to_string(),
         )),
         Value::File(path) => {
-            let rendered = item.render(path, meta);
+            let rendered = render_rule_path(path, item, meta)?;
             let mut last_err = None;
-            for candidate in rendered
+            let candidates = rendered
                 .split('|')
                 .map(str::trim)
                 .filter(|candidate| !candidate.is_empty())
-            {
+                .take(rsproxy_rules::MAX_RULE_MOCK_FILE_CANDIDATES + 1)
+                .collect::<Vec<_>>();
+            if candidates.len() > rsproxy_rules::MAX_RULE_MOCK_FILE_CANDIDATES {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    format!(
+                        "mock file exceeds the {}-candidate limit",
+                        rsproxy_rules::MAX_RULE_MOCK_FILE_CANDIDATES
+                    ),
+                ));
+            }
+            for candidate in candidates {
                 match read_rule_file_candidate(candidate, meta, state) {
                     Ok((body, resolved_path)) => {
                         return Ok((
-                            render_text_bytes(body, item, meta),
+                            render_text_bytes(body, item, meta, rule_body_limit(state))?,
                             content_type_for_path(&resolved_path),
                         ));
                     }
-                    Err(err) => last_err = Some(err),
+                    Err(err) if err.kind() == io::ErrorKind::NotFound => last_err = Some(err),
+                    Err(err) => return Err(err),
                 }
             }
             Err(last_err.unwrap_or_else(|| {
@@ -104,8 +169,14 @@ pub(super) fn read_rule_file_candidate(
     state: &SharedState,
 ) -> io::Result<(Vec<u8>, String)> {
     let storage_path = state.config.storage.join(path);
-    read_rule_file_path(&storage_path, meta)
-        .or_else(|_| read_rule_file_path(Path::new(path), meta))
+    read_rule_file_path(&storage_path, meta, rule_body_limit(state))
+        .or_else(|error| {
+            if error.kind() == io::ErrorKind::NotFound {
+                read_rule_file_path(Path::new(path), meta, rule_body_limit(state))
+            } else {
+                Err(error)
+            }
+        })
         .map(|(body, resolved)| {
             let display = resolved.to_string_lossy().into_owned();
             (body, display)
@@ -115,30 +186,60 @@ pub(super) fn read_rule_file_candidate(
 pub(super) fn read_rule_file_path(
     path: &Path,
     meta: &RequestMeta,
+    limit: usize,
 ) -> io::Result<(Vec<u8>, PathBuf)> {
     if path.is_dir() {
-        let resolved = path.join(mock_directory_relative_path(meta));
-        return fs::read(&resolved).map(|body| (body, resolved));
+        let base = fs::canonicalize(path)?;
+        let relative = mock_directory_relative_path(meta)?;
+        let resolved = base.join(&relative);
+        let directory = Dir::open_ambient_dir(path, ambient_authority())?;
+        let file = directory.open(&relative)?;
+        return crate::bounded_io::read_open_file(
+            file,
+            &resolved,
+            limit.min(rsproxy_rules::MAX_RULE_EXTERNAL_VALUE_BYTES),
+            "mock file",
+        )
+        .map(|body| (body, resolved));
     }
-    fs::read(path).map(|body| (body, path.to_path_buf()))
+    crate::bounded_io::read_file(
+        path,
+        limit.min(rsproxy_rules::MAX_RULE_EXTERNAL_VALUE_BYTES),
+        "mock file",
+    )
+    .map(|body| (body, path.to_path_buf()))
 }
 
-pub(super) fn mock_directory_relative_path(meta: &RequestMeta) -> PathBuf {
+pub(super) fn mock_directory_relative_path(meta: &RequestMeta) -> io::Result<PathBuf> {
     let path = UrlParts::parse(&meta.url)
         .map(|url| url.path)
         .unwrap_or_else(|_| "/".to_string());
     let mut out = PathBuf::new();
     for segment in path.split('/') {
         let segment = segment.trim();
-        if segment.is_empty() || segment == "." || segment == ".." {
+        if segment.is_empty() {
             continue;
+        }
+        if matches!(segment, "." | "..")
+            || segment.contains(['\\', ':', '\0'])
+            || !is_safe_path_segment(segment)
+        {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                format!("unsafe mock directory URL path segment `{segment}`"),
+            ));
         }
         out.push(segment);
     }
     if out.as_os_str().is_empty() || path.ends_with('/') {
         out.push("index.html");
     }
-    out
+    Ok(out)
+}
+
+fn is_safe_path_segment(segment: &str) -> bool {
+    let mut components = Path::new(segment).components();
+    matches!(components.next(), Some(Component::Normal(_))) && components.next().is_none()
 }
 
 pub(super) fn content_type_for_path(path: &str) -> String {
@@ -191,10 +292,10 @@ pub(super) fn parse_raw_mock_response(bytes: &[u8]) -> io::Result<MockResponse> 
         .trim_end_matches('\r');
     let mut parts = status_line.splitn(3, ' ');
     let version = parts.next().unwrap_or("");
-    if !version.starts_with("HTTP/") {
+    if !matches!(version, "HTTP/1.0" | "HTTP/1.1") {
         return Err(io::Error::new(
             io::ErrorKind::InvalidData,
-            "mock.raw status line must start with HTTP/",
+            "mock.raw status line must use HTTP/1.0 or HTTP/1.1",
         ));
     }
     let status = parts

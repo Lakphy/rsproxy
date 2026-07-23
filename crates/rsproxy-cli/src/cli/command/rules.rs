@@ -4,6 +4,7 @@ use std::path::PathBuf;
 use super::ClientArgs;
 
 #[derive(Args)]
+#[command(disable_help_subcommand = true)]
 pub(crate) struct RulesArgs {
     #[command(flatten)]
     pub(crate) client: ClientArgs,
@@ -14,12 +15,24 @@ pub(crate) struct RulesArgs {
 
 #[derive(Subcommand)]
 pub(crate) enum RulesCommand {
+    /// Browse and search the complete rule-language reference.
+    #[command(
+        long_about = "Print the built-in rule-language index, one exact topic, one category, or deterministic search results. Topic IDs are stable and cover every matcher, condition, action family, rule property, value source, template form, ordering rule, limit, and diagnostic category.",
+        after_help = "EXAMPLES:\n  rsproxy rules help\n  rsproxy rules help action.req.header\n  rsproxy rules help req.header\n  rsproxy rules help conditions\n  rsproxy rules help --search 'response header'\n  rsproxy rules help action.tls --json\n\nUse the canonical IDs printed by the index in scripts. A shorthand is accepted only when it identifies exactly one topic."
+    )]
+    Help(RulesHelpArgs),
     /// Validate rules read from FILE or stdin.
     #[command(
         long_about = "Parse and validate a standalone rule file without changing active rules. If FILE is omitted, all input is read from stdin. Diagnostics include the source line and parser guidance.",
-        after_help = "EXAMPLES:\n  rsproxy rules check ./debug.rules\n  printf '%s\n' 'example.test status(503)' | rsproxy rules check\n\nA successful check prints the number of parsed rules."
+        after_help = "EXAMPLES:\n  rsproxy rules check ./debug.rules\n  printf '%s\n' '@language 3' 'example.test status(503)' | rsproxy rules check\n\nA successful check prints the number of parsed rules. Use `rules migrate` to upgrade older sources."
     )]
     Check(RulesCheckArgs),
+    /// Upgrade an unversioned/v2 rule source to canonical v3 syntax.
+    #[command(
+        long_about = "Add the required @language 3 directive and rewrite known compatibility aliases to canonical v3 action and condition names. Input is read from FILE or stdin. Output is written to stdout unless --write is supplied.",
+        after_help = "EXAMPLES:\n  rsproxy rules migrate ./debug.rules\n  rsproxy rules migrate ./debug.rules --write\n  cat old.rules | rsproxy rules migrate > new.rules\n\nThe migrated output is validated with the strict v3 parser before it is emitted or written."
+    )]
+    Migrate(RulesMigrateArgs),
     /// List rule groups.
     #[command(
         name = "ls",
@@ -43,7 +56,7 @@ pub(crate) enum RulesCommand {
     /// Replace a rule group from FILE or stdin (defaults to `default`).
     #[command(
         long_about = "Validate and atomically replace one rule group. Read from --file when supplied; otherwise read the complete rule text from stdin. The group name defaults to `default`.",
-        after_help = "EXAMPLES:\n  rsproxy rules set default --file ./debug.rules\n  rsproxy rules set mobile --file ./mobile.rules\n  printf '%s\n' 'example.test status(503)' | rsproxy rules set\n\nUse `rules check FILE` first when preparing a larger ruleset."
+        after_help = "EXAMPLES:\n  rsproxy rules set default --file ./debug.rules\n  rsproxy rules set mobile --file ./mobile.rules\n  printf '%s\n' '@language 3' 'example.test status(503)' | rsproxy rules set\n\nUse `rules check FILE` first when preparing a larger ruleset."
     )]
     Set(RulesSetArgs),
     /// Remove a rule group.
@@ -68,10 +81,10 @@ pub(crate) enum RulesCommand {
         after_help = "EXAMPLES:\n  rsproxy rules disable mobile\n  rsproxy rules ls"
     )]
     Disable(RequiredGroupArgs),
-    /// Detect rules shadowed by earlier, broader rules.
+    /// Detect provably ineffective or contradictory rules.
     #[command(
-        long_about = "Compile rules and report later rules that can never take effect because an earlier, condition-free rule with a broader matcher always wins their single-action family first. Rules resolve in group order then line order (first match wins per family), so a leading wildcard rule silently swallows more specific rules below it. With --file, lint that standalone file; otherwise lint enabled groups from the daemon or selected storage.",
-        after_help = "EXAMPLES:\n  rsproxy rules lint\n  rsproxy rules lint --file ./candidate.rules\n\nEXIT STATUS:\n  0 when no shadowed rules are found; 1 when findings exist.\n\nThe check is conservative: it only reports provable shadowing, so a clean run does not guarantee the ordering is correct. Put specific rules above broader wildcard rules within a group."
+        long_about = "Compile rules and report conservative, provable problems: earlier broader rules shadowing later single-action families; repeated single-action families; contradictory positive/negative method, status, environment, or constant-chance conditions; request-only actions guarded by required response metadata; actions suppressed by an earlier same-rule skip; mutually exclusive local responses; response actions bypassed by a local response; and upstream routes overridden by direct. With --file, lint that standalone file; otherwise lint enabled groups from the daemon or selected storage.",
+        after_help = "EXAMPLES:\n  rsproxy rules lint\n  rsproxy rules lint --file ./candidate.rules\n  rsproxy rules lint --file ./candidate.rules --json\n\nEXIT STATUS:\n  0 when no findings are found and the report is complete; 1 when findings exist or a published lint budget makes the report incomplete.\n\nThe check is deliberately conservative: it does not guess about regex overlap, ambiguous any(...) alternatives, dynamic environment contents, or cross-rule action capabilities, so a clean run is not a completeness proof. Put specific rules above broader wildcard rules and keep one action per single-action family in each rule."
     )]
     Lint(RulesSourceArgs),
     /// Print rule index statistics.
@@ -95,6 +108,18 @@ pub(crate) enum RulesCommand {
 }
 
 #[derive(Args)]
+pub(crate) struct RulesHelpArgs {
+    /// Exact topic ID, unambiguous shorthand, or category (matchers, conditions, actions,
+    /// properties, concepts).
+    #[arg(value_name = "TOPIC", conflicts_with = "search")]
+    pub(crate) topic: Option<String>,
+    /// Search topic IDs, aliases, syntax, summaries, and notes. All whitespace-separated terms
+    /// must match; results retain stable index order.
+    #[arg(long, short = 's', value_name = "TERMS", conflicts_with = "topic")]
+    pub(crate) search: Option<String>,
+}
+
+#[derive(Args)]
 pub(crate) struct RulesListArgs {}
 
 #[derive(Args)]
@@ -102,6 +127,16 @@ pub(crate) struct RulesCheckArgs {
     /// Rule file to validate. Omit FILE to read rule text from stdin.
     #[arg(value_name = "FILE")]
     pub(crate) file: Option<PathBuf>,
+}
+
+#[derive(Args)]
+pub(crate) struct RulesMigrateArgs {
+    /// Rule file to migrate. Omit FILE to read rule text from stdin.
+    #[arg(value_name = "FILE")]
+    pub(crate) file: Option<PathBuf>,
+    /// Atomically replace FILE with the migrated v3 source.
+    #[arg(long, requires = "file")]
+    pub(crate) write: bool,
 }
 
 #[derive(Args)]

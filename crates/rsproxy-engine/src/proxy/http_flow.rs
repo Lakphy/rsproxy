@@ -187,28 +187,57 @@ pub(super) fn handle_http_stream_inner<W: WsIo + Send>(
     if let Some((status, rule)) = first_status(&resolved.actions) {
         session.status = Some(status);
         session.flags.push("status".to_string());
-        let body = format!(
-            "rsproxy status({status}) from {}:{}\n",
-            rule.rule.group, rule.rule.line
-        );
-        session.response_bytes = body.len() as u64;
+        let body = if http::status_can_send_content(status) {
+            format!(
+                "rsproxy status({status}) from {}:{}\n",
+                rule.rule.group, rule.rule.line
+            )
+        } else {
+            String::new()
+        };
+        let body_allowed = http::response_can_send_content(&req.method, status);
+        session.response_bytes = if body_allowed { body.len() as u64 } else { 0 };
         session.res_body_head = body
             .as_bytes()
             .iter()
             .copied()
-            .take(state.config.trace_body_limit)
+            .take(if body_allowed {
+                state.config.trace_body_limit
+            } else {
+                0
+            })
             .collect();
+        let mut headers = Vec::new();
+        if http::status_can_send_content(status) {
+            headers.push(("Content-Type".to_string(), "text/plain".to_string()));
+        }
         apply_client_connection_flag(&mut session, &req.version, short_circuit_connection);
         session.finish();
-        http::write_response_with_version_and_connection(
-            &mut *client,
-            client_response_version(&req.version),
-            status,
-            http::reason_phrase(status),
-            &[("Content-Type".to_string(), "text/plain".to_string())],
-            body.as_bytes(),
-            short_circuit_connection.keep_alive(),
-        )?;
+        if req.method.eq_ignore_ascii_case("HEAD") && http::status_can_send_content(status) {
+            http::set_header(&mut headers, "Content-Length", body.len().to_string());
+            http::write_response_head_with_connection(
+                &mut *client,
+                &http::RawResponseHead {
+                    version: client_response_version(&req.version).to_string(),
+                    status,
+                    reason: http::reason_phrase(status).to_string(),
+                    headers: Vec::new(),
+                },
+                &headers,
+                short_circuit_connection.keep_alive(),
+            )?;
+            client.flush()?;
+        } else {
+            http::write_response_with_version_and_connection(
+                &mut *client,
+                client_response_version(&req.version),
+                status,
+                http::reason_phrase(status),
+                &headers,
+                if body_allowed { body.as_bytes() } else { b"" },
+                short_circuit_connection.keep_alive(),
+            )?;
+        }
         if record_session_if_visible(state, session, hidden) {
             trace_abort.disarm();
         }
@@ -238,32 +267,59 @@ pub(super) fn handle_http_stream_inner<W: WsIo + Send>(
     if let Some(mock) = first_mock(&resolved.actions, &meta, state)? {
         session.status = Some(mock.status);
         session.flags.push("mock".to_string());
-        session.response_bytes = mock.body.len() as u64;
-        session.res_headers = mock.headers.clone();
-        if http::header(&session.res_headers, "content-length").is_none() {
-            session
-                .res_headers
-                .push(("Content-Length".to_string(), mock.body.len().to_string()));
+        let body_allowed = http::response_can_send_content(&req.method, mock.status);
+        session.response_bytes = if body_allowed {
+            mock.body.len() as u64
+        } else {
+            0
+        };
+        let mut response_headers = mock.headers.clone();
+        if http::status_can_send_content(mock.status) {
+            http::set_header(
+                &mut response_headers,
+                "Content-Length",
+                mock.body.len().to_string(),
+            );
         }
+        session.res_headers = response_headers.clone();
         let res_trace_body_limit =
             trace_body_limit_for_headers(&state.config, &session.res_headers);
         session.res_body_head = mock
             .body
             .iter()
             .copied()
-            .take(res_trace_body_limit)
+            .take(if body_allowed {
+                res_trace_body_limit
+            } else {
+                0
+            })
             .collect();
         apply_client_connection_flag(&mut session, &req.version, short_circuit_connection);
         session.finish();
-        http::write_response_with_version_and_connection(
-            &mut *client,
-            client_response_version(&req.version),
-            mock.status,
-            &mock.reason,
-            &mock.headers,
-            &mock.body,
-            short_circuit_connection.keep_alive(),
-        )?;
+        if req.method.eq_ignore_ascii_case("HEAD") && http::status_can_send_content(mock.status) {
+            http::write_response_head_with_connection(
+                &mut *client,
+                &http::RawResponseHead {
+                    version: client_response_version(&req.version).to_string(),
+                    status: mock.status,
+                    reason: mock.reason.clone(),
+                    headers: Vec::new(),
+                },
+                &response_headers,
+                short_circuit_connection.keep_alive(),
+            )?;
+            client.flush()?;
+        } else {
+            http::write_response_with_version_and_connection(
+                &mut *client,
+                client_response_version(&req.version),
+                mock.status,
+                &mock.reason,
+                &response_headers,
+                if body_allowed { &mock.body } else { b"" },
+                short_circuit_connection.keep_alive(),
+            )?;
+        }
         if record_session_if_visible(state, session, hidden) {
             trace_abort.disarm();
         }

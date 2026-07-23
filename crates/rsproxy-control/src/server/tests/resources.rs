@@ -102,6 +102,23 @@ fn value_ca_trace_and_fallback_routes_cover_success_and_error_contracts() {
         assert_eq!(status(&response), expected_status);
         assert_eq!(response_body(&response), expected_body);
     }
+    fs::write(
+        state.options.storage.join("values/oversized"),
+        vec![b'x'; rsproxy_rules::MAX_RULE_EXTERNAL_VALUE_BYTES + 1],
+    )
+    .unwrap();
+    let mut oversized = Vec::new();
+    dispatch(
+        &mut oversized,
+        &request("GET", "/api/values/oversized", &[]),
+        &state,
+    )
+    .unwrap();
+    assert_eq!(status(&oversized), 413);
+    assert_eq!(
+        response_body(&oversized),
+        "{\"error\":\"value exceeds size limit\"}"
+    );
     let mut deleted = Vec::new();
     dispatch(
         &mut deleted,

@@ -3,9 +3,11 @@ use super::*;
 const SMALL_BODY_LIMIT: usize = 64 * 1024;
 
 mod body;
+mod empty;
 mod result;
 
 use body::*;
+use empty::*;
 use result::*;
 
 pub(super) struct FastResponseOutcome {
@@ -48,11 +50,12 @@ pub(super) fn finish<W: WsIo + Send>(
         deadline: forward.deadline,
         reusable,
     };
-    let body_allowed = !context.request.method.eq_ignore_ascii_case("HEAD")
-        && !(100..200).contains(&head.status)
-        && !matches!(head.status, 204 | 304);
+    let body_allowed = http::response_has_framed_body(&context.request.method, head.status);
     if !body_allowed {
         return finish_without_body(client, &context, head);
+    }
+    if head.status == 205 {
+        return finish_reset_content(client, &context, head, connection);
     }
     if is_sse_response(&head.headers) {
         return finish_sse(client, &context, head, connection);
@@ -100,40 +103,6 @@ pub(super) fn finish<W: WsIo + Send>(
     }
     head.version = client_response_version(&context.request.version).to_string();
     finish_close_delimited(client, &context, head, connection)
-}
-
-fn finish_without_body<W: WsIo + Send>(
-    client: &mut W,
-    context: &FastResponseContext<'_>,
-    mut head: http::RawResponseHead,
-) -> io::Result<FastResponseOutcome> {
-    let mut headers = head.headers.clone();
-    strip_hop_by_hop_headers(&mut headers);
-    head.version = client_response_version(&context.request.version).to_string();
-    emit_response(context.state, context.trace_id, head.status, &headers, &[]);
-    http::write_response_head_with_connection(
-        client,
-        &head,
-        &headers,
-        context.client_connection.keep_alive(),
-    )?;
-    client.flush()?;
-    Ok(FastResponseOutcome {
-        result: result(
-            context,
-            &head,
-            ResultPayload {
-                headers,
-                trailers: Vec::new(),
-                summary: BodySummary::empty(),
-                client_connection: context.client_connection,
-                response_receive_ms: Some(0),
-                kind: None,
-                frames: Vec::new(),
-            },
-        ),
-        reusable: context.reusable,
-    })
 }
 
 fn finish_fixed<W: WsIo + Send>(
@@ -207,12 +176,29 @@ fn finish_chunked<W: WsIo + Send>(
     mut head: http::RawResponseHead,
     connection: &mut FastConnection,
 ) -> io::Result<FastResponseOutcome> {
-    let declared_trailers = http::header(&head.headers, "trailer").map(str::to_string);
+    let mut declared_trailers = head
+        .headers
+        .iter()
+        .filter(|(name, _)| name.eq_ignore_ascii_case("trailer"))
+        .flat_map(|(_, value)| value.split(','))
+        .map(str::trim)
+        .filter(|name| !name.is_empty())
+        .map(|name| (name.to_string(), String::new()))
+        .collect::<Vec<_>>();
+    sanitize_upstream_trailers(&mut declared_trailers, &head.headers);
     let mut headers = head.headers.clone();
     strip_hop_by_hop_headers(&mut headers);
     http::set_header(&mut headers, "Transfer-Encoding", "chunked".to_string());
-    if let Some(declared) = declared_trailers {
-        http::set_header(&mut headers, "Trailer", declared);
+    if !declared_trailers.is_empty() {
+        http::set_header(
+            &mut headers,
+            "Trailer",
+            declared_trailers
+                .iter()
+                .map(|(name, _)| name.as_str())
+                .collect::<Vec<_>>()
+                .join(", "),
+        );
     }
     head.version = client_response_version(&context.request.version).to_string();
     emit_response(context.state, context.trace_id, head.status, &headers, &[]);
@@ -228,7 +214,7 @@ fn finish_chunked<W: WsIo + Send>(
         &headers,
     ));
     let mut trace = body_trace(context.state, context.trace_id, summary.limit);
-    let trailers = match relay_chunked(
+    let mut trailers = match relay_chunked(
         &mut connection.reader,
         client,
         &mut summary,
@@ -253,6 +239,7 @@ fn finish_chunked<W: WsIo + Send>(
             ));
         }
     };
+    let dropped_forbidden_trailer = sanitize_upstream_trailers(&mut trailers, &head.headers);
     if let Err(error) = write_chunk_end(client, &trailers).and_then(|()| client.flush()) {
         return Ok(body_error_result(
             context,
@@ -267,20 +254,26 @@ fn finish_chunked<W: WsIo + Send>(
             },
         ));
     }
+    let mut result = result(
+        context,
+        &head,
+        ResultPayload {
+            headers,
+            trailers,
+            summary,
+            client_connection: context.client_connection,
+            response_receive_ms: Some(duration_millis(started.elapsed())),
+            kind: None,
+            frames: Vec::new(),
+        },
+    );
+    if dropped_forbidden_trailer {
+        result
+            .flags
+            .push("forbidden-upstream-trailer-dropped".to_string());
+    }
     Ok(FastResponseOutcome {
-        result: result(
-            context,
-            &head,
-            ResultPayload {
-                headers,
-                trailers,
-                summary,
-                client_connection: context.client_connection,
-                response_receive_ms: Some(duration_millis(started.elapsed())),
-                kind: None,
-                frames: Vec::new(),
-            },
-        ),
+        result,
         reusable: context.reusable,
     })
 }

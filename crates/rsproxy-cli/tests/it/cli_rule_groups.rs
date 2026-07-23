@@ -50,12 +50,12 @@ fn offline_cli_manages_ordered_rule_groups_end_to_end() {
     success(run(
         &storage,
         &["rules", "set", "default"],
-        Some("example.test status(201)"),
+        Some("@language 3\nexample.test status(201)"),
     ));
     success(run(
         &storage,
         &["rules", "set", "override"],
-        Some("example.test status(202) @important"),
+        Some("@language 3\nexample.test status(202) @important"),
     ));
 
     let list = success(run(&storage, &["rules", "ls", "--json"], None));
@@ -70,8 +70,8 @@ fn offline_cli_manages_ordered_rule_groups_end_to_end() {
         &["rules", "test", "http://example.test/"],
         None,
     ));
-    assert!(fallback.contains("default:1 status(201)"));
-    assert!(!fallback.contains("override:1 status(202)"));
+    assert!(fallback.contains("default:2 status(201)"));
+    assert!(!fallback.contains("override:2 status(202)"));
 
     success(run(&storage, &["rules", "enable", "override"], None));
     let overridden = success(run(
@@ -79,7 +79,7 @@ fn offline_cli_manages_ordered_rule_groups_end_to_end() {
         &["rules", "test", "http://example.test/"],
         None,
     ));
-    assert!(overridden.contains("override:1 status(202)"));
+    assert!(overridden.contains("override:2 status(202)"));
 
     success(run(&storage, &["rules", "rm", "override"], None));
     let list = success(run(&storage, &["rules", "ls", "--json"], None));
@@ -90,7 +90,7 @@ fn offline_cli_manages_ordered_rule_groups_end_to_end() {
     success(run(
         &storage,
         &["rules", "set", "default"],
-        Some("example.test res.header(x-template: ${statusCode}|${resH.x-origin})"),
+        Some("@language 3\nexample.test res.header(x-template: ${statusCode}|${resH.x-origin})"),
     ));
     let response_explain = success(run(
         &storage,

@@ -7,12 +7,13 @@ pub(super) fn apply_req_cookie(
     meta: &RequestMeta,
     state: &SharedState,
 ) -> io::Result<()> {
+    let limit = rule_header_limit(state);
     let mut cookies = http::header(headers, "cookie")
         .map(parse_cookie_header)
         .unwrap_or_default();
     match op {
         CookieOp::Set { name, value, .. } => {
-            let value = resolve_value_text(value, item, meta, state)?;
+            let value = resolve_value_text_bounded(value, item, meta, state, limit)?;
             if let Some((_, existing)) = cookies.iter_mut().find(|(key, _)| key == name) {
                 *existing = value;
             } else {
@@ -24,15 +25,7 @@ pub(super) fn apply_req_cookie(
     if cookies.is_empty() {
         http::remove_header(headers, "cookie");
     } else {
-        http::set_header(
-            headers,
-            "Cookie",
-            cookies
-                .into_iter()
-                .map(|(key, value)| format!("{key}={value}"))
-                .collect::<Vec<_>>()
-                .join("; "),
-        );
+        http::set_header(headers, "Cookie", render_request_cookies(&cookies, limit)?);
     }
     Ok(())
 }
@@ -44,9 +37,10 @@ pub(super) fn apply_res_cookie(
     meta: &RequestMeta,
     state: &SharedState,
 ) -> io::Result<()> {
+    let limit = rule_header_limit(state);
     match op {
         CookieOp::Set { name, value, attrs } => {
-            let value = resolve_value_text(value, item, meta, state)?;
+            let value = resolve_value_text_bounded(value, item, meta, state, limit)?;
             headers.push((
                 "Set-Cookie".to_string(),
                 render_set_cookie(name, &value, attrs, item, meta, state)?,
@@ -71,18 +65,37 @@ pub(super) fn render_set_cookie(
     meta: &RequestMeta,
     state: &SharedState,
 ) -> io::Result<String> {
-    let mut out = format!("{name}={value}");
+    let limit = rule_header_limit(state);
+    let mut out = String::new();
+    push_text_bounded(&mut out, name, limit, "Set-Cookie value")?;
+    push_text_bounded(&mut out, "=", limit, "Set-Cookie value")?;
+    push_text_bounded(&mut out, value, limit, "Set-Cookie value")?;
     if attrs.is_empty() {
-        out.push_str("; Path=/");
+        push_text_bounded(&mut out, "; Path=/", limit, "Set-Cookie value")?;
         return Ok(out);
     }
     for attr in attrs {
-        out.push_str("; ");
-        out.push_str(&attr.name);
+        push_text_bounded(&mut out, "; ", limit, "Set-Cookie value")?;
+        push_text_bounded(&mut out, &attr.name, limit, "Set-Cookie value")?;
         if let Some(value) = &attr.value {
-            out.push('=');
-            out.push_str(&resolve_value_text(value, item, meta, state)?);
+            push_text_bounded(&mut out, "=", limit, "Set-Cookie value")?;
+            let remaining = remaining_capacity(out.len(), limit, "Set-Cookie value")?;
+            let value = resolve_value_text_bounded(value, item, meta, state, remaining)?;
+            push_text_bounded(&mut out, &value, limit, "Set-Cookie value")?;
         }
+    }
+    Ok(out)
+}
+
+fn render_request_cookies(cookies: &[(String, String)], limit: usize) -> io::Result<String> {
+    let mut out = String::new();
+    for (index, (name, value)) in cookies.iter().enumerate() {
+        if index > 0 {
+            push_text_bounded(&mut out, "; ", limit, "Cookie header")?;
+        }
+        push_text_bounded(&mut out, name, limit, "Cookie header")?;
+        push_text_bounded(&mut out, "=", limit, "Cookie header")?;
+        push_text_bounded(&mut out, value, limit, "Cookie header")?;
     }
     Ok(out)
 }

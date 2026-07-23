@@ -2,6 +2,8 @@ use super::*;
 
 mod conditions;
 mod delete;
+mod error;
+mod lexer;
 mod matcher;
 mod metadata;
 mod migration_hints;
@@ -10,8 +12,22 @@ mod syntax;
 mod tls;
 mod transforms;
 
-use conditions::*;
+/// Hard source-line bound used before tokenization or regex compilation.
+///
+/// Keeping the limit at the fuzzing contract's maximum makes accepted input
+/// explicit while preventing one accidental/generated line from consuming
+/// unbounded parser memory.
+pub(super) const MAX_RULE_LINE_BYTES: usize = MAX_RULE_SOURCE_LINE_BYTES;
+
+/// Maximum recursive matcher/condition and delimiter nesting accepted by the DSL.
+pub(super) const MAX_PARSE_NESTING: usize = MAX_RULE_PARSE_NESTING;
+
+use crate::family::normalize_skip_family;
+use conditions::parse_condition;
+pub(super) use conditions::{body_condition_count, condition_node_count};
 use delete::parse_delete_ops;
+use error::{ParseRuleError, parse_error, validate_status_range};
+pub(super) use lexer::{RuleToken, tokenize};
 use matcher::{parse_matcher, parse_regex_matcher};
 use metadata::*;
 use migration_hints::whistle_syntax_hint;
@@ -20,13 +36,22 @@ pub(super) use syntax::*;
 use tls::parse_tls_op;
 use transforms::*;
 
-pub(super) struct ParseRuleError {
-    pub(super) code: RuleErrorCode,
-    pub(super) source: RuleModelError,
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum SyntaxProfile {
+    /// Headerless, programmatic sources retain v2 aliases for API compatibility.
+    Compatible,
+    /// Versioned v3 sources accept canonical spellings only.
+    CanonicalV3,
 }
 
-pub(super) fn parse_rule(group: &str, line: usize, input: &str) -> Result<Rule, ParseRuleError> {
-    let tokens = tokenize(input).map_err(|source| parse_error(RuleErrorCode::Syntax, source))?;
+pub(super) fn parse_rule(
+    group: &str,
+    line: usize,
+    input: &str,
+    profile: SyntaxProfile,
+) -> Result<Rule, ParseRuleError> {
+    let tokens = tokenize(input)
+        .map_err(|source| parse_error(RuleErrorCode::Syntax, source).with_span(0, input.len()))?;
     if tokens.is_empty() {
         return Err(parse_error(
             RuleErrorCode::Syntax,
@@ -34,18 +59,20 @@ pub(super) fn parse_rule(group: &str, line: usize, input: &str) -> Result<Rule, 
         ));
     }
 
-    let matcher =
-        parse_matcher(&tokens[0]).map_err(|source| parse_error(RuleErrorCode::Matcher, source))?;
+    let matcher = parse_matcher(&tokens[0].text)
+        .map_err(|source| parse_error(RuleErrorCode::Matcher, source).at_token(&tokens[0]))?;
     let mut actions = Vec::new();
     let mut conditions = Vec::new();
+    let mut condition_nodes = 0usize;
     let mut important = false;
     let mut disabled = false;
     let mut tags = Vec::new();
+    let mut properties = 0usize;
     let mut idx = 1;
 
     while idx < tokens.len() {
         let token = &tokens[idx];
-        if token == "when" {
+        if token.text == "when" {
             idx += 1;
             let cond = tokens.get(idx).ok_or_else(|| {
                 parse_error(
@@ -56,29 +83,66 @@ pub(super) fn parse_rule(group: &str, line: usize, input: &str) -> Result<Rule, 
                     ),
                 )
             })?;
-            conditions.push(
-                parse_condition(cond)
-                    .map_err(|source| parse_error(RuleErrorCode::Condition, source))?,
-            );
-        } else if let Some(prop) = token.strip_prefix('@') {
-            match prop {
-                "important" => important = true,
-                "disabled" => disabled = true,
-                _ if prop.starts_with("tag:") => tags.push(prop[4..].to_string()),
+            let condition = parse_condition(&cond.text, profile)
+                .map_err(|source| parse_error(RuleErrorCode::Condition, source).at_token(cond))?;
+            condition_nodes = condition_nodes.saturating_add(condition_node_count(&condition));
+            if condition_nodes > MAX_RULE_CONDITION_NODES_PER_RULE {
+                return Err(parse_error(
+                    RuleErrorCode::Condition,
+                    RuleModelError::limit(
+                        "condition count",
+                        format!(
+                            "rule exceeds the {MAX_RULE_CONDITION_NODES_PER_RULE}-condition-node limit"
+                        ),
+                    ),
+                ));
+            }
+            conditions.push(condition);
+        } else if token.text.starts_with('@') {
+            properties += 1;
+            if properties > MAX_RULE_PROPERTIES_PER_RULE {
+                return Err(parse_error(
+                    RuleErrorCode::Property,
+                    RuleModelError::limit(
+                        "property count",
+                        format!("rule exceeds the {MAX_RULE_PROPERTIES_PER_RULE}-property limit"),
+                    ),
+                ));
+            }
+            match language::canonical_property(&token.text) {
+                Some(("@important", _)) => important = true,
+                Some(("@disabled", _)) => disabled = true,
+                Some(("@tag:", "")) => {
+                    return Err(parse_error(
+                        RuleErrorCode::Property,
+                        RuleModelError::missing("rule tag", "@tag: requires a non-empty name"),
+                    ));
+                }
+                Some(("@tag:", name)) => tags.push(name.to_string()),
                 _ => {
                     return Err(parse_error(
                         RuleErrorCode::Property,
                         RuleModelError::unsupported(
                             "rule property",
-                            format!("unknown property @{prop}"),
+                            format!("unknown property {}", token.text),
                         ),
                     ));
                 }
             }
         } else {
-            actions.push(
-                parse_action(token).map_err(|source| parse_error(RuleErrorCode::Action, source))?,
-            );
+            if actions.len() == MAX_RULE_ACTIONS_PER_RULE {
+                return Err(parse_error(
+                    RuleErrorCode::Action,
+                    RuleModelError::limit(
+                        "action count",
+                        format!("rule exceeds the {MAX_RULE_ACTIONS_PER_RULE}-action limit"),
+                    ),
+                ));
+            }
+            actions
+                .push(parse_action(&token.text, profile).map_err(|source| {
+                    parse_error(RuleErrorCode::Action, source).at_token(token)
+                })?);
         }
         idx += 1;
     }
@@ -91,9 +155,9 @@ pub(super) fn parse_rule(group: &str, line: usize, input: &str) -> Result<Rule, 
     }
 
     Ok(Rule {
-        group: group.to_string(),
+        group: Arc::from(group),
         line,
-        raw: input.to_string(),
+        raw: Arc::from(input),
         matcher,
         actions,
         conditions,
@@ -103,22 +167,38 @@ pub(super) fn parse_rule(group: &str, line: usize, input: &str) -> Result<Rule, 
     })
 }
 
-fn parse_error(code: RuleErrorCode, source: RuleModelError) -> ParseRuleError {
-    ParseRuleError { code, source }
-}
-
-fn parse_action(input: &str) -> Result<Action, RuleModelError> {
-    match input {
-        "direct" => return Ok(Action::Direct),
-        "bypass" => return Ok(Action::Bypass),
-        "hide" => return Ok(Action::Hide),
+fn parse_action(input: &str, profile: SyntaxProfile) -> Result<Action, RuleModelError> {
+    let canonical_name = |name| match profile {
+        SyntaxProfile::Compatible => canonical_action_name(name),
+        SyntaxProfile::CanonicalV3 => language::canonical_v3_action_name(name),
+    };
+    match canonical_name(input) {
+        Some("direct") => return Ok(Action::Direct),
+        Some("bypass") => return Ok(Action::Bypass),
+        Some("hide") => return Ok(Action::Hide),
         _ => {}
     }
     if let Some(hint) = whistle_syntax_hint(input) {
         return Err(RuleModelError::unsupported("action", hint));
     }
 
-    let (name, args) = parse_call(input)?;
+    let (input_name, args) = parse_call(input)?;
+    let Some(name) = canonical_name(input_name) else {
+        if profile == SyntaxProfile::CanonicalV3
+            && let Some(canonical) = canonical_action_name(input_name)
+        {
+            return Err(RuleModelError::unsupported(
+                "action",
+                format!(
+                    "v3 accepts canonical action names only; replace `{input_name}` with `{canonical}`"
+                ),
+            ));
+        }
+        return Err(RuleModelError::unsupported(
+            "action",
+            format!("unknown action `{input_name}`"),
+        ));
+    };
     let action = match name {
         "host" => Ok(Action::Host(HostPool::new(
             args.iter()
@@ -140,19 +220,25 @@ fn parse_action(input: &str) -> Result<Action, RuleModelError> {
             Ok(Action::Upstream(value))
         }
         "mock" => parse_mock(&args),
-        "map.remote" | "mapRemote" | "map_remote" | "map-remote" => {
+        "map.remote" => {
             let value = parse_value(require_one(&args, "map.remote")?)?;
             validate_map_remote_target(&value)?;
             Ok(Action::MapRemote(value))
         }
-        "mock.raw" | "mockRaw" | "mock_raw" | "mock-raw" => Ok(Action::MockRaw(parse_value(
-            require_one(&args, "mock.raw")?,
-        )?)),
+        "mock.raw" => Ok(Action::MockRaw(parse_value(require_one(
+            &args, "mock.raw",
+        )?)?)),
         "status" => {
             let raw = require_one(&args, "status")?;
             let code = raw.parse::<u16>().map_err(|source| {
                 RuleModelError::integer("status code", raw, "status code must be numeric", source)
             })?;
+            validate_status_range(
+                code,
+                MIN_FINAL_HTTP_STATUS..=MAX_HTTP_STATUS,
+                "status code",
+                "200..599",
+            )?;
             Ok(Action::Status(code))
         }
         "redirect" => {
@@ -174,10 +260,25 @@ fn parse_action(input: &str) -> Result<Action, RuleModelError> {
             } else {
                 302
             };
-            Ok(Action::Redirect {
-                url: parse_value(args[0])?,
-                code,
-            })
+            if args.len() > 2 {
+                return Err(RuleModelError::constraint(
+                    "redirect action",
+                    "redirect accepts URL and at most one status code",
+                ));
+            }
+            if !REDIRECT_STATUSES.contains(&code) {
+                return Err(RuleModelError::constraint(
+                    "redirect code",
+                    "redirect code must be one of 301, 302, 303, 307, or 308",
+                ));
+            }
+            let url = parse_value(args[0])?;
+            if let Value::Inline(location) = &url
+                && !location.contains('$')
+            {
+                validate_redirect_location(location)?;
+            }
+            Ok(Action::Redirect { url, code })
         }
         "req.header" => Ok(Action::ReqHeader(parse_header_op(require_call_body(
             input,
@@ -197,6 +298,12 @@ fn parse_action(input: &str) -> Result<Action, RuleModelError> {
                     source,
                 )
             })?;
+            validate_status_range(
+                code,
+                MIN_FINAL_HTTP_STATUS..=MAX_HTTP_STATUS,
+                "response status code",
+                "200..599",
+            )?;
             Ok(Action::ResStatus(code))
         }
         "req.method" => Ok(Action::ReqMethod(parse_value(require_one(
@@ -242,16 +349,25 @@ fn parse_action(input: &str) -> Result<Action, RuleModelError> {
             &args,
             "res.merge",
         )?)?)),
-        "res.trailer" => Ok(Action::ResTrailer(parse_header_op(require_call_body(
-            input,
-            "res.trailer",
-        )?)?)),
-        "attachment" => Ok(Action::Attachment(
-            args.first()
-                .filter(|value| !value.trim().is_empty())
-                .map(|value| parse_value(value))
-                .transpose()?,
-        )),
+        "res.trailer" => {
+            let operation = parse_header_op(require_call_body(input, "res.trailer")?)?;
+            validate_trailer_op(&operation)?;
+            Ok(Action::ResTrailer(operation))
+        }
+        "attachment" => {
+            if args.len() > 1 {
+                return Err(RuleModelError::constraint(
+                    "attachment action",
+                    "attachment accepts at most one filename",
+                ));
+            }
+            Ok(Action::Attachment(
+                args.first()
+                    .filter(|value| !value.trim().is_empty())
+                    .map(|value| parse_value(value))
+                    .transpose()?,
+            ))
+        }
         "cache" => Ok(Action::Cache(parse_cache_op(&args)?)),
         "tls" => Ok(Action::Tls(parse_tls_op(&args)?)),
         "url.rewrite" => {
@@ -346,7 +462,22 @@ fn parse_action(input: &str) -> Result<Action, RuleModelError> {
             })
         }
         "tag" => Ok(Action::Tag(parse_value(require_one(&args, "tag")?)?)),
-        "skip" => Ok(Action::Skip(args.iter().map(|s| unquote(s)).collect())),
+        "skip" => {
+            let mut families = ActionFamilySet::EMPTY;
+            for family in &args {
+                let family = normalize_skip_family(&unquote(family));
+                let Some(selected) = ActionFamilySet::from_prefix(&family) else {
+                    return Err(RuleModelError::unsupported(
+                        "skip action family",
+                        format!(
+                            "unknown skip family `{family}`; use an action family, a parent such as `res.body`, `all`, or `*`"
+                        ),
+                    ));
+                };
+                families.union(selected);
+            }
+            Ok(Action::Skip(families))
+        }
         _ => Err(RuleModelError::unsupported(
             "action",
             format!("unknown action `{name}`"),

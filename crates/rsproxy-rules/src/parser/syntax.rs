@@ -14,7 +14,7 @@ pub(crate) fn parse_call(input: &str) -> Result<(&str, Vec<&str>), RuleModelErro
     if name.is_empty() {
         return Err(RuleModelError::empty("call name", "call name is empty"));
     }
-    let args = split_args(&input[open + 1..input.len() - 1]);
+    let args = split_args(&input[open + 1..input.len() - 1])?;
     Ok((name, args))
 }
 
@@ -52,11 +52,22 @@ pub(crate) fn require_call_body<'a>(
 
 pub(crate) fn parse_value(input: &str) -> Result<Value, RuleModelError> {
     let input = input.trim();
+    if input.starts_with('<') != input.ends_with('>') {
+        return Err(RuleModelError::syntax(
+            "file value",
+            "file values must use a paired `<path>` delimiter",
+        ));
+    }
     if let Some(path) = input.strip_prefix('<').and_then(|s| s.strip_suffix('>')) {
         if path.trim().is_empty() {
             Err(RuleModelError::empty(
                 "file value path",
                 "file value path must not be empty",
+            ))
+        } else if path.contains('\0') {
+            Err(RuleModelError::invalid(
+                "file value path",
+                "file value path must not contain NUL",
             ))
         } else {
             Ok(Value::File(path.to_string()))
@@ -96,7 +107,7 @@ pub(crate) fn parse_duration_ms(input: &str) -> Result<u64, RuleModelError> {
                 source,
             )
         })?;
-        Ok((value * 1000.0).round() as u64)
+        checked_scaled_number(value, 1000.0, "duration", input, true)
     } else {
         input.parse::<u64>().map_err(|source| {
             RuleModelError::integer(
@@ -128,7 +139,7 @@ pub(crate) fn parse_speed_bps(input: &str) -> Result<u64, RuleModelError> {
     let value = number.parse::<f64>().map_err(|source| {
         RuleModelError::float("speed", input, format!("invalid speed `{input}`"), source)
     })?;
-    let bytes = (value * multiplier).round() as u64;
+    let bytes = checked_scaled_number(value, multiplier, "speed", input, false)?;
     if bytes == 0 {
         return Err(RuleModelError::constraint(
             "speed",
@@ -138,69 +149,32 @@ pub(crate) fn parse_speed_bps(input: &str) -> Result<u64, RuleModelError> {
     Ok(bytes)
 }
 
-pub(crate) fn tokenize(input: &str) -> Result<Vec<String>, RuleModelError> {
-    let mut tokens = Vec::new();
-    let mut current = String::new();
-    let mut paren_depth = 0usize;
-    let mut quote: Option<char> = None;
-    let mut escaped = false;
-
-    for ch in input.chars() {
-        if escaped {
-            current.push(ch);
-            escaped = false;
-            continue;
-        }
-        if ch == '\\' {
-            current.push(ch);
-            escaped = true;
-            continue;
-        }
-        if let Some(q) = quote {
-            current.push(ch);
-            if ch == q {
-                quote = None;
-            }
-            continue;
-        }
-        match ch {
-            '"' | '\'' => {
-                quote = Some(ch);
-                current.push(ch);
-            }
-            '(' => {
-                paren_depth += 1;
-                current.push(ch);
-            }
-            ')' => {
-                if paren_depth == 0 {
-                    return Err(RuleModelError::syntax("rule", "unmatched `)`"));
-                }
-                paren_depth -= 1;
-                current.push(ch);
-            }
-            c if c.is_whitespace() && paren_depth == 0 => {
-                if !current.is_empty() {
-                    tokens.push(std::mem::take(&mut current));
-                }
-            }
-            _ => current.push(ch),
-        }
+fn checked_scaled_number(
+    value: f64,
+    multiplier: f64,
+    context: &'static str,
+    input: &str,
+    allow_zero: bool,
+) -> Result<u64, RuleModelError> {
+    let scaled = value * multiplier;
+    if !value.is_finite()
+        || value.is_sign_negative()
+        || !scaled.is_finite()
+        || scaled >= u64::MAX as f64
+        || (!allow_zero && scaled < 0.5)
+    {
+        return Err(RuleModelError::constraint(
+            context,
+            format!("{context} `{input}` is outside the supported finite range"),
+        ));
     }
-
-    if quote.is_some() {
-        return Err(RuleModelError::syntax("rule", "unterminated quote"));
-    }
-    if paren_depth != 0 {
-        return Err(RuleModelError::syntax("rule", "unclosed `(`"));
-    }
-    if !current.is_empty() {
-        tokens.push(current);
-    }
-    Ok(tokens)
+    Ok(scaled.round() as u64)
 }
 
-pub(crate) fn split_args(input: &str) -> Vec<&str> {
+pub(crate) fn split_args(input: &str) -> Result<Vec<&str>, RuleModelError> {
+    if input.trim().is_empty() {
+        return Ok(Vec::new());
+    }
     let mut args = Vec::new();
     let mut start = 0usize;
     let mut quote: Option<char> = None;
@@ -209,8 +183,34 @@ pub(crate) fn split_args(input: &str) -> Vec<&str> {
     let mut bracket_depth = 0usize;
     let mut paren_depth = 0usize;
     let mut escaped = false;
+    let mut regex_end = None;
+
+    // Each depth is bounded by the input length, so the sum cannot overflow.
+    let check_nesting = |angle: usize, brace: usize, bracket: usize, paren: usize| {
+        if angle + brace + bracket + paren > MAX_PARSE_NESTING {
+            Err(RuleModelError::limit(
+                "call nesting",
+                format!("call nesting exceeds {MAX_PARSE_NESTING} levels"),
+            ))
+        } else {
+            Ok(())
+        }
+    };
 
     for (idx, ch) in input.char_indices() {
+        if let Some(end) = regex_end {
+            if idx == end {
+                regex_end = None;
+            }
+            continue;
+        }
+        if ch == '/'
+            && begins_regex_value(input, idx)
+            && let Some(end) = regex_end_at_argument_boundary(input, idx)
+        {
+            regex_end = Some(end);
+            continue;
+        }
         if escaped {
             escaped = false;
             continue;
@@ -227,30 +227,154 @@ pub(crate) fn split_args(input: &str) -> Vec<&str> {
         }
         match ch {
             '"' | '\'' => quote = Some(ch),
-            '(' => paren_depth += 1,
-            ')' => paren_depth = paren_depth.saturating_sub(1),
-            '<' => angle_depth += 1,
-            '>' => angle_depth = angle_depth.saturating_sub(1),
-            '{' => brace_depth += 1,
-            '}' => brace_depth = brace_depth.saturating_sub(1),
-            '[' => bracket_depth += 1,
-            ']' => bracket_depth = bracket_depth.saturating_sub(1),
+            '(' => {
+                paren_depth += 1;
+                check_nesting(angle_depth, brace_depth, bracket_depth, paren_depth)?;
+            }
+            ')' => {
+                if paren_depth == 0 {
+                    return Err(RuleModelError::syntax("call argument", "unmatched `)`"));
+                }
+                paren_depth -= 1;
+            }
+            '<' if begins_file_value(input, idx) => {
+                angle_depth += 1;
+                check_nesting(angle_depth, brace_depth, bracket_depth, paren_depth)?;
+            }
+            '>' if angle_depth > 0 => angle_depth -= 1,
+            '{' => {
+                brace_depth += 1;
+                check_nesting(angle_depth, brace_depth, bracket_depth, paren_depth)?;
+            }
+            '}' => {
+                if brace_depth == 0 {
+                    return Err(RuleModelError::syntax("call argument", "unmatched `}`"));
+                }
+                brace_depth -= 1;
+            }
+            '[' => {
+                bracket_depth += 1;
+                check_nesting(angle_depth, brace_depth, bracket_depth, paren_depth)?;
+            }
+            ']' => {
+                if bracket_depth == 0 {
+                    return Err(RuleModelError::syntax("call argument", "unmatched `]`"));
+                }
+                bracket_depth -= 1;
+            }
             ',' if angle_depth == 0
                 && brace_depth == 0
                 && bracket_depth == 0
                 && paren_depth == 0 =>
             {
-                args.push(input[start..idx].trim());
+                push_argument(
+                    &mut args,
+                    input[start..idx].trim(),
+                    "call arguments must not be empty",
+                )?;
                 start = idx + 1;
             }
             _ => {}
         }
     }
-    let tail = input[start..].trim();
-    if !tail.is_empty() {
-        args.push(tail);
+    if quote.is_some() {
+        return Err(RuleModelError::syntax(
+            "call argument",
+            "unterminated quote",
+        ));
     }
-    args
+    for (depth, delimiter) in [
+        (angle_depth, '<'),
+        (brace_depth, '{'),
+        (bracket_depth, '['),
+        (paren_depth, '('),
+    ] {
+        if depth != 0 {
+            return Err(RuleModelError::syntax(
+                "call argument",
+                format!("unclosed `{delimiter}`"),
+            ));
+        }
+    }
+    push_argument(
+        &mut args,
+        input[start..].trim(),
+        "call arguments must not be empty or end with a comma",
+    )?;
+    Ok(args)
+}
+
+fn push_argument<'a>(
+    args: &mut Vec<&'a str>,
+    argument: &'a str,
+    empty_message: &'static str,
+) -> Result<(), RuleModelError> {
+    if argument.is_empty() {
+        return Err(RuleModelError::empty("call argument", empty_message));
+    }
+    if args.len() == MAX_RULE_CALL_ARGUMENTS {
+        return Err(RuleModelError::limit(
+            "call argument count",
+            format!("call exceeds the {MAX_RULE_CALL_ARGUMENTS}-argument limit"),
+        ));
+    }
+    args.push(argument);
+    Ok(())
+}
+
+/// Returns the last non-whitespace character before `index`, if any.
+fn last_non_whitespace_before(input: &str, index: usize) -> Option<char> {
+    input[..index]
+        .chars()
+        .rev()
+        .find(|character| !character.is_whitespace())
+}
+
+fn begins_file_value(input: &str, index: usize) -> bool {
+    last_non_whitespace_before(input, index)
+        .is_none_or(|character| matches!(character, ',' | '(' | '='))
+}
+
+fn begins_regex_value(input: &str, index: usize) -> bool {
+    last_non_whitespace_before(input, index)
+        .is_none_or(|character| matches!(character, ',' | '(' | '=' | '~'))
+}
+
+/// Finds a closing regex delimiter only when it is followed by an argument
+/// boundary. This keeps `/a,b/` as one regex value without mistaking the two
+/// ordinary path arguments in `url.rewrite(/old, /new)` for one regex.
+fn regex_end_at_argument_boundary(input: &str, start: usize) -> Option<usize> {
+    let mut escaped = false;
+    let mut character_class = false;
+    for (offset, character) in input[start + 1..].char_indices() {
+        if escaped {
+            escaped = false;
+            continue;
+        }
+        if character == '\\' {
+            escaped = true;
+            continue;
+        }
+        if character == '[' {
+            character_class = true;
+            continue;
+        }
+        if character == ']' && character_class {
+            character_class = false;
+            continue;
+        }
+        if character == '/' && !character_class {
+            let end = start + 1 + offset;
+            if input[end + 1..]
+                .chars()
+                .find(|character| !character.is_whitespace())
+                .is_none_or(|character| character == ',')
+            {
+                return Some(end);
+            }
+        }
+    }
+    None
 }
 
 pub(crate) fn strip_comment(input: &str) -> Option<String> {

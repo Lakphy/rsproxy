@@ -1,4 +1,5 @@
 use super::*;
+use crate::model::CompiledBodyContainsSet;
 
 #[test]
 fn url_parts_cover_authority_query_origin_and_port_boundaries() {
@@ -38,31 +39,65 @@ fn url_parts_cover_authority_query_origin_and_port_boundaries() {
     assert!(UrlParts::parse("missing-scheme").is_err());
     assert!(UrlParts::parse("http://").is_err());
     assert!(UrlParts::parse("http://:80").is_err());
+    for invalid in [
+        "http://example.test:",
+        "http://example.test:0",
+        "http://example.test:65536",
+        "http://example.test:not-a-port",
+        "http://2001:db8::1/",
+        "http://[not-ipv6]/",
+        "http://user@example.test/",
+        "http://example.test/#fragment",
+    ] {
+        assert!(UrlParts::parse(invalid).is_err(), "{invalid}");
+    }
+
+    for valid in [
+        "/next?ok=1#section",
+        "//cdn.example.test:8443/asset",
+        "https://safe.test:443/path#section",
+    ] {
+        validate_redirect_location(valid).unwrap_or_else(|error| panic!("{valid}: {error}"));
+    }
+    for invalid in [
+        "//cdn.example.test:bad/asset",
+        "https://safe.test:70000/",
+        "javascript:alert(1)",
+        "relative:segment",
+        "/bad%2",
+    ] {
+        assert!(validate_redirect_location(invalid).is_err(), "{invalid}");
+    }
 }
 
 #[test]
 fn low_level_matching_rejects_invalid_and_boundary_patterns() {
     let url = UrlParts::parse("http://api.example.test/path").unwrap();
     assert!(!exact_url_matches("not-a-url", &url));
-    assert!(host_matches("*", "anything.test"));
-    assert!(!host_matches("*.example.test", "deep.api.example.test"));
-    assert!(host_matches("api*.example.test", "api2.example.test"));
-    assert!(!host_matches("api*.example.test", "other.example.test"));
-    assert!(ip_matches("*", "192.0.2.1"));
-    assert!(ip_matches("192.0.*.*", "192.0.2.1:443"));
-    assert!(!ip_matches("192.0.2.2", "192.0.2.1"));
+    let globs = CompiledGlobSet::of(&[
+        ("api*.example.test", '.'),
+        ("192.0.*.*", '\0'),
+        (r"literal\*", '.'),
+        ("*", '\0'),
+        ("**", '\0'),
+        ("*/end", '/'),
+    ]);
+    assert!(globs.host_matches("*", "anything.test"));
+    assert!(!globs.host_matches("*.example.test", "deep.api.example.test"));
+    assert!(globs.host_matches("api*.example.test", "api2.example.test"));
+    assert!(!globs.host_matches("api*.example.test", "other.example.test"));
+    assert!(globs.ip_matches("*", "192.0.2.1"));
+    assert!(globs.ip_matches("192.0.*.*", &normalize_ip_value("192.0.2.1:443")));
+    assert!(!globs.ip_matches("192.0.2.2", "192.0.2.1"));
     assert!(path_prefix_matches("/", "/anything"));
-    assert!(glob_match(r"literal\*", "literal*", '.'));
-    assert!(!glob_match(r"literal\*", "literal-x", '.'));
+    assert!(globs.glob_match(r"literal\*", "literal*", '.'));
+    assert!(!globs.glob_match(r"literal\*", "literal-x", '.'));
+    assert!(!globs.glob_match("*", "left\0right", '\0'));
+    assert!(globs.glob_match("**", "left\0right", '\0'));
 
     let mut captures = Captures::default();
     captures.insert_index("kept".to_string());
-    assert!(!glob_match_with_captures(
-        "*/end",
-        "a/bad",
-        '/',
-        &mut captures
-    ));
+    assert!(!globs.glob_match_with_captures("*/end", "a/bad", '/', &mut captures));
     assert_eq!(captures.get_index(1), Some("kept"));
 
     let request = req("http://example.test/chance");
@@ -71,6 +106,45 @@ fn low_level_matching_rejects_invalid_and_boundary_patterns() {
     let deterministic = chance(&request, 9, 500);
     assert_eq!(chance(&request, 9, 500), deterministic);
     assert_eq!(header(&request.headers, "missing"), None);
+}
+
+#[test]
+fn glob_matching_is_bounded_non_greedy_and_capture_safe() {
+    let pattern = std::iter::repeat_n("*:", 12).collect::<String>() + "done";
+    let text = (0..12).map(|index| format!("{index}:")).collect::<String>() + "done";
+    let long = "a".repeat(MAX_RULE_LINE_BYTES);
+    let globs = CompiledGlobSet::of(&[
+        ("*/**/end", '/'),
+        (&pattern, '\0'),
+        ("*:*:missing", '\0'),
+        (&long, '/'),
+    ]);
+
+    let mut captures = Captures::default();
+    assert!(globs.glob_match_with_captures("*/**/end", "first/deep/path/end", '/', &mut captures));
+    assert_eq!(captures.get_index(1), Some("first"));
+    assert_eq!(captures.get_index(2), Some("deep/path"));
+
+    let mut captures = Captures::default();
+    captures.insert_index("existing".to_string());
+    assert!(globs.glob_match_with_captures(&pattern, &text, '\0', &mut captures));
+    assert_eq!(captures.indexed.len(), 9);
+    assert_eq!(captures.get_index(1), Some("existing"));
+    for index in 0..8 {
+        assert_eq!(
+            captures.get_index(index + 2),
+            Some(index.to_string().as_str())
+        );
+    }
+
+    let before = captures.clone();
+    assert!(!globs.glob_match_with_captures("*:*:missing", "one:two:done", '\0', &mut captures));
+    assert_eq!(captures, before);
+
+    // The former recursive matcher exhausted the stack on a long literal.
+    // The compiled linear matcher accepts the same maximum-size input without
+    // recursion or backtracking growth.
+    assert!(globs.glob_match(&long, &long, '/'));
 }
 
 #[test]
@@ -148,10 +222,20 @@ fn matcher_and_condition_rejection_paths_do_not_leak_captures() {
     assert!(
         Condition::Any(vec![Condition::BodyContains("x".to_string())]).depends_on_request_body()
     );
-    assert!(
-        Condition::Not(Box::new(Condition::BodyContains("x".to_string())))
-            .may_match_before_request_body(&request, Some(&url), 1)
+    let condition = Condition::Not(Box::new(Condition::BodyContains("x".to_string())));
+    let globs = CompiledGlobSet::for_condition(&condition);
+    let body_literals = CompiledBodyContainsSet::for_condition(&condition);
+    let resources = bind_condition_resources(&condition, &globs, &body_literals);
+    let cache = matcher::ConditionCache::new(&request);
+    let context = matcher::ConditionMatchContext::compiled(
+        Some(&url),
+        None,
+        1,
+        &globs,
+        &body_literals,
+        &cache,
     );
+    assert!(condition.may_match_before_request_body(&resources, &context));
 }
 
 #[test]
