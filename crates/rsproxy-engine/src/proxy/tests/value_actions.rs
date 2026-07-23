@@ -332,6 +332,43 @@ fn rendered_upstream_chains_reject_the_first_hop_beyond_the_limit() {
 }
 
 #[test]
+fn websocket_map_remote_targets_normalize_to_http_transport_after_capture_rendering() {
+    let mut request = meta("ws://socket.test/client");
+    request.headers = vec![
+        ("Upgrade".to_string(), "websocket".to_string()),
+        ("Connection".to_string(), "Upgrade".to_string()),
+    ];
+    let rules = RuleSet::parse(
+        "default",
+        r"/^ws:\/\/socket\.test\/(.*)$/ map.remote(wss://local.test/socket/$1)",
+    )
+    .unwrap();
+    let actions = rules.resolve(&request).actions;
+
+    assert_eq!(
+        apply_url_actions(
+            "http://socket.test/client",
+            &request,
+            &actions,
+            &test_state()
+        )
+        .unwrap(),
+        "https://local.test/socket/client"
+    );
+
+    request.headers.clear();
+    let error = apply_url_actions(
+        "http://socket.test/client",
+        &request,
+        &actions,
+        &test_state(),
+    )
+    .unwrap_err();
+    assert_eq!(error.kind(), io::ErrorKind::InvalidInput);
+    assert!(error.to_string().contains("requires an Upgrade request"));
+}
+
+#[test]
 fn mock_sources_render_text_and_preserve_binary_files() {
     let (state, storage) = state_with_storage("mock");
     write_storage(&storage, "values/mock-text", b"hello ${kind} $2 at ${path}");

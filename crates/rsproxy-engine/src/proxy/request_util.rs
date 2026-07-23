@@ -101,19 +101,51 @@ pub(super) fn absolute_url_for(
     req: &RawRequest,
     https_authority: Option<&str>,
 ) -> io::Result<String> {
-    if req.target.contains("://") {
-        return Ok(req.target.clone());
+    let absolute = if req.target.contains("://") {
+        req.target.clone()
+    } else if let Some(authority) = https_authority {
+        format!("https://{authority}{}", req.target)
+    } else {
+        let host = http::header(&req.headers, "host").ok_or_else(|| {
+            io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "origin-form request missing Host",
+            )
+        })?;
+        format!("http://{host}{}", req.target)
+    };
+    normalize_websocket_transport_scheme(&absolute)
+}
+
+/// Presents Upgrade requests to the rules layer as WebSocket URLs while the
+/// forwarding layer continues to use their HTTP(S) transport URL.
+pub(super) fn rule_url_for(transport_url: &str, headers: &[(String, String)]) -> String {
+    if !is_websocket_request(headers) {
+        return transport_url.to_string();
     }
-    if let Some(authority) = https_authority {
-        return Ok(format!("https://{authority}{}", req.target));
-    }
-    let host = http::header(&req.headers, "host").ok_or_else(|| {
-        io::Error::new(
-            io::ErrorKind::InvalidInput,
-            "origin-form request missing Host",
-        )
-    })?;
-    Ok(format!("http://{host}{}", req.target))
+    replace_url_scheme(transport_url, |scheme| match scheme {
+        "http" => Some("ws"),
+        "https" => Some("wss"),
+        _ => None,
+    })
+    .unwrap_or_else(|| transport_url.to_string())
+}
+
+fn normalize_websocket_transport_scheme(url: &str) -> io::Result<String> {
+    let parsed =
+        UrlParts::parse(url).map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error))?;
+    Ok(replace_url_scheme(url, |_| match parsed.scheme.as_str() {
+        "ws" => Some("http"),
+        "wss" => Some("https"),
+        _ => None,
+    })
+    .unwrap_or_else(|| url.to_string()))
+}
+
+fn replace_url_scheme(url: &str, replacement: impl FnOnce(&str) -> Option<&str>) -> Option<String> {
+    let (scheme, rest) = url.split_once("://")?;
+    let scheme = scheme.to_ascii_lowercase();
+    replacement(&scheme).map(|replacement| format!("{replacement}://{rest}"))
 }
 
 pub(super) fn host_header(url: &UrlParts) -> String {

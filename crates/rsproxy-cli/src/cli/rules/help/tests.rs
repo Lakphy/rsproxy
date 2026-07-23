@@ -203,6 +203,13 @@ fn exact_shorthand_ambiguity_category_and_search_are_deterministic() {
     assert_eq!(kind, "search");
     assert!(found.iter().any(|topic| topic.id == "action.res.header"));
     assert!(found.iter().any(|topic| topic.id == "condition.res.header"));
+
+    let (_, _, found) = select_topics(RulesHelpArgs {
+        topic: None,
+        search: Some("script hook program transform".to_string()),
+    })
+    .unwrap();
+    assert_eq!(found[0].id, "concept.scripting");
 }
 
 fn singular(category: &str) -> &str {

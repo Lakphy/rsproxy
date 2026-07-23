@@ -4,6 +4,26 @@ rsproxy is a Rust workspace split by domain. The executable is a composition
 root; protocol, policy, persistence, control, and operating-system concerns are
 kept behind crate boundaries.
 
+## Extension safety boundary
+
+The rule engine publishes typed, immutable actions; the proxy engine owns their
+bounded effects. It deliberately does not execute arbitrary host-language code
+from `script://`, `resScript://`, or a similar in-process hook. That boundary
+keeps action phase, body planning, protocol framing, lint, and output budgets
+visible before a ruleset is published.
+
+A future general-purpose transform must be a separately versioned sandbox
+component rather than another untyped `Action` payload. Its contract must:
+
+- receive a bounded request or response snapshot and return a typed patch;
+- deny filesystem, process, and network capabilities by default;
+- enforce wall-time, instruction/fuel, memory, input, and output limits;
+- make capability grants explicit in configuration, not rule text; and
+- fail one transform without compromising the proxy process or framing state.
+
+Typed actions remain the preferred extension path for common migrations such as
+CORS, header/body changes, JSON merge, and content injection.
+
 ## Workspace map
 
 | Path | Responsibility | Must not own |

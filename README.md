@@ -121,7 +121,9 @@ api.example.com/large throttle(res, 1MB/s)
 
 `map.remote` serves the request from the target backend without a redirect —
 the browser URL never changes (the Whistle `域名 localhost:3000` / Charles Map
-Remote workflow).
+Remote workflow). It accepts `ws://` and `wss://` targets for WebSocket Upgrade
+requests, including capture-based path remaps; the proxy preserves the Upgrade
+handshake and uses the corresponding HTTP(S) transport internally.
 
 Validate, lint, and install a rule group:
 

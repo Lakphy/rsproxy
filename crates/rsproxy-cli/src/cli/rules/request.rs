@@ -5,11 +5,15 @@ use rsproxy_control::api_request;
 use rsproxy_rules::{RequestMeta, ResponseMeta, UrlParts};
 use std::path::Path;
 
+use super::advisory::{print_advisories, request_advisories};
+use super::groups::load_rule_set;
+
 pub(super) fn run_rules_test(
     args: RulesTestArgs,
     json: bool,
     api: &str,
     storage: &Path,
+    no_mitm: bool,
 ) -> CliResult<()> {
     let request = request_meta(&args.request, args.url)?;
     let response = response_meta(args.response_status.as_deref(), &args.response_header)?;
@@ -27,6 +31,8 @@ pub(super) fn run_rules_test(
             }
         }
     };
+    let rules = load_rule_set(None, api, storage)?;
+    let advisories = request_advisories(&rules, &request, storage, no_mitm);
     if json {
         println!(
             "{}",
@@ -34,10 +40,20 @@ pub(super) fn run_rules_test(
                 "url": request.url,
                 "phase": if response.is_some() { "response" } else { "request" },
                 "explain": explain,
+                "warnings": advisories
+                    .iter()
+                    .map(super::advisory::EnvironmentAdvisory::to_json)
+                    .collect::<Vec<_>>(),
             })
         );
     } else {
         print!("{explain}");
+        if !advisories.is_empty() {
+            if !explain.ends_with('\n') {
+                println!();
+            }
+            print_advisories(&advisories);
+        }
     }
     Ok(())
 }

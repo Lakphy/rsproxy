@@ -38,3 +38,37 @@ fn throttle_pacer_normalizes_programmatic_zero_rates() {
 
     assert_eq!(pacer.bytes_per_sec, Some(1));
 }
+
+#[test]
+fn websocket_urls_have_distinct_rule_and_transport_schemes() {
+    let request = RawRequest {
+        method: "GET".to_string(),
+        target: "ws://socket.test/live".to_string(),
+        version: "HTTP/1.1".to_string(),
+        headers: vec![
+            ("Host".to_string(), "socket.test".to_string()),
+            ("Upgrade".to_string(), "websocket".to_string()),
+            ("Connection".to_string(), "Upgrade".to_string()),
+        ],
+        body: Vec::new(),
+        trailers: Vec::new(),
+    };
+
+    let transport = absolute_url_for(&request, None).unwrap();
+    assert_eq!(transport, "http://socket.test/live");
+    assert_eq!(rule_url_for(&transport, &request.headers), request.target);
+
+    let secure_transport = absolute_url_for(
+        &RawRequest {
+            target: "/live".to_string(),
+            ..request.clone()
+        },
+        Some("socket.test"),
+    )
+    .unwrap();
+    assert_eq!(secure_transport, "https://socket.test/live");
+    assert_eq!(
+        rule_url_for(&secure_transport, &request.headers),
+        "wss://socket.test/live"
+    );
+}

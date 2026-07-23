@@ -30,9 +30,10 @@ pub(in crate::proxy) fn handle_http_head<W: WsIo + Send>(
     }
 
     let full_url = absolute_url_for(&head.request, connection.https_authority.as_deref())?;
+    let rule_url = rule_url_for(&full_url, &head.request.headers);
     let planning_meta = RequestMeta {
         method: head.request.method.clone(),
-        url: full_url.clone(),
+        url: rule_url,
         headers: head.request.headers.clone(),
         body: Vec::new(),
         client_ip: Some(connection.peer.clone()),

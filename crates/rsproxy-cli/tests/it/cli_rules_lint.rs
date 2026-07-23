@@ -223,3 +223,78 @@ fn rules_lint_reports_same_rule_semantic_findings() {
 
     std::fs::remove_dir_all(&storage).ok();
 }
+
+#[test]
+fn map_remote_check_and_mitm_advisories_cover_websocket_migrations() {
+    let storage = temp_storage("map-remote-websocket");
+    std::fs::create_dir_all(&storage).unwrap();
+    let websocket_rules = concat!(
+        "@language 3\n",
+        "/^wss?:\\/\\/socket\\.test\\/(.*)$/ ",
+        "map.remote(wss://127.0.0.1:3000/$1)\n"
+    );
+    let rules_path = storage.join("websocket.rules");
+    std::fs::write(&rules_path, websocket_rules).unwrap();
+
+    let output = run(
+        &storage,
+        &["rules", "check", rules_path.to_str().unwrap()],
+        None,
+    );
+    assert!(output.status.success());
+
+    let invalid_path = storage.join("invalid.rules");
+    std::fs::write(
+        &invalid_path,
+        "@language 3\nsocket.test map.remote(socks5://127.0.0.1:1080/$1)\n",
+    )
+    .unwrap();
+    let output = run(
+        &storage,
+        &["rules", "check", invalid_path.to_str().unwrap()],
+        None,
+    );
+    assert_eq!(output.status.code(), Some(1));
+    assert!(String::from_utf8_lossy(&output.stderr).contains("must use http, https, ws, or wss"));
+
+    let output = run(
+        &storage,
+        &[
+            "rules",
+            "set",
+            "default",
+            "--file",
+            rules_path.to_str().unwrap(),
+        ],
+        None,
+    );
+    assert!(output.status.success());
+
+    let output = run(&storage, &["rules", "test", "wss://socket.test/live"], None);
+    assert!(output.status.success());
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    assert!(stdout.contains("map.remote(wss://127.0.0.1:3000/live)"));
+    assert!(stdout.contains("warning[https-mitm-unavailable]"));
+    assert!(stdout.contains("rsproxy ca init && rsproxy ca install"));
+
+    let output = run(&storage, &["rules", "lint", "--json"], None);
+    assert!(output.status.success());
+    let value: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(value["ok"], serde_json::json!(true));
+    assert_eq!(
+        value["warnings"][0]["kind"],
+        serde_json::json!("https-mitm-unavailable")
+    );
+
+    let output = run(&storage, &["ca", "init"], None);
+    assert!(output.status.success());
+    let output = run(&storage, &["rules", "test", "wss://socket.test/live"], None);
+    assert!(output.status.success());
+    assert!(
+        !String::from_utf8(output.stdout)
+            .unwrap()
+            .contains("https-mitm-unavailable")
+    );
+
+    std::fs::remove_dir_all(&storage).ok();
+}

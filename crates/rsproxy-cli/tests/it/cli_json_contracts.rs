@@ -75,9 +75,10 @@ fn offline_query_commands_emit_stable_json_shapes() {
         &["rules", "test", "http://contract.test/", "--json"],
         None,
     );
-    assert_exact_keys(&explain, &["explain", "phase", "url"]);
+    assert_exact_keys(&explain, &["explain", "phase", "url", "warnings"]);
     assert_eq!(explain["phase"], "request");
     assert!(explain["explain"].as_str().unwrap().contains("status(204)"));
+    assert_eq!(explain["warnings"], json!([]));
 
     let bench = run_json(
         &storage,

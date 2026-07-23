@@ -22,19 +22,35 @@ pub(in crate::proxy) fn apply_url_actions(
                         format!("map.remote target `{rendered}`: {e}"),
                     )
                 })?;
-                if target.scheme != "http" && target.scheme != "https" {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidInput,
-                        format!("map.remote target must use http or https: {rendered}"),
-                    ));
-                }
+                let target_scheme = match target.scheme.as_str() {
+                    "http" => "http",
+                    "https" => "https",
+                    "ws" if is_websocket_request(&meta.headers) => "http",
+                    "wss" if is_websocket_request(&meta.headers) => "https",
+                    "ws" | "wss" => {
+                        return Err(io::Error::new(
+                            io::ErrorKind::InvalidInput,
+                            format!(
+                                "map.remote WebSocket target requires an Upgrade request: {rendered}"
+                            ),
+                        ));
+                    }
+                    _ => {
+                        return Err(io::Error::new(
+                            io::ErrorKind::InvalidInput,
+                            format!(
+                                "map.remote target must use http, https, ws, or wss: {rendered}"
+                            ),
+                        ));
+                    }
+                };
                 // A target without an explicit path keeps the original path
                 // and query; an explicit path (even a bare `/`) replaces both.
                 let explicit_path = rendered
                     .trim()
                     .split_once("://")
                     .is_some_and(|(_, rest)| rest.contains('/') || rest.contains('?'));
-                url.scheme = target.scheme;
+                url.scheme = target_scheme.to_string();
                 url.host = target.host;
                 url.port = target.port;
                 if explicit_path {

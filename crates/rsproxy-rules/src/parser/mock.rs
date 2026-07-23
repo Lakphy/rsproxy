@@ -83,19 +83,31 @@ pub(super) fn parse_mock(args: &[&str]) -> Result<Action, RuleModelError> {
 }
 
 pub(super) fn validate_map_remote_target(value: &Value) -> Result<(), RuleModelError> {
-    // Only literal inline targets are validated at parse time; templated,
-    // file-backed, and referenced targets resolve when the request runs.
+    // File-backed and referenced targets resolve when the request runs. Inline
+    // templates still expose a static scheme prefix in common capture forms,
+    // so reject known-unsupported schemes before publishing the snapshot.
     let Value::Inline(target) = value else {
         return Ok(());
     };
-    if target.contains('$') {
+    let target = target.trim();
+    if let Some(template_start) = target.find('$') {
+        if let Some((scheme, _)) = target[..template_start].split_once("://") {
+            return validate_map_remote_scheme(scheme, target);
+        }
         return Ok(());
     }
     let parsed = UrlParts::parse(target)?;
-    if !matches!(parsed.scheme.as_str(), "http" | "https") {
+    validate_map_remote_scheme(&parsed.scheme, target)
+}
+
+fn validate_map_remote_scheme(scheme: &str, target: &str) -> Result<(), RuleModelError> {
+    if !matches!(
+        scheme.to_ascii_lowercase().as_str(),
+        "http" | "https" | "ws" | "wss"
+    ) {
         return Err(RuleModelError::invalid(
             "map.remote target",
-            format!("map.remote target must use http or https; got `{target}`"),
+            format!("map.remote target must use http, https, ws, or wss; got `{target}`"),
         ));
     }
     Ok(())

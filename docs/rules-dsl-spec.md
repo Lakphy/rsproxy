@@ -106,7 +106,7 @@ requires response metadata can never execute and is reported by `rules lint`.
 | `mock(status=..., type=..., header=..., body=...)` | `mock(status=503, type=application/json, header=X-Mock: yes, body={"ok":false})` | One-stop inline mock: combine a final status (default 200, range 200–599), Content-Type, repeatable `header=Name: value` entries, and a body (inline, `@key`, or `<file>`) in one action; 204/205/304 reject a body |
 | `mock.raw(value)` | `mock.raw("HTTP/1.1 207 Multi-Status\r\nX-Raw: yes\r\n\r\nbody")` | Short-circuit with raw status line, headers, and body |
 <!-- corpus:action-map-remote-transparent-forward -->
-| `map.remote(url)` | `map.remote(http://localhost:3000)` / `/^https:\/\/a.test\/(.*)$/ map.remote(http://localhost:3000/$1)` | Transparent reverse proxy (Whistle `pattern target`, Charles Map Remote): the request is served by the target backend while the client-visible URL is unchanged — no 30x is sent. A target without a path keeps the original path and query; an explicit target path (captures such as `$1` supported) replaces them. The upstream `Host` header and TLS follow the target. Aliases: `mapRemote`, `map_remote`, `map-remote` |
+| `map.remote(url)` | `map.remote(http://localhost:3000)` / `/^wss?:\/\/a.test\/(.*)$/ map.remote(wss://localhost:3000/$1)` | Transparent reverse proxy (Whistle `pattern target`, Charles Map Remote): the request is served by the target backend while the client-visible URL is unchanged — no 30x is sent. Targets may use `http`, `https`, `ws`, or `wss`. A target without a path keeps the original path and query; an explicit target path (captures such as `$1` supported) replaces them. WebSocket Upgrade requests are matched with their logical `ws`/`wss` URL, while forwarding normalizes to the corresponding HTTP(S) transport and preserves the Upgrade handshake. `ws`/`wss` targets reject non-Upgrade requests. The upstream `Host` header and TLS follow the target. Static inline scheme prefixes are validated even when the path is templated. Aliases: `mapRemote`, `map_remote`, `map-remote` |
 | `status(code)` | `status(410)` | Short-circuit with a final 200–599 status response; 204/205/304 cannot carry response content |
 | `redirect(url[, code])` | `redirect(https://a.test, 302)` | Short-circuit with 301, 302, 303, 307, or 308 (default 302) |
 <!-- corpus:action-header-regex-replace -->
@@ -305,6 +305,13 @@ including `pipe`, `sniCallback`, general `tpl`, write-to-file actions, request
 CORS, PAC/style, log, and Weinre. This is an executable migration reference, not
 the planned v2 `rules import --from-whistle` converter.
 
+Whistle `script://` and `resScript://` are also not executable rule actions.
+Use typed request/response header, body, CORS, merge, and injection actions
+where possible. `rsproxy rules help concept.scripting` documents the extension
+boundary: any future general program hook must run behind a separately
+versioned sandbox with explicit capabilities and resource budgets, rather than
+executing arbitrary host code inside the proxy.
+
 ## Conditions
 
 Supported now:
@@ -421,6 +428,13 @@ parse errors. Regex matcher captures support `$0` for the complete match,
 `$1` through `$9`, and `${name}`; glob wildcards populate `$1` through `$9`.
 
 `rsproxy rules test <url> [-X METHOD] [-H 'Name: value']... [--body TEXT|-d TEXT] [--client-ip IP] [--server-ip IP] [--response-status CODE] [--response-header 'Name: value']...` injects the same request and optional response metadata used by the proxy path. The response options work through both the authenticated control API and offline storage fallback. `rules bench` remains request-only. Quote URLs containing `?` or `&` (zsh expands them as globs): `rsproxy rules test 'https://x.test/api?a=1'`.
+
+When a concrete HTTPS/WSS test resolves `map.remote`, `rules test` reports the
+non-fatal `https-mitm-unavailable` warning if MITM is disabled or the selected
+storage has no initialized CA. `rules lint` reports the same condition
+conservatively when the ruleset contains `map.remote`; the warning is separate
+from semantic findings and does not change lint's exit status. Initialize and
+trust the CA with `rsproxy ca init && rsproxy ca install`, then restart rsproxy.
 
 ## Scope and Limits
 

@@ -74,9 +74,10 @@ pub(super) fn handle_http_stream_inner<W: WsIo + Send>(
         client_connection,
     } = connection;
     let full_url = absolute_url_for(&req, https_authority.as_deref())?;
+    let rule_url = rule_url_for(&full_url, &req.headers);
     let meta = RequestMeta {
         method: req.method.clone(),
-        url: full_url.clone(),
+        url: rule_url,
         headers: req.headers.clone(),
         body: req.body.clone(),
         client_ip: Some(peer.clone()),

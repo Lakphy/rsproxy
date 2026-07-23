@@ -182,4 +182,27 @@ pub(super) const TOPICS: &[Topic] = &[
         ["groups", "rule-groups"],
         ["concept.ordering"]
     ),
+    topic!(
+        "concept.scripting",
+        "concepts",
+        "Scripting compatibility and the bounded transform-extension policy.",
+        [
+            "script:// and resScript://: unsupported",
+            "prefer typed request, response, body, CORS, inject, and merge actions"
+        ],
+        ["example.test res.cors(origin=*)"],
+        [
+            "rsproxy does not execute an arbitrary user script, program, or in-process hook from a rule.",
+            "Typed transform actions remain bounded, phase-aware, lintable, and safe to run in the proxy process.",
+            "A future general extension must use a separately versioned sandbox boundary with explicit capabilities, time, memory, input, and output budgets; raw host-code execution is not a compatible additive rule change."
+        ],
+        [
+            "script",
+            "scripting",
+            "program-hook",
+            "resScript",
+            "script-hook-transform"
+        ],
+        ["action.inject", "action.res.cors", "action.res.merge"]
+    ),
 ];

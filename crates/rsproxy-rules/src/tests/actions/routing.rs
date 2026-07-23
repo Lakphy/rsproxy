@@ -111,18 +111,26 @@ fn map_remote_keeps_only_the_first_match() {
 }
 
 #[test]
-fn map_remote_rejects_literal_targets_without_http_scheme() {
+fn map_remote_accepts_websocket_targets_and_rejects_static_unsupported_schemes() {
+    for source in [
+        "example.test map.remote(ws://127.0.0.1:3000)",
+        "example.test map.remote(wss://127.0.0.1:3000/socket/$1)",
+    ] {
+        RuleSet::parse("default", source).unwrap();
+    }
     for source in [
         "example.test map.remote(localhost:3000)",
         "example.test map.remote(socks5://127.0.0.1:1080)",
+        "example.test map.remote(socks5://127.0.0.1:1080/$1)",
     ] {
         let errors =
-            RuleSet::parse("default", source).expect_err("non-http literal target must fail");
+            RuleSet::parse("default", source).expect_err("unsupported static scheme must fail");
         assert_eq!(errors[0].code, RuleErrorCode::Action);
     }
-    // Templated, file, and reference targets defer validation to execution.
+    // A dynamic scheme plus file and reference targets defer validation to execution.
     for source in [
         "example.test map.remote(${reqH.x-target})",
+        "example.test map.remote(${reqH.x-scheme}://127.0.0.1:3000)",
         "example.test map.remote(@target)",
         "example.test map.remote(<target.txt>)",
     ] {

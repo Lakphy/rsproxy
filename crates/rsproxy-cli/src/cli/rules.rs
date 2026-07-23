@@ -1,3 +1,4 @@
+mod advisory;
 mod bench;
 pub(crate) mod groups;
 mod help;
@@ -7,6 +8,7 @@ use super::command::{RulesArgs, RulesCommand, RulesMigrateArgs, RuntimeArgs};
 use super::config::runtime_config;
 use super::util::{read_stdin_bounded, read_utf8_file_bounded};
 use crate::{CliError, CliResult, RuleDiagnostics};
+use advisory::{lint_advisories, print_advisories};
 use groups::{
     load_rule_set, run_rules_cat, run_rules_edit, run_rules_list, run_rules_remove, run_rules_set,
     run_rules_toggle,
@@ -29,6 +31,7 @@ pub(super) fn rules_cmd(args: RulesArgs, json: bool) -> CliResult<()> {
     let config = runtime_config(&RuntimeArgs::from_client(args.client))?;
     let api = config.api.clone();
     let storage = config.engine().storage.clone();
+    let no_mitm = config.engine().no_mitm;
     // `rsproxy rules` with no subcommand defaults to listing groups, matching
     // the default-status behavior of `ca` and `proxy`.
     let Some(command) = command else {
@@ -68,6 +71,7 @@ pub(super) fn rules_cmd(args: RulesArgs, json: bool) -> CliResult<()> {
             let rules = load_rule_set(args.file.as_deref(), &api, &storage)?;
             let shadow_report = rules.lint_report();
             let semantic_report = rules.semantic_lint_report();
+            let advisories = lint_advisories(&rules, &storage, no_mitm);
             let shadow_findings = &shadow_report.findings;
             let semantic_findings = &semantic_report.findings;
             let complete = shadow_report.complete && semantic_report.complete;
@@ -117,6 +121,10 @@ pub(super) fn rules_cmd(args: RulesArgs, json: bool) -> CliResult<()> {
                             "report_bytes": MAX_RULE_LINT_REPORT_BYTES,
                         },
                         "findings": findings,
+                        "warnings": advisories
+                            .iter()
+                            .map(advisory::EnvironmentAdvisory::to_json)
+                            .collect::<Vec<_>>(),
                     })
                 );
             } else if finding_count == 0 && complete {
@@ -166,6 +174,10 @@ pub(super) fn rules_cmd(args: RulesArgs, json: bool) -> CliResult<()> {
                     );
                 }
             }
+            if !json && !advisories.is_empty() {
+                println!();
+                print_advisories(&advisories);
+            }
             if finding_count == 0 && complete {
                 Ok(())
             } else if !complete {
@@ -210,7 +222,7 @@ pub(super) fn rules_cmd(args: RulesArgs, json: bool) -> CliResult<()> {
             Ok(())
         }
         RulesCommand::Bench(args) => bench::run_rules_bench(args, json, &api, &storage),
-        RulesCommand::Test(args) => request::run_rules_test(args, json, &api, &storage),
+        RulesCommand::Test(args) => request::run_rules_test(args, json, &api, &storage, no_mitm),
     }
 }
 

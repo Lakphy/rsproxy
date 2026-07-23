@@ -58,10 +58,15 @@ pub(super) const TOPICS: &[Topic] = &[
         "action.map.remote",
         "actions",
         "Transparently replace the request origin without sending a redirect.",
-        ["map.remote(HTTP_URL)"],
-        ["example.test map.remote(http://127.0.0.1:3000)"],
+        ["map.remote(HTTP_OR_WEBSOCKET_URL)"],
+        [
+            "example.test map.remote(http://127.0.0.1:3000)",
+            "/^wss?:\\/\\/socket\\.test\\/(.*)$/ map.remote(wss://127.0.0.1:3000/$1)"
+        ],
         [
             "A target without a path retains the original path/query; an explicit path replaces them.",
+            "ws/wss targets apply only to WebSocket Upgrade requests. Rules match their logical ws/wss URL while forwarding reuses the equivalent http/https transport.",
+            "Inline targets with a static scheme prefix are validated even when their path contains captures.",
             "Aliases: mapRemote, map_remote, map-remote."
         ],
         ["mapRemote", "map_remote", "map-remote", "map-remote-action"],

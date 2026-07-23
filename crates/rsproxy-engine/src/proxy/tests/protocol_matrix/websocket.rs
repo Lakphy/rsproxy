@@ -19,7 +19,7 @@ fn websocket_upgrade_forwards_server_first_and_client_frames_over_real_sockets()
         let head = http::read_request_head(&mut stream, 64 * 1024, 128)
             .unwrap()
             .unwrap();
-        assert_eq!(head.request.target, "/socket");
+        assert_eq!(head.request.target, "/socket/client");
         assert!(is_websocket_request(&head.request.headers));
         stream
             .write_all(
@@ -41,22 +41,22 @@ fn websocket_upgrade_forwards_server_first_and_client_frames_over_real_sockets()
     });
     let state = isolated_state(
         "protocol-websocket",
-        "127.0.0.1 res.header(x-matrix-websocket: yes) when status(101)",
+        &format!(
+            "=ws://map-ws.test/client map.remote(ws://{origin_address}/socket/client)\n\
+             map-ws.test res.header(x-matrix-websocket: yes) when status(101)"
+        ),
     );
     let (proxy, proxy_server) = spawn_proxy(state.clone(), 1);
     let mut client = connect_client(proxy);
     client
         .write_all(
-            format!(
-                "GET http://{origin_address}/socket HTTP/1.1\r\nHost: {origin_address}\r\nUpgrade: websocket\r\nConnection: keep-alive, Upgrade\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\n\r\n"
-            )
-            .as_bytes(),
+            b"GET http://map-ws.test/client HTTP/1.1\r\nHost: map-ws.test\r\nUpgrade: websocket\r\nConnection: keep-alive, Upgrade\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\n\r\n",
         )
         .unwrap();
     client.flush().unwrap();
 
     let response = http::read_response_head(&mut client, 64 * 1024, 128).unwrap();
-    assert_eq!(response.status, 101);
+    assert_eq!(response.status, 101, "sessions: {:?}", state.trace.list(2));
     assert_eq!(
         http::header(&response.headers, "x-origin-websocket"),
         Some("yes")
